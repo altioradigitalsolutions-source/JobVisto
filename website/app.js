@@ -1,21 +1,21 @@
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
-const supabase = window.supabase ? window.supabase.createClient(
+const supabaseClient = window.supabase ? window.supabase.createClient(
   window.JOBVISTO_CONFIG?.supabaseUrl || "",
   window.JOBVISTO_CONFIG?.supabaseAnonKey || ""
 ) : null;
 
 // Supabase Data Integration Helpers
 async function loadStateFromSupabase() {
-  if (!supabase) return;
+  if (!supabaseClient) return;
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await supabaseClient.auth.getUser();
     if (!user) return;
     state.user = user;
 
     // Fetch profile
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+    const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', user.id).maybeSingle();
     if (profile) {
       state.companyProfile.ownerName = profile.full_name || state.companyProfile.ownerName;
       state.companyProfile.email = profile.email || state.companyProfile.email;
@@ -23,13 +23,13 @@ async function loadStateFromSupabase() {
     }
 
     // Fetch membership
-    const { data: memberships } = await supabase.from('organization_members').select('*').eq('user_id', user.id).eq('status', 'active');
+    const { data: memberships } = await supabaseClient.from('organization_members').select('*').eq('user_id', user.id).eq('status', 'active');
     if (memberships && memberships.length > 0) {
       const orgId = memberships[0].organization_id;
       state.orgId = orgId;
 
       // Fetch organization details
-      const { data: org } = await supabase.from('organizations').select('*').eq('id', orgId).maybeSingle();
+      const { data: org } = await supabaseClient.from('organizations').select('*').eq('id', orgId).maybeSingle();
       if (org) {
         state.mode = org.type;
         state.country = org.country;
@@ -38,7 +38,7 @@ async function loadStateFromSupabase() {
       }
 
       // Fetch clients
-      const { data: clients } = await supabase.from('clients').select('*').eq('organization_id', orgId);
+      const { data: clients } = await supabaseClient.from('clients').select('*').eq('organization_id', orgId);
       if (clients) {
         state.clients = clients.map(c => ({
           id: c.id,
@@ -53,7 +53,7 @@ async function loadStateFromSupabase() {
       }
 
       // Fetch client addresses
-      const { data: addresses } = await supabase.from('client_addresses').select('*').eq('organization_id', orgId);
+      const { data: addresses } = await supabaseClient.from('client_addresses').select('*').eq('organization_id', orgId);
       if (addresses) {
         state.clients.forEach(c => {
           const addr = addresses.find(a => a.client_id === c.id);
@@ -62,7 +62,7 @@ async function loadStateFromSupabase() {
       }
 
       // Fetch cleaners
-      const { data: cleaners } = await supabase.from('cleaners').select('*').eq('organization_id', orgId);
+      const { data: cleaners } = await supabaseClient.from('cleaners').select('*').eq('organization_id', orgId);
       if (cleaners) {
         state.cleaners = cleaners.map(c => ({
           id: c.id,
@@ -75,13 +75,13 @@ async function loadStateFromSupabase() {
       }
 
       // Fetch job evidence
-      const { data: evidence } = await supabase.from('job_evidence').select('*').eq('organization_id', orgId);
+      const { data: evidence } = await supabaseClient.from('job_evidence').select('*').eq('organization_id', orgId);
 
       // Fetch client signatures
-      const { data: signatures } = await supabase.from('client_signatures').select('*').eq('organization_id', orgId);
+      const { data: signatures } = await supabaseClient.from('client_signatures').select('*').eq('organization_id', orgId);
 
       // Fetch jobs
-      const { data: jobs } = await supabase.from('jobs').select('*').eq('organization_id', orgId);
+      const { data: jobs } = await supabaseClient.from('jobs').select('*').eq('organization_id', orgId);
       if (jobs) {
         state.jobs = jobs.map(j => {
           const dateStr = j.scheduled_start ? j.scheduled_start.slice(0, 10) : today();
@@ -135,7 +135,7 @@ async function loadStateFromSupabase() {
       }
 
       // Fetch receipts
-      const { data: receipts } = await supabase.from('payment_receipts').select('*').eq('organization_id', orgId);
+      const { data: receipts } = await supabaseClient.from('payment_receipts').select('*').eq('organization_id', orgId);
       if (receipts) {
         state.receipts = receipts.map(r => ({
           id: r.id,
@@ -206,12 +206,12 @@ function ensureValidUuids() {
 }
 
 async function asyncSaveToSupabase() {
-  if (!supabase || !state.orgId || !state.user) return;
+  if (!supabaseClient || !state.orgId || !state.user) return;
   try {
     ensureValidUuids();
 
     // 1. Sync profile
-    await supabase.from('profiles').upsert({
+    await supabaseClient.from('profiles').upsert({
       id: state.user.id,
       full_name: state.companyProfile.ownerName,
       email: state.companyProfile.email,
@@ -220,7 +220,7 @@ async function asyncSaveToSupabase() {
     });
 
     // 2. Sync organization details
-    await supabase.from('organizations').update({
+    await supabaseClient.from('organizations').update({
       name: state.companyProfile.businessName,
       type: state.mode,
       country: state.country,
@@ -231,14 +231,14 @@ async function asyncSaveToSupabase() {
     const currentClientIds = state.clients.map(c => c.id).filter(Boolean);
     if (currentClientIds.length > 0) {
       const formattedIds = currentClientIds.map(id => `'${id}'`).join(',');
-      await supabase.from('clients').delete().eq('organization_id', state.orgId).not('id', 'in', `(${formattedIds})`);
+      await supabaseClient.from('clients').delete().eq('organization_id', state.orgId).not('id', 'in', `(${formattedIds})`);
     } else {
-      await supabase.from('clients').delete().eq('organization_id', state.orgId);
+      await supabaseClient.from('clients').delete().eq('organization_id', state.orgId);
     }
 
     // 4. Sync clients & addresses
     for (const client of state.clients) {
-      await supabase.from('clients').upsert({
+      await supabaseClient.from('clients').upsert({
         id: client.id,
         organization_id: state.orgId,
         name: client.name,
@@ -250,7 +250,7 @@ async function asyncSaveToSupabase() {
       });
 
       if (client.address) {
-        await supabase.from('client_addresses').upsert({
+        await supabaseClient.from('client_addresses').upsert({
           organization_id: state.orgId,
           client_id: client.id,
           address_line: client.address
@@ -262,14 +262,14 @@ async function asyncSaveToSupabase() {
     const currentCleanerIds = state.cleaners.map(c => c.id).filter(Boolean);
     if (currentCleanerIds.length > 0) {
       const formattedIds = currentCleanerIds.map(id => `'${id}'`).join(',');
-      await supabase.from('cleaners').delete().eq('organization_id', state.orgId).not('id', 'in', `(${formattedIds})`);
+      await supabaseClient.from('cleaners').delete().eq('organization_id', state.orgId).not('id', 'in', `(${formattedIds})`);
     } else {
-      await supabase.from('cleaners').delete().eq('organization_id', state.orgId);
+      await supabaseClient.from('cleaners').delete().eq('organization_id', state.orgId);
     }
 
     // 6. Sync cleaners
     for (const cleaner of state.cleaners) {
-      await supabase.from('cleaners').upsert({
+      await supabaseClient.from('cleaners').upsert({
         id: cleaner.id,
         organization_id: state.orgId,
         name: cleaner.name,
@@ -284,9 +284,9 @@ async function asyncSaveToSupabase() {
     const currentJobIds = state.jobs.map(j => j.id).filter(Boolean);
     if (currentJobIds.length > 0) {
       const formattedIds = currentJobIds.map(id => `'${id}'`).join(',');
-      await supabase.from('jobs').delete().eq('organization_id', state.orgId).not('id', 'in', `(${formattedIds})`);
+      await supabaseClient.from('jobs').delete().eq('organization_id', state.orgId).not('id', 'in', `(${formattedIds})`);
     } else {
-      await supabase.from('jobs').delete().eq('organization_id', state.orgId);
+      await supabaseClient.from('jobs').delete().eq('organization_id', state.orgId);
     }
 
     // 8. Sync jobs
@@ -301,7 +301,7 @@ async function asyncSaveToSupabase() {
                        job.status === 'Terminado por cleaner' ? 'cleaner_finished' :
                        job.status === 'Confirmado por cliente' ? 'client_confirmed' : 'scheduled';
 
-      await supabase.from('jobs').upsert({
+      await supabaseClient.from('jobs').upsert({
         id: job.id,
         organization_id: state.orgId,
         client_id: job.clientId,
@@ -318,8 +318,8 @@ async function asyncSaveToSupabase() {
 
       // Sync signatures
       if (job.siteSignature) {
-        await supabase.from('client_signatures').delete().eq('job_id', job.id).eq('signed_from', 'cleaner_device');
-        await supabase.from('client_signatures').insert({
+        await supabaseClient.from('client_signatures').delete().eq('job_id', job.id).eq('signed_from', 'cleaner_device');
+        await supabaseClient.from('client_signatures').insert({
           organization_id: state.orgId,
           job_id: job.id,
           signer_name: job.siteSignerName || 'Persona en sitio',
@@ -329,8 +329,8 @@ async function asyncSaveToSupabase() {
       }
 
       if (job.clientSignature) {
-        await supabase.from('client_signatures').delete().eq('job_id', job.id).eq('signed_from', 'private_link');
-        await supabase.from('client_signatures').insert({
+        await supabaseClient.from('client_signatures').delete().eq('job_id', job.id).eq('signed_from', 'private_link');
+        await supabaseClient.from('client_signatures').insert({
           organization_id: state.orgId,
           job_id: job.id,
           signer_name: 'Cliente',
@@ -343,7 +343,7 @@ async function asyncSaveToSupabase() {
       if (Array.isArray(job.evidence)) {
         for (const ev of job.evidence) {
           const dbPhase = ev.phase === 'Antes' ? 'before' : 'after';
-          await supabase.from('job_evidence').upsert({
+          await supabaseClient.from('job_evidence').upsert({
             id: ev.id,
             organization_id: state.orgId,
             job_id: job.id,
@@ -360,24 +360,24 @@ async function asyncSaveToSupabase() {
     const currentEvidenceIds = state.jobs.flatMap(j => (j.evidence || []).map(e => e.id)).filter(Boolean);
     if (currentEvidenceIds.length > 0) {
       const formattedIds = currentEvidenceIds.map(id => `'${id}'`).join(',');
-      await supabase.from('job_evidence').delete().eq('organization_id', state.orgId).not('id', 'in', `(${formattedIds})`);
+      await supabaseClient.from('job_evidence').delete().eq('organization_id', state.orgId).not('id', 'in', `(${formattedIds})`);
     } else {
-      await supabase.from('job_evidence').delete().eq('organization_id', state.orgId);
+      await supabaseClient.from('job_evidence').delete().eq('organization_id', state.orgId);
     }
 
     // 10. Clean up deleted payment receipts
     const currentReceiptIds = state.receipts.map(r => r.id).filter(Boolean);
     if (currentReceiptIds.length > 0) {
       const formattedIds = currentReceiptIds.map(id => `'${id}'`).join(',');
-      await supabase.from('payment_receipts').delete().eq('organization_id', state.orgId).not('id', 'in', `(${formattedIds})`);
+      await supabaseClient.from('payment_receipts').delete().eq('organization_id', state.orgId).not('id', 'in', `(${formattedIds})`);
     } else {
-      await supabase.from('payment_receipts').delete().eq('organization_id', state.orgId);
+      await supabaseClient.from('payment_receipts').delete().eq('organization_id', state.orgId);
     }
 
     // 11. Sync receipts
     for (const receipt of state.receipts) {
       const [start, end] = receipt.period ? receipt.period.split(" - ") : [today(), today()];
-      await supabase.from('payment_receipts').upsert({
+      await supabaseClient.from('payment_receipts').upsert({
         id: receipt.id,
         organization_id: state.orgId,
         cleaner_id: receipt.cleanerId || state.cleaners.find(c => c.name === receipt.cleaner)?.id,
@@ -1332,7 +1332,7 @@ function save() {
   localStorage.setItem("jobvisto-cost-rules", JSON.stringify(state.costRules));
   localStorage.setItem("jobvisto-company-profile", JSON.stringify(state.companyProfile));
   
-  if (supabase && state.orgId && state.user) {
+  if (supabaseClient && state.orgId && state.user) {
     asyncSaveToSupabase();
   }
 }
@@ -4279,13 +4279,13 @@ async function loadAndRenderAdminPayments() {
   const listEl = $("#adminPaymentsList");
   if (!listEl) return;
   
-  if (!supabase) {
+  if (!supabaseClient) {
     listEl.innerHTML = "<p class='muted'>Supabase no esta configurado.</p>";
     return;
   }
   
   try {
-    const { data: payments, error } = await supabase
+    const { data: payments, error } = await supabaseClient
       .from("stripe_payments")
       .select("*")
       .order("created_at", { ascending: false });
@@ -4778,7 +4778,7 @@ function setupEvents() {
     const data = Object.fromEntries(new FormData(event.currentTarget));
     if (selectedAuthAction === "login") {
       toast("Iniciando sesion...");
-      const { data: authData, error } = await supabase.auth.signInWithPassword({
+      const { data: authData, error } = await supabaseClient.auth.signInWithPassword({
         email: data.email,
         password: data.password
       });
@@ -4794,7 +4794,7 @@ function setupEvents() {
     }
     
     toast("Registrando cuenta...");
-    const { data: authData, error } = await supabase.auth.signUp({
+    const { data: authData, error } = await supabaseClient.auth.signUp({
       email: data.email,
       password: data.password
     });
@@ -4807,7 +4807,7 @@ function setupEvents() {
       state.user = user;
       
       // Create profile
-      await supabase.from('profiles').insert({
+      await supabaseClient.from('profiles').insert({
         id: user.id,
         full_name: data.fullName || data.email.split('@')[0],
         email: data.email,
@@ -4819,7 +4819,7 @@ function setupEvents() {
       let finalPlan = selectedPlan;
       let stripePayment = null;
       try {
-        const { data: payment } = await supabase
+        const { data: payment } = await supabaseClient
           .from("stripe_payments")
           .select("*")
           .eq("email", data.email.toLowerCase())
@@ -4834,7 +4834,7 @@ function setupEvents() {
       
       // Create organization
       const dbPlanId = finalPlan === "independent" ? "solo" : (finalPlan === "company" ? "starter" : finalPlan);
-      const { data: org } = await supabase.from('organizations').insert({
+      const { data: org } = await supabaseClient.from('organizations').insert({
         name: data.companyName || `${data.fullName || 'Mi Empresa'}`,
         type: finalPlan === "independent" ? "independent" : "company",
         owner_user_id: user.id,
@@ -4846,7 +4846,7 @@ function setupEvents() {
       if (org) {
         state.orgId = org.id;
         if (stripePayment) {
-          await supabase.from("subscriptions").insert({
+          await supabaseClient.from("subscriptions").insert({
             organization_id: org.id,
             plan_id: dbPlanId,
             status: "active",
@@ -4863,9 +4863,9 @@ function setupEvents() {
     }
   });
   $("#googleLogin").addEventListener("click", async () => {
-    if (supabase) {
+    if (supabaseClient) {
       toast("Conectando con Google...");
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabaseClient.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: window.location.origin + window.location.pathname
@@ -4877,9 +4877,9 @@ function setupEvents() {
     }
   });
   $(".google.microsoft")?.addEventListener("click", async () => {
-    if (supabase) {
+    if (supabaseClient) {
       toast("Conectando con Microsoft...");
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabaseClient.auth.signInWithOAuth({
         provider: 'azure',
         options: {
           redirectTo: window.location.origin + window.location.pathname
@@ -4898,7 +4898,7 @@ function setupEvents() {
   $$("[data-view-target]").forEach((button) => button.addEventListener("click", () => setView(button.dataset.viewTarget)));
   $$("[data-open-job]").forEach((button) => button.addEventListener("click", () => setView("jobs")));
   $("#logoutButton").addEventListener("click", async () => {
-    if (supabase) await supabase.auth.signOut();
+    if (supabaseClient) await supabaseClient.auth.signOut();
     state.user = null;
     state.orgId = null;
     $("#appShell").classList.add("hidden");
@@ -5367,8 +5367,8 @@ populateCountrySelect();
 setupEvents();
 enterClientPortalFromUrl();
 
-if (supabase) {
-  supabase.auth.onAuthStateChange(async (event, session) => {
+if (supabaseClient) {
+  supabaseClient.auth.onAuthStateChange(async (event, session) => {
     if (session) {
       const user = session.user;
       state.user = user;
@@ -5378,9 +5378,9 @@ if (supabase) {
       // If they don't have an organization, they signed up via OAuth (Google/Microsoft)
       if (!state.orgId) {
         // Create profile if not exists
-        const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+        const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', user.id).maybeSingle();
         if (!profile) {
-          await supabase.from('profiles').insert({
+          await supabaseClient.from('profiles').insert({
             id: user.id,
             full_name: user.user_metadata?.full_name || user.email.split('@')[0],
             email: user.email,
@@ -5390,7 +5390,7 @@ if (supabase) {
         }
 
         // Create organization
-        const { data: org } = await supabase.from('organizations').insert({
+        const { data: org } = await supabaseClient.from('organizations').insert({
           name: `${user.user_metadata?.full_name || user.email.split('@')[0]}'s Company`,
           type: state.mode || 'independent',
           owner_user_id: user.id,
