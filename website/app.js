@@ -1157,26 +1157,51 @@ function countryInfo(code) {
 }
 
 function populateCountrySelect() {
-  const select = $("#accountCountry");
-  if (!select && !$("#cleanerCountry")) return;
-  const supported = Object.keys(dialCodes);
-  const names = new Intl.DisplayNames([state.language || "en"], { type: "region" });
-  const options = supported
-    .filter((code) => /^[A-Z]{2}$/.test(code))
-    .map((code) => ({ code, name: names.of(code) || code, dial: dialCodes[code] || countries[code]?.dial || "+" }))
-    .sort((a, b) => a.name.localeCompare(b.name, state.language || "en"));
-  const html = options.map((item) => `<option value="${item.code}">${item.name} (${item.dial})</option>`).join("");
-  if (select) {
-    select.innerHTML = html;
-    select.value = state.country || "IL";
-    if (!select.value) select.value = "IL";
-  }
-  const cleanerCountry = $("#cleanerCountry");
-  if (cleanerCountry) {
-    const current = cleanerCountry.value || state.country || "IL";
-    cleanerCountry.innerHTML = html;
-    cleanerCountry.value = current;
-    if (!cleanerCountry.value) cleanerCountry.value = state.country || "IL";
+  try {
+    const select = $("#accountCountry");
+    if (!select && !$("#cleanerCountry")) return;
+    const supported = Object.keys(dialCodes);
+    
+    let names;
+    try {
+      names = new Intl.DisplayNames([state.language || "en"], { type: "region" });
+    } catch (e) {
+      console.warn("Intl.DisplayNames not supported or failed:", e);
+    }
+
+    const options = supported
+      .filter((code) => /^[A-Z]{2}$/.test(code))
+      .map((code) => {
+        let name = code;
+        try {
+          if (names) name = names.of(code) || code;
+        } catch (e) {
+          name = countries[code]?.name || code;
+        }
+        return { code, name, dial: dialCodes[code] || countries[code]?.dial || "+" };
+      })
+      .sort((a, b) => {
+        try {
+          return a.name.localeCompare(b.name, state.language || "en");
+        } catch (e) {
+          return a.name.localeCompare(b.name);
+        }
+      });
+    const html = options.map((item) => `<option value="${item.code}">${item.name} (${item.dial})</option>`).join("");
+    if (select) {
+      select.innerHTML = html;
+      select.value = state.country || "IL";
+      if (!select.value) select.value = "IL";
+    }
+    const cleanerCountry = $("#cleanerCountry");
+    if (cleanerCountry) {
+      const current = cleanerCountry.value || state.country || "IL";
+      cleanerCountry.innerHTML = html;
+      cleanerCountry.value = current;
+      if (!cleanerCountry.value) cleanerCountry.value = state.country || "IL";
+    }
+  } catch (globalError) {
+    console.error("Critical error populating country select:", globalError);
   }
 }
 
@@ -4757,19 +4782,33 @@ function setupEvents() {
       toast("Cuenta creada y activada.");
     }
   });
-  $("#googleLogin").addEventListener("click", () => {
-    if (selectedAuthAction === "signup") {
-      verificationSent = true;
-      showPaymentStep();
-      toast("Google verifico el correo. Continua con el pago.");
-      return;
+  $("#googleLogin").addEventListener("click", async () => {
+    if (supabase) {
+      toast("Conectando con Google...");
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin + window.location.pathname
+        }
+      });
+      if (error) toast("Error: " + error.message);
+    } else {
+      toast("Supabase no esta configurado.");
     }
-    if (!validateDemoAccount("login", { email: $("#authForm").elements.email.value })) return;
-    enterApp(selectedAuthMode);
-    toast("Bienvenido con Google.");
   });
-  $(".google.microsoft")?.addEventListener("click", () => {
-    toast(t("microsoftSoon"));
+  $(".google.microsoft")?.addEventListener("click", async () => {
+    if (supabase) {
+      toast("Conectando con Microsoft...");
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'azure',
+        options: {
+          redirectTo: window.location.origin + window.location.pathname
+        }
+      });
+      if (error) toast("Error: " + error.message);
+    } else {
+      toast("Supabase no esta configurado.");
+    }
   });
   $("#mobileMenuToggle").addEventListener("click", toggleMobileMenu);
   $("#dashboardMobileMenu")?.addEventListener("click", toggleMobileMenu);
@@ -5251,7 +5290,40 @@ enterClientPortalFromUrl();
 if (supabase) {
   supabase.auth.onAuthStateChange(async (event, session) => {
     if (session) {
+      const user = session.user;
+      state.user = user;
+
       await loadStateFromSupabase();
+
+      // If they don't have an organization, they signed up via OAuth (Google/Microsoft)
+      if (!state.orgId) {
+        // Create profile if not exists
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
+        if (!profile) {
+          await supabase.from('profiles').insert({
+            id: user.id,
+            full_name: user.user_metadata?.full_name || user.email.split('@')[0],
+            email: user.email,
+            phone: user.phone || "",
+            preferred_language: state.language || "es"
+          });
+        }
+
+        // Create organization
+        const { data: org } = await supabase.from('organizations').insert({
+          name: `${user.user_metadata?.full_name || user.email.split('@')[0]}'s Company`,
+          type: state.mode || 'independent',
+          owner_user_id: user.id,
+          country: state.country || 'IL',
+          default_language: state.language || 'es',
+          plan_id: 'free'
+        }).select().single();
+        
+        if (org) {
+          state.orgId = org.id;
+        }
+      }
+
       enterApp(state.mode);
     }
   });
