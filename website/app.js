@@ -34,6 +34,7 @@ async function loadStateFromSupabase() {
         state.mode = org.type;
         state.country = org.country;
         state.companyProfile.businessName = org.name;
+        selectedPlan = normalizePlanKey(org.plan_id);
       }
 
       // Fetch clients
@@ -4260,6 +4261,56 @@ function renderSettings() {
   $$("[data-delete-cost-rule]").forEach((button) => {
     button.addEventListener("click", () => deleteCostRule(button.dataset.deleteCostRule));
   });
+
+  // Render Super Admin Stripe Payments Panel
+  const isSuperAdmin = state.user?.email === window.JOBVISTO_CONFIG?.ownerEmail;
+  const adminPanel = $("#adminPaymentsPanel");
+  if (adminPanel) {
+    if (isSuperAdmin) {
+      adminPanel.classList.remove("hidden");
+      loadAndRenderAdminPayments();
+    } else {
+      adminPanel.classList.add("hidden");
+    }
+  }
+}
+
+async function loadAndRenderAdminPayments() {
+  const listEl = $("#adminPaymentsList");
+  if (!listEl) return;
+  
+  if (!supabase) {
+    listEl.innerHTML = "<p class='muted'>Supabase no esta configurado.</p>";
+    return;
+  }
+  
+  try {
+    const { data: payments, error } = await supabase
+      .from("stripe_payments")
+      .select("*")
+      .order("created_at", { ascending: false });
+      
+    if (error) throw error;
+    
+    if (!payments || payments.length === 0) {
+      listEl.innerHTML = "<p class='muted'>No se han registrado pagos de Stripe todavia.</p>";
+      return;
+    }
+    
+    listEl.innerHTML = payments.map(p => `
+      <article class="receipt-item">
+        <strong>${p.email}</strong>
+        <span class="client-meta">Plan: ${p.plan_id} · Cliente: ${p.customer_id || 'N/A'}</span>
+        <span class="client-meta">Suscripcion: ${p.subscription_id || 'N/A'}</span>
+        <span class="client-meta">Sesion: ${p.session_id || 'N/A'}</span>
+        <span class="badge ${p.payment_status === 'paid' || p.payment_status === 'complete' ? 'dark' : 'gold'}">${p.payment_status}</span>
+        <span class="client-meta">Fecha: ${new Date(p.created_at).toLocaleString()}</span>
+      </article>
+    `).join("");
+  } catch (err) {
+    console.error("Error loading stripe payments for admin:", err);
+    listEl.innerHTML = `<p class="muted error">Error al cargar pagos: ${err.message}</p>`;
+  }
 }
 
 function resetCostRuleForm() {
@@ -4764,21 +4815,50 @@ function setupEvents() {
         preferred_language: state.language
       });
       
+      // Check for Stripe payment matching the email
+      let finalPlan = selectedPlan;
+      let stripePayment = null;
+      try {
+        const { data: payment } = await supabase
+          .from("stripe_payments")
+          .select("*")
+          .eq("email", data.email.toLowerCase())
+          .maybeSingle();
+        if (payment) {
+          stripePayment = payment;
+          finalPlan = payment.plan_id === "solo" ? "independent" : (payment.plan_id === "starter" ? "company" : payment.plan_id);
+        }
+      } catch (err) {
+        console.error("Error looking up Stripe payment:", err);
+      }
+      
       // Create organization
+      const dbPlanId = finalPlan === "independent" ? "solo" : (finalPlan === "company" ? "starter" : finalPlan);
       const { data: org } = await supabase.from('organizations').insert({
         name: data.companyName || `${data.fullName || 'Mi Empresa'}`,
-        type: selectedAuthMode,
+        type: finalPlan === "independent" ? "independent" : "company",
         owner_user_id: user.id,
         country: state.country,
         default_language: state.language,
-        plan_id: selectedPlan
+        plan_id: dbPlanId
       }).select().single();
       
       if (org) {
         state.orgId = org.id;
+        if (stripePayment) {
+          await supabase.from("subscriptions").insert({
+            organization_id: org.id,
+            plan_id: dbPlanId,
+            status: "active",
+            provider: "stripe",
+            provider_customer_id: stripePayment.customer_id,
+            provider_subscription_id: stripePayment.subscription_id,
+            started_at: new Date().toISOString()
+          });
+        }
       }
       
-      enterApp(selectedAuthMode);
+      enterApp(finalPlan === "independent" ? "independent" : "company");
       toast("Cuenta creada y activada.");
     }
   });

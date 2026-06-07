@@ -845,6 +845,14 @@
               <button class="primary" type="submit">Guardar reglas de costos</button>
               <div class="cost-rule-list" id="specialCostRulesList"></div>
             </form>
+
+            <section class="panel hidden" id="adminPaymentsPanel">
+              <h3>Stripe Payments (Super Admin)</h3>
+              <p class="muted">Lista de todos los pagos de Stripe registrados mediante webhooks.</p>
+              <div id="adminPaymentsList" class="receipt-list">
+                <p class="muted">Cargando pagos...</p>
+              </div>
+            </section>
           </div>
       <!-- Mobile Bottom Navigation Bar -->
       <nav class="mobile-bottom-nav">

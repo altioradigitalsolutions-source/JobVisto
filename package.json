@@ -1,0 +1,14 @@
+{
+  "name": "jobvisto",
+  "version": "1.0.0",
+  "description": "JobVisto SaaS Application",
+  "main": "website/server.js",
+  "scripts": {
+    "start": "node website/server.js",
+    "dev": "node website/server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "stripe": "^15.12.0"
+  }
+}
