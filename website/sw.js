@@ -1,4 +1,4 @@
-const CACHE_NAME = "jobvisto-app-v1";
+const CACHE_NAME = "jobvisto-app-v2";
 const APP_SHELL = [
   "./",
   "./index.html",
