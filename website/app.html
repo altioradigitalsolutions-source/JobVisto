@@ -1,0 +1,1140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>JobVisto App | Access</title>
+    <meta name="description" content="Acceso a JobVisto para cleaners independientes y empresas de limpieza.">
+    <meta name="theme-color" content="#063f34">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="JobVisto">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="apple-touch-icon" href="./assets/jobvisto-icon-192.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./app.css">
+  </head>
+  <body>
+    <div class="auth-screen" id="authScreen">
+      <section class="auth-panel">
+        <div class="auth-top">
+          <a class="auth-brand" href="./index.html">
+            <img src="./assets/Logo Jobvisto.png" alt="JobVisto Logo">
+          </a>
+          <div class="language-switch auth-language-switch" aria-label="Language">
+            <span class="language-globe" aria-hidden="true">◎</span>
+            <button class="active" type="button" data-language="en">EN</button>
+            <button type="button" data-language="es">ES</button>
+            <button type="button" data-language="ru">RU</button>
+          </div>
+        </div>
+        <div class="auth-intro">
+          <p class="eyebrow" data-i18n="authEyebrow">Private access</p>
+          <h1 data-i18n="authTitle">Manage cleaning jobs, evidence and signatures from today.</h1>
+          <p class="muted" data-i18n="authCopy">Log in if you already have an account, or register to activate your plan with email verification and secure payment.</p>
+        </div>
+        <div class="payment-return-card hidden" id="paymentSuccessBanner">
+          <span class="payment-return-icon" aria-hidden="true">JV</span>
+          <div>
+            <strong data-i18n="paymentReturnTitle">Payment received</strong>
+            <p data-i18n="paymentReturnCopy">Complete your account details to activate JobVisto with the plan you just paid for.</p>
+          </div>
+        </div>
+        <div class="account-toggle auth-flow-toggle" role="tablist" aria-label="Acceso o registro">
+          <button class="active" type="button" data-auth-action="login" data-i18n="login">Log in</button>
+          <button type="button" data-auth-action="signup" data-i18n="signup">Register</button>
+        </div>
+        <form id="authForm" class="auth-form">
+          <label>
+            Email
+            <input type="email" name="email" value="meir.meiras1@gmail.com" required>
+          </label>
+          <label>
+            <span data-i18n="password">Password</span>
+            <input type="password" name="password" value="JobVisto2026!" required>
+          </label>
+          <label>
+            <span data-i18n="accountCountry">Account country</span>
+            <select name="country" id="accountCountry">
+              <option value="IL">Israel (+972)</option>
+            </select>
+          </label>
+          <div class="account-toggle" role="tablist" aria-label="Tipo de cuenta">
+            <button class="active" type="button" data-auth-mode="independent" data-i18n="independent">Independent</button>
+            <button type="button" data-auth-mode="company" data-i18n="company">Company</button>
+          </div>
+          <div class="auth-helper-row">
+            <label class="remember-me">
+              <input type="checkbox" checked>
+              <span data-i18n="rememberMe">Remember me</span>
+            </label>
+            <button class="forgot-link" type="button" data-i18n="forgotPassword">Forgot your password?</button>
+          </div>
+          <div class="signup-fields hidden" id="signupFields">
+            <label><span data-i18n="fullName">Full name</span> <input name="fullName" placeholder="Name and last name" data-i18n-placeholder="fullNamePlaceholder"></label>
+            <label><span data-i18n="companyName">Company name</span> <input name="companyName" placeholder="Only if applicable" data-i18n-placeholder="companyNamePlaceholder"></label>
+            <label><span data-i18n="phone">Phone</span> <input name="phone" placeholder="Contact number" data-i18n-placeholder="phonePlaceholder"></label>
+            <label id="signupPlanField"><span data-i18n="plan">Plan</span>
+              <select name="plan" id="signupPlan">
+                <option value="free">Freelancer Free - $0/mes</option>
+                <option value="independent">Independent - $9.99/mes</option>
+                <option value="company">Company - $29.99/mes</option>
+                <option value="pro">Pro - $59.99/mes</option>
+              </select>
+            </label>
+            <div class="verification-box" id="verificationBox">
+              <div>
+                <strong data-i18n="emailVerification">Email verification</strong>
+                <p class="muted" data-i18n="emailVerificationCopy">First we confirm that the email belongs to the client. In production, a real email will be sent.</p>
+              </div>
+              <button class="ghost" type="button" id="sendVerification" data-i18n="sendCode">Send code</button>
+              <label><span data-i18n="receivedCode">Received code</span> <input name="verifyCode" placeholder="123456"></label>
+            </div>
+            <div class="payment-step hidden" id="paymentStep">
+              <span class="status-chip" data-i18n="securePayment">Secure payment</span>
+              <strong id="paymentPlanTitle">Plan seleccionado</strong>
+              <p class="muted" data-i18n="stripeCopy">After email verification, the client goes to Stripe. When payment is approved, access is activated and the password is delivered.</p>
+              <button class="primary" type="button" id="stripePayButton" data-i18n="payStripe">Pay with Stripe and activate</button>
+            </div>
+          </div>
+          <button class="primary" type="submit" id="authSubmit">Log in</button>
+          <div class="auth-divider"><span data-i18n="orContinue">or continue with</span></div>
+          <div class="social-row">
+            <button class="google" type="button" id="googleLogin">Continue with Google</button>
+            <button class="google microsoft" type="button" aria-label="Continue with Microsoft" data-i18n="microsoft">Microsoft</button>
+          </div>
+          <div class="auth-mobile-trust" aria-label="JobVisto trust highlights">
+            <article>
+              <span aria-hidden="true">◇</span>
+              <div>
+                <strong data-i18n="secureReliable">Safe and reliable</strong>
+                <p data-i18n="secureReliableCopy">Your data is protected</p>
+              </div>
+            </article>
+            <article>
+              <span aria-hidden="true">24</span>
+              <div>
+                <strong data-i18n="access247">24/7 access</strong>
+                <p data-i18n="access247Copy">From anywhere and any device</p>
+              </div>
+            </article>
+            <article>
+              <span aria-hidden="true">☷</span>
+              <div>
+                <strong data-i18n="manyUsers">Thousands of users</strong>
+                <p data-i18n="manyUsersCopy">Cleaning companies already trust JobVisto</p>
+              </div>
+            </article>
+            <article>
+              <span aria-hidden="true">⌕</span>
+              <div>
+                <strong data-i18n="dedicatedSupport">Dedicated support</strong>
+                <p data-i18n="dedicatedSupportCopy">We are ready to help you</p>
+              </div>
+            </article>
+          </div>
+        </form>
+        <p class="fineprint" data-i18n="fineprint">Real payment will connect with Stripe. This screen prepares the registration, verification and activation flow.</p>
+      </section>
+      <aside class="auth-visual">
+        <div class="auth-visual-content">
+          <p class="visual-kicker" data-i18n="authPlatformKicker">All in one platform</p>
+          <h2 data-i18n="authVisualTitle">Total control of your cleaning company, in real time.</h2>
+          <ul class="visual-checklist" aria-label="JobVisto benefits">
+            <li data-i18n="authVisualPoint1">Clients, cleaners and jobs organized</li>
+            <li data-i18n="authVisualPoint2">Photo evidence and digital signatures</li>
+            <li data-i18n="authVisualPoint3">Reports and metrics in real time</li>
+            <li data-i18n="authVisualPoint4">Access from any device</li>
+          </ul>
+          <div class="rating-row" aria-label="Rating">
+            <strong data-i18n="excellent">Excellent</strong>
+            <span aria-hidden="true">★★★★★</span>
+            <p data-i18n="ratingCopy">4.8 out of 5 from 200+ reviews</p>
+          </div>
+        </div>
+        <div class="glass-card">
+          <span class="pulse"></span>
+          <strong data-i18n="cleanerArrived">Cleaner arrived</strong>
+          <p data-i18n="cleanerArrivedCopy">Client notified, GPS saved and job in progress.</p>
+        </div>
+        <div class="auth-trust-row">
+          <article>
+            <span aria-hidden="true">◇</span>
+            <strong data-i18n="secureReliable">Safe and reliable</strong>
+            <p data-i18n="secureReliableCopy">Your data is protected</p>
+          </article>
+          <article>
+            <span aria-hidden="true">24</span>
+            <strong data-i18n="access247">24/7 access</strong>
+            <p data-i18n="access247Copy">From anywhere and any device</p>
+          </article>
+          <article>
+            <span aria-hidden="true">☷</span>
+            <strong data-i18n="manyUsers">Thousands of users</strong>
+            <p data-i18n="manyUsersCopy">Cleaning companies already trust JobVisto</p>
+          </article>
+        </div>
+      </aside>
+    </div>
+
+    <div class="app-shell hidden" id="appShell">
+      <button class="mobile-menu-toggle" id="mobileMenuToggle" type="button" aria-controls="appSidebar" aria-expanded="false">
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+        <span aria-hidden="true"></span>
+        <strong>Menu</strong>
+      </button>
+      <button class="mobile-menu-backdrop" id="mobileMenuBackdrop" type="button" aria-label="Cerrar menu"></button>
+      <aside class="sidebar" id="appSidebar">
+        <a class="logo" href="./index.html">
+          <img src="./assets/Logo Jobvisto white transparent.png" alt="JobVisto Logo">
+        </a>
+        <nav>
+          <button class="active" data-view="dashboard"><i data-icon="grid"></i> <span data-i18n="dashboard">Dashboard</span></button>
+          <button data-view="clients"><i data-icon="users"></i> <span data-i18n="clients">Clients</span></button>
+          <button data-view="cleaners"><i data-icon="users"></i> Cleaners</button>
+          <button data-view="calendar"><i data-icon="calendar"></i> <span data-i18n="calendar">Calendar</span></button>
+          <button data-view="jobs"><i data-icon="briefcase"></i> <span data-i18n="jobs">Jobs</span></button>
+          <button data-view="clientLinks"><i data-icon="link"></i> <span data-i18n="clientLinks">Client links</span></button>
+          <button data-view="reports"><i data-icon="chart"></i> <span data-i18n="reports">Reports</span></button>
+          <button data-view="payments" data-company-nav><i data-icon="receipt"></i> <span data-i18n="payments">Payments</span></button>
+          <button data-view="settings"><i data-icon="settings"></i> <span data-i18n="settings">Settings</span></button>
+        </nav>
+        <button class="logout" id="logoutButton" data-i18n="logout">Log out</button>
+      </aside>
+
+      <main class="workspace">
+        <header class="saas-mobile-head">
+          <button class="mobile-menu-button" type="button" id="globalMobileMenu" aria-label="Menu">
+            <span></span><span></span><span></span>
+          </button>
+          <img src="./assets/Logo Jobvisto.png" alt="JobVisto">
+          <div class="saas-mobile-actions">
+            <button class="notification-button" type="button" aria-label="Notifications">
+              <span aria-hidden="true">♡</span>
+              <b>3</b>
+            </button>
+            <button class="mobile-plus-button" type="button" data-open-job aria-label="New job">+</button>
+          </div>
+        </header>
+        <header class="topbar">
+          <div>
+            <h2 id="pageTitle" data-i18n="dashboardGreeting">Good morning, Miguel! 👋</h2>
+            <p class="muted" data-i18n="dashboardSubtitle">Here's what's happening with your business today.</p>
+            <span class="hidden" id="modeLabel">Independiente</span>
+          </div>
+          <div class="top-actions">
+            <label class="search-box" aria-label="Search">
+              <span aria-hidden="true">⌕</span>
+              <input type="search" id="dashboardSearch" data-i18n-placeholder="searchPlaceholder" placeholder="Search anything...">
+              <kbd>Ctrl K</kbd>
+              <div class="search-results hidden" id="dashboardSearchResults"></div>
+            </label>
+            <button class="notification-button" type="button" aria-label="Notifications">
+              <span aria-hidden="true">♡</span>
+              <b>3</b>
+            </button>
+            <div class="user-chip">
+              <span class="avatar-dot">A</span>
+              <div>
+                <strong>Miguel</strong>
+                <small data-i18n="administrator">Administrator</small>
+              </div>
+            </div>
+            <div class="language-switch app-language-switch" aria-label="Language">
+              <button class="active" type="button" data-language="en">EN</button>
+              <button type="button" data-language="es">ES</button>
+              <button type="button" data-language="ru">RU</button>
+            </div>
+            <span class="country-pill" id="accountCountryPill">Israel - +972</span>
+            <button class="ghost top-client-button" data-view-target="clients" data-i18n="newClient">New client</button>
+            <button class="primary" data-open-job data-i18n="newJob">New job</button>
+          </div>
+        </header>
+
+        <section class="view active" id="dashboardView">
+          <header class="dashboard-mobile-head">
+            <button class="mobile-menu-button" type="button" id="dashboardMobileMenu" aria-label="Menu">
+              <span></span><span></span><span></span>
+            </button>
+            <img src="./assets/Logo Jobvisto.png" alt="JobVisto">
+            <button class="notification-button" type="button" aria-label="Notifications">
+              <span aria-hidden="true">♡</span>
+              <b>3</b>
+            </button>
+          </header>
+          <div class="summary-band dashboard-hero">
+            <div>
+              <h3 data-i18n="dashboardGreeting">Good morning, Miguel! 👋</h3>
+              <p class="muted" data-i18n="dashboardSubtitle">Here's what's happening with your business today.</p>
+              <span class="hidden" id="summaryTitle">Hoy tienes 2 trabajos activos</span>
+              <span class="hidden" id="summaryCopy">El panel resume agenda, horas, ganancias estimadas y firmas pendientes.</span>
+            </div>
+            <button class="primary dashboard-new-job" data-open-job><span aria-hidden="true">+</span><span data-i18n="newJob">New job</span></button>
+            <div class="summary-chips hidden" id="summaryChips"></div>
+          </div>
+          <div class="metric-grid">
+            <article>
+              <div class="metric-header">
+                <span class="metric-icon">📅</span>
+                <span data-i18n="todayJobs">Today's jobs</span>
+              </div>
+              <strong id="metricJobs">3</strong>
+              <small id="metricJobsNote" class="metric-note">day agenda</small>
+              <div class="metric-trend green">
+                <span>↗ 15% vs yesterday</span>
+                <svg class="sparkline" width="60" height="20" viewBox="0 0 60 20"><path d="M0,15 Q15,5 30,12 T60,5" fill="none" stroke="var(--green)" stroke-width="1.5"/></svg>
+              </div>
+            </article>
+            <article>
+              <div class="metric-header">
+                <span class="metric-icon">✅</span>
+                <span data-i18n="completedJobs">Completed jobs</span>
+              </div>
+              <strong id="metricDone">0</strong>
+              <small id="metricDoneNote" class="metric-note">closed this month</small>
+              <div class="metric-trend green">
+                <span>↗ 20% vs yesterday</span>
+                <svg class="sparkline" width="60" height="20" viewBox="0 0 60 20"><path d="M0,18 Q15,10 30,14 T60,8" fill="none" stroke="var(--green)" stroke-width="1.5"/></svg>
+              </div>
+            </article>
+            <article>
+              <div class="metric-header">
+                <span class="metric-icon">🕒</span>
+                <span data-i18n="completedHours">Completed hours</span>
+              </div>
+              <strong id="metricHours">18.5</strong>
+              <small class="metric-note" data-i18n="thisWeek">this week</small>
+              <div class="metric-trend green">
+                <span>↗ 18% vs yesterday</span>
+                <svg class="sparkline" width="60" height="20" viewBox="0 0 60 20"><path d="M0,16 Q15,12 30,8 T60,4" fill="none" stroke="var(--green)" stroke-width="1.5"/></svg>
+              </div>
+            </article>
+            <article>
+              <div class="metric-header">
+                <span class="metric-icon">💵</span>
+                <span data-i18n="estimatedRevenue">Revenue</span>
+              </div>
+              <strong id="metricRevenue">$1,420</strong>
+              <small class="metric-note" data-i18n="thisMonth">this month</small>
+              <div class="metric-trend green">
+                <span>↗ 22% vs yesterday</span>
+                <svg class="sparkline" width="60" height="20" viewBox="0 0 60 20"><path d="M0,15 Q15,10 30,5 T60,2" fill="none" stroke="var(--green)" stroke-width="1.5"/></svg>
+              </div>
+            </article>
+            <article>
+              <div class="metric-header">
+                <span class="metric-icon">👥</span>
+                <span data-i18n="activeClients">Active clients</span>
+              </div>
+              <strong id="metricClients">0</strong>
+              <small class="metric-note">registered clients</small>
+              <div class="metric-trend green">
+                <span>↗ 8% vs last month</span>
+                <svg class="sparkline" width="60" height="20" viewBox="0 0 60 20"><path d="M0,12 Q15,14 30,10 T60,5" fill="none" stroke="var(--green)" stroke-width="1.5"/></svg>
+              </div>
+            </article>
+            <article>
+              <div class="metric-header">
+                <span class="metric-icon">🧹</span>
+                <span id="metricSecondaryLabel">Active cleaners</span>
+              </div>
+              <strong id="metricSecondaryValue">0</strong>
+              <small class="metric-note" id="metricSecondaryNote">active cleaners</small>
+              <span id="metricSignatures" class="hidden">0</span> <!-- hidden container to keep JS happy -->
+              <div class="metric-trend green">
+                <span>↗ 6% vs last month</span>
+                <svg class="sparkline" width="60" height="20" viewBox="0 0 60 20"><path d="M0,16 Q15,14 30,15 T60,10" fill="none" stroke="var(--green)" stroke-width="1.5"/></svg>
+              </div>
+            </article>
+          </div>
+          <div class="dashboard-grid">
+            <section class="panel schedule-panel">
+              <div class="panel-head">
+                <h3 data-i18n="todaysSchedule">Today's schedule</h3>
+                <span class="status-chip" data-i18n="live">Live</span>
+              </div>
+              <div class="job-list" id="todayJobs"></div>
+              <button class="link-action" type="button" data-view-target="jobs"><span data-i18n="viewAllJobs">View all jobs</span><span aria-hidden="true">›</span></button>
+            </section>
+            <section class="panel dashboard-map-panel">
+              <div class="panel-head">
+                <h3 data-i18n="jobsMap">Jobs map</h3>
+                <span class="status-chip" data-i18n="today">Today</span>
+              </div>
+              <div class="dashboard-map" aria-label="Jobs map">
+                <iframe id="dashboardMapFrame" title="Mapa de trabajos" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+                <div class="map-overlay-list" id="dashboardMapList"></div>
+              </div>
+              <div class="map-stats">
+                <div><strong>5</strong><span data-i18n="jobsScheduled">Jobs scheduled</span></div>
+                <div><strong>3</strong><span data-i18n="inProgress">In progress</span></div>
+                <div><strong>2</strong><span data-i18n="completed">Completed</span></div>
+              </div>
+            </section>
+            <section class="panel recent-panel">
+              <div class="panel-head">
+                <h3 data-i18n="recentActivity">Recent activity</h3>
+                <button class="text-link" type="button" data-i18n="viewAll">View all</button>
+              </div>
+              <div class="recent-list" id="recentActivityList"></div>
+            </section>
+            <section class="panel quick-panel">
+              <div class="panel-head">
+                <h3 data-i18n="quickActions">Quick actions</h3>
+              </div>
+              <div class="quick-actions">
+                <button class="quick-action-item" data-view-target="clients">
+                  <span class="quick-action-icon" aria-hidden="true">👤</span>
+                  <strong data-i18n="createClient">Create client</strong>
+                </button>
+                <button class="quick-action-item" data-view-target="cleaners">
+                  <span class="quick-action-icon" aria-hidden="true">🧹</span>
+                  <strong data-i18n="registerCleaner">Register cleaner</strong>
+                </button>
+                <button class="quick-action-item featured" data-open-job>
+                  <span class="quick-action-icon" aria-hidden="true">📝</span>
+                  <strong data-i18n="createJob">Create job</strong>
+                </button>
+                <button class="quick-action-item" data-view-target="jobs">
+                  <span class="quick-action-icon" aria-hidden="true">📍</span>
+                  <strong data-i18n="viewJobProgress">View job progress</strong>
+                </button>
+                <button class="quick-action-item" data-view-target="reports">
+                  <span class="quick-action-icon" aria-hidden="true">📊</span>
+                  <strong data-i18n="viewConsolidated">View consolidated</strong>
+                </button>
+              </div>
+            </section>
+            <section class="growth-banner">
+              <span aria-hidden="true">↗</span>
+              <div>
+                <strong data-i18n="growBusiness">Grow your cleaning business</strong>
+                <p data-i18n="growBusinessCopy">Save time, get more clients, and increase your revenue with JobVisto.</p>
+              </div>
+              <button class="primary" type="button" data-i18n="exploreFeatures">Explore features</button>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="clientsView">
+          <div class="split-view">
+            <form class="panel form-panel" id="clientForm">
+              <h3>Nuevo cliente</h3>
+              <input type="hidden" name="id" id="clientId">
+              <label>Nombre completo <input name="name" placeholder="Casa Cohen" required></label>
+              <label>Telefono
+                <div class="phone-row">
+                  <input id="clientDialCode" aria-label="Codigo pais" readonly value="+972">
+                  <input name="phoneLocal" placeholder="50 000 0000">
+                </div>
+              </label>
+              <label>Email <input name="email" type="email" placeholder="cliente@email.com"></label>
+              <label>Direccion <input name="address" list="addressSuggestions" placeholder="Herzl 42, Tel Aviv" required></label>
+              <datalist id="addressSuggestions"></datalist>
+              <label>Metodo esperado de pago
+                <select name="paymentMethod">
+                  <option>Efectivo</option>
+                  <option>Transferencia</option>
+                  <option>PayPal</option>
+                  <option>Zelle</option>
+                  <option>Tarjeta</option>
+                  <option>Otro</option>
+                </select>
+              </label>
+              <label>Notas <textarea name="notes" placeholder="Codigo de entrada, mascotas, instrucciones..."></textarea></label>
+              <div class="form-actions">
+                <button class="primary" type="submit" id="saveClientButton">Guardar cliente</button>
+                <button class="ghost hidden" type="button" id="cancelClientEdit">Cancelar edicion</button>
+              </div>
+            </form>
+            <section class="panel">
+              <div class="panel-head"><h3>Clientes</h3><span id="clientCount"></span></div>
+              <div id="clientTerritory"></div>
+              <div class="client-list" id="clientList"></div>
+              <div class="client-history-block">
+                <h3>Historial de clientes eliminados</h3>
+                <div class="client-list" id="archivedClientList"></div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="cleanersView">
+          <div class="split-view">
+            <form class="panel form-panel" id="cleanerForm">
+              <h3>Registrar cleaner</h3>
+              <input type="hidden" name="id" id="cleanerId">
+              <p class="muted">Aqui registras a las personas del equipo para poder asignarles trabajos o abrir trabajos para que ellos los tomen.</p>
+              <label>Nombre <input name="name" placeholder="Maria Lopez" required></label>
+              <label>Telefono <input name="phone" placeholder="+972 50 777 1000"></label>
+              <label>Email <input name="email" type="email" placeholder="cleaner@email.com"></label>
+              <label>Pais del cleaner <select name="country" id="cleanerCountry"></select></label>
+              <label>Ciudad o zona <input name="city" placeholder="Tel Aviv, Jerusalem, Guayaquil..."></label>
+              <label>Clave de acceso <input name="key" placeholder="JV-MARIA"></label>
+              <div class="form-actions">
+                <button class="primary" type="submit" id="saveCleanerButton">Guardar cleaner</button>
+                <button class="ghost hidden" type="button" id="cancelCleanerEdit">Cancelar edicion</button>
+              </div>
+            </form>
+            <section class="panel">
+              <div class="panel-head"><h3>Equipo</h3><span id="cleanerCount"></span></div>
+              <div id="cleanerTerritory"></div>
+              <div class="client-list" id="cleanerList"></div>
+              <div class="client-history-block">
+                <h3>Historial de cleaners eliminados</h3>
+                <div class="client-list" id="archivedCleanerList"></div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="calendarView">
+          <div class="panel">
+            <div class="panel-head">
+              <h3 id="calendarTitle">Calendario mensual</h3>
+              <div class="calendar-actions">
+                <button class="ghost" type="button" id="prevMonth">Mes anterior</button>
+                <button class="ghost" type="button" id="todayMonth">Hoy</button>
+                <button class="ghost" type="button" id="nextMonth">Mes siguiente</button>
+              </div>
+            </div>
+            <p class="muted">Calendario propio de JobVisto. Google Maps se abre solo como direccion, sin depender de Google Calendar.</p>
+            <div class="calendar-grid" id="calendarGrid"></div>
+          </div>
+        </section>
+
+        <section class="view" id="jobsView">
+          <div class="section-hero jobs-section-hero">
+            <div>
+              <p class="eyebrow">Company</p>
+              <h3>Jobs</h3>
+              <p class="muted">Create, assign and track all cleaning jobs.</p>
+            </div>
+            <div class="section-hero-actions">
+              <div class="language-switch compact-language" aria-label="Language">
+                <button class="active" type="button" data-language="en">EN</button>
+                <button type="button" data-language="es">ES</button>
+                <button type="button" data-language="ru">RU</button>
+              </div>
+              <span class="country-pill">⌖ Israel · +972</span>
+              <button class="primary" type="button" data-open-job><span aria-hidden="true">+</span> New job</button>
+            </div>
+          </div>
+          <div class="split-view">
+            <form class="panel form-panel" id="jobForm">
+              <div class="job-form-title">
+                <span aria-hidden="true">▣</span>
+                <h3>Create new job</h3>
+              </div>
+              <input type="hidden" name="id" id="jobId">
+              <h4 class="form-section-label">Customer & Assignment</h4>
+              <label>Client <select name="clientId" id="jobClientSelect"></select></label>
+              <label>Assignment
+                <select name="cleanerId" id="jobCleanerSelect">
+                  <option value="">Abrir para que un cleaner lo tome</option>
+                </select>
+              </label>
+              <label>Service address <input id="jobAddressMirror" type="text" readonly></label>
+              <label>Date <input name="date" type="date" required></label>
+              <p class="address-hint" id="jobClientAddressHint"></p>
+              <h4 class="form-section-label">Schedule</h4>
+              <label>Start time <input name="start" type="time" value="08:00" required></label>
+              <label>Estimated end time <input name="end" type="time" value="12:00"></label>
+              <label>Actual end time <input name="actualEnd" type="time"></label>
+              <label>Status
+                <select name="status" id="jobStatusSelect">
+                  <option value="Asignado">Asignado</option>
+                  <option value="Disponible para tomar">Disponible para tomar</option>
+                  <option value="En progreso">En sitio / en proceso</option>
+                  <option value="En sitio vencido">En sitio vencido</option>
+                  <option value="Vencido / no iniciado">Vencido / no iniciado</option>
+                  <option value="Terminado por cleaner">Terminado por cleaner</option>
+                  <option value="Terminado por cliente">Terminado por cliente</option>
+                  <option value="Terminado por administrador">Terminado por administrador</option>
+                </select>
+              </label>
+              <h4 class="form-section-label">Service details</h4>
+              <label>Cleaning type
+                <select name="serviceType" id="jobServiceType">
+                  <option>Limpieza normal</option>
+                  <option>Deep cleaning</option>
+                  <option>Oficina</option>
+                  <option>Antes de Shabat</option>
+                  <option>Urgente</option>
+                  <option>Proyecto / primera visita</option>
+                </select>
+              </label>
+              <label>Price per hour <input name="rate" type="number" value="65" min="0"></label>
+              <label>Extras <input name="extras" type="number" value="0" min="0"></label>
+              <h4 class="form-section-label">Additional details</h4>
+              <label>Repeat
+                <select name="recurrence">
+                  <option value="">Solo esta vez</option>
+                  <option value="weekly">Semanal</option>
+                  <option value="biweekly">Cada 2 semanas</option>
+                  <option value="monthly">Mensual</option>
+                </select>
+              </label>
+              <label>Create how many dates <input name="repeatCount" type="number" min="1" max="24" value="1"></label>
+              <label>Checklist <textarea name="tasks" placeholder="e.g. Kitchen, bathrooms, floors, windows, etc."></textarea></label>
+              <div class="form-actions">
+                <button class="primary" type="submit" id="saveJobButton">Crear trabajo</button>
+                <button class="ghost hidden" type="button" id="cancelJobEdit">Cancelar edicion</button>
+              </div>
+            </form>
+            <section class="panel jobs-board-panel">
+              <div class="panel-head jobs-board-head"><h3>Jobs board</h3><span id="jobCount"></span></div>
+              <div class="job-list" id="allJobs"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="mobileView">
+          <div class="mobile-layout">
+            <section class="phone-demo">
+              <div class="phone-notch"></div>
+              <div class="phone-card" id="mobileJob"></div>
+            </section>
+            <section class="panel">
+              <h3>Simulador interno del trabajo</h3>
+              <p class="muted">Esta pantalla queda solo para demo y pruebas. En el producto real, el cleaner tendra su propio acceso movil; el admin vera el progreso desde Trabajos y Panel.</p>
+              <div class="action-stack">
+                <button id="checkInButton">Marcar Llegue + GPS</button>
+                <button id="uploadPhotoButton">Subir foto de evidencia</button>
+                <button id="finishButton">Marcar Termine</button>
+                <button id="signatureButton">Firma del cliente</button>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="clientLinksView">
+          <div class="client-links-hero">
+            <div>
+              <p class="eyebrow">Empresa</p>
+              <h3>Links clientes</h3>
+              <p class="muted">Administra y comparte los portales de tus clientes. El cliente abre su portal con clave y confirma desde su propia pantalla.</p>
+            </div>
+            <div class="client-links-hero-actions">
+              <div class="language-switch compact-language" aria-label="Language">
+                <button class="active" type="button" data-language="en">EN</button>
+                <button type="button" data-language="es">ES</button>
+                <button type="button" data-language="ru">RU</button>
+              </div>
+              <span class="country-pill" id="clientLinksCountryPill">Israel · +972</span>
+              <button class="primary" type="button" data-open-job>+ Nuevo trabajo</button>
+            </div>
+          </div>
+
+          <div class="client-link-kpis" id="clientLinkKpis"></div>
+
+          <div class="panel client-links-table-panel">
+            <div class="panel-head">
+              <div class="client-link-title">
+                <span class="client-link-title-icon">🔗</span>
+                <h3>Lista de links de clientes</h3>
+              </div>
+              <div class="client-link-tools">
+                <label class="client-link-search">
+                  <span>⌕</span>
+                  <input id="clientLinkSearch" type="search" placeholder="Buscar cliente...">
+                </label>
+                <select id="clientLinkFilter" aria-label="Filtrar links">
+                  <option value="all">Todos los estados</option>
+                  <option value="active">Activos</option>
+                  <option value="history">Con historial</option>
+                </select>
+              </div>
+            </div>
+            <div class="client-link-list" id="clientLinksList"></div>
+          </div>
+          <section class="client-link-safe-banner">
+            <span class="client-link-safe-icon">◇</span>
+            <div>
+              <strong>Compartir es seguro</strong>
+              <p>El cliente accede con su clave unica y confirma desde su propia pantalla.</p>
+            </div>
+          </section>
+          <div class="client-link-watermark" aria-hidden="true">
+            <img src="./assets/Logo Jobvisto.png" alt="">
+          </div>
+          <div class="client-public hidden" id="clientPortalPreview">
+            <section class="client-summary">
+              <span class="status-chip">Portal cliente</span>
+              <h3>Vista previa del portal</h3>
+              <div id="clientSummary"></div>
+            </section>
+            <section class="photo-board" id="photoBoard"></section>
+          </div>
+        </section>
+
+        <section class="view" id="reportsView">
+          <div class="reports-page-head">
+            <div>
+              <h3>Reports</h3>
+              <p class="muted">Aquí tienes lo que está pasando en tu negocio hoy.</p>
+            </div>
+            <div class="reports-head-actions">
+              <select aria-label="Rango de fechas">
+                <option>01 - 07 Jun 2026</option>
+                <option>Mes actual</option>
+              </select>
+              <button class="ghost" type="button">Filtros</button>
+              <span class="country-pill">Israel - +972</span>
+              <button class="ghost top-client-button" data-view-target="clients" type="button">Nuevo cliente</button>
+              <button class="primary" data-open-job type="button">Nuevo trabajo</button>
+            </div>
+          </div>
+          <div class="report-hero">
+            <span class="report-hero-icon">▥</span>
+            <div>
+              <p class="eyebrow">Resumen general</p>
+              <h3>Control de ingresos, costos y rendimiento.</h3>
+              <p class="muted">Valores claros para tomar mejores decisiones y hacer crecer tu negocio.</p>
+            </div>
+            <div class="report-period">Mes actual</div>
+          </div>
+          <div class="report-kpi-grid" id="reportKpis"></div>
+          <div class="report-grid">
+            <section class="panel chart-panel">
+              <div class="panel-head"><h3>Distribucion del mes</h3><span class="status-chip">Estimado</span></div>
+              <div class="donut-wrap">
+                <div class="donut" id="incomeDonut"></div>
+                <div class="legend" id="incomeLegend"></div>
+              </div>
+            </section>
+            <section class="panel chart-panel">
+              <div class="panel-head"><h3>Clientes y servicios</h3><span class="status-chip">Actividad</span></div>
+              <div class="bar-chart" id="clientBars"></div>
+            </section>
+            <section class="panel">
+              <h3>Reglas de costos</h3>
+              <p class="muted">Regla general para todos y excepciones por cleaner cuando corresponda.</p>
+              <div class="report-lines" id="costRules"></div>
+            </section>
+            <section class="panel">
+              <h3>Consolidado</h3>
+              <div class="report-lines" id="reportLines"></div>
+            </section>
+            <section class="panel report-trend-card">
+              <div class="panel-head"><h3>Tendencia de ingresos</h3><span class="status-chip">Últimos 7 días</span></div>
+              <div class="report-trend-line" id="reportTrendLine"></div>
+            </section>
+            <section class="panel report-goal-card">
+              <div class="panel-head"><h3>Trabajos completados</h3><span class="status-chip">7 días</span></div>
+              <div class="report-gauge" id="reportGauge"></div>
+            </section>
+            <section class="panel report-evidence-card">
+              <div class="panel-head"><h3>Evidencia capturada</h3><span class="status-chip">Actividad</span></div>
+              <div class="report-evidence-stats" id="reportEvidenceStats"></div>
+            </section>
+            <section class="report-bottom-banner">
+              <article><span>◇</span><strong>Decisiones basadas en datos</strong><small>Optimiza operación, márgenes y rentabilidad.</small></article>
+              <article><span>◷</span><strong>Datos en tiempo real</strong><small>Información actualizada al instante.</small></article>
+              <article><span>⇩</span><strong>Reportes descargables</strong><small>Exporta datos con un clic.</small></article>
+              <article><span>✓</span><strong>100% confiable</strong><small>Tus datos siempre protegidos.</small></article>
+              <button class="primary" type="button">Ver todos los reportes →</button>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="paymentsView">
+          <div class="split-view">
+            <form class="panel form-panel" id="paymentForm">
+              <h3>Registrar pago externo</h3>
+              <input type="hidden" name="id" id="paymentId">
+              <label>Cleaner
+                <select name="cleaner" id="paymentCleanerSelect"></select>
+              </label>
+              <section class="payment-job-picker" id="paymentJobPicker"></section>
+              <label>Monto <input name="amount" id="paymentAmount" type="number" value="0"></label>
+              <label>Metodo
+                <select name="method">
+                  <option>Efectivo</option>
+                  <option>Transferencia</option>
+                  <option>PayPal</option>
+                  <option>Zelle</option>
+                  <option>Tarjeta</option>
+                </select>
+              </label>
+              <label>Periodo <input name="period" id="paymentPeriod" readonly></label>
+              <div class="form-actions">
+                <button class="primary" type="submit" id="savePaymentButton">Registrar pago externo</button>
+                <button class="ghost hidden" type="button" id="cancelPaymentEdit">Cancelar edicion</button>
+              </div>
+            </form>
+            <section class="panel">
+              <div class="panel-head"><h3>Comprobantes</h3><span>Empresa Pro</span></div>
+              <div id="paymentReceipts" class="receipt-list"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="settingsView">
+          <div class="settings-grid">
+            <form class="panel form-panel profile-settings-form" id="profileSettingsForm">
+              <h3>Perfil de la cuenta</h3>
+              <p class="muted">Datos visibles en el panel y utiles para identificar tu negocio.</p>
+              <div class="profile-photo-row">
+                <span class="profile-photo-preview" id="profilePhotoPreview">JV</span>
+                <label>Foto o logo
+                  <input name="photo" id="profilePhotoInput" type="file" accept="image/*">
+                </label>
+              </div>
+              <label>Nombre del negocio <input name="businessName" placeholder="JobVisto Cleaning"></label>
+              <label>Nombre del administrador <input name="ownerName" placeholder="Miguel"></label>
+              <label>Nombre para el saludo <input name="greetingName" placeholder="Miguel"></label>
+              <label>Telefono <input name="phone" placeholder="+972 50 000 0000"></label>
+              <label>Email <input name="email" type="email" placeholder="admin@jobvisto.demo"></label>
+              <label>Direccion base <input name="address" placeholder="Tel Aviv, Israel"></label>
+              <button class="primary" type="submit">Guardar perfil</button>
+            </form>
+
+            <form class="panel form-panel" id="serviceRulesForm">
+              <h3>Reglas de precios al cliente</h3>
+              <p class="muted">Estas reglas llenan automaticamente el precio por hora cuando creas o editas un trabajo. Si un caso es especial, puedes cambiarlo manualmente.</p>
+              <div class="rules-editor" id="serviceRulesEditor"></div>
+              <button class="primary" type="submit">Guardar reglas de precios</button>
+            </form>
+
+            <form class="panel form-panel" id="clientPriceRulesForm">
+              <h3>Reglas independientes por cliente</h3>
+              <p class="muted">Usa esto cuando un cliente paga distinto a la regla general. Ejemplo: regla general 85/h, pero Gladys paga 100/h.</p>
+              <input type="hidden" name="clientRuleId">
+              <label>Cliente con precio especial
+                <select name="clientId" id="specialClientPriceSelect"></select>
+              </label>
+              <div>
+                <strong class="subsection-title">Precios especiales por servicio</strong>
+                <p class="muted">Deja un campo en 0 o vacio para usar el precio general de ese servicio.</p>
+                <div class="rules-editor compact-rules" id="specialClientPricesEditor"></div>
+              </div>
+              <button class="primary" type="submit">Guardar regla del cliente</button>
+              <div class="cost-rule-list" id="specialClientPriceRulesList"></div>
+            </form>
+
+            <form class="panel form-panel" id="costRulesForm">
+              <h3>Reglas de pago a cleaners</h3>
+              <p class="muted">Sirve para reportes internos: cuanto cuesta el cleaner contra cuanto se cobra al cliente.</p>
+              <input type="hidden" name="ruleId">
+              <label>Regla general por hora <input name="generalCleanerRate" type="number" min="0"></label>
+              <div>
+                <strong class="subsection-title">Valores generales por servicio</strong>
+                <p class="muted">Si un servicio tiene un costo distinto para pagar al cleaner, se usa este valor. Si queda vacio, usa la regla general.</p>
+                <div class="rules-editor compact-rules" id="generalCleanerRulesEditor"></div>
+              </div>
+              <label>Cleaner con regla especial
+                <select name="specialCleanerId" id="specialCleanerSelect"></select>
+              </label>
+              <label>Tipo de regla
+                <select name="specialMode">
+                  <option value="replace">Reemplaza la regla general</option>
+                  <option value="add">Se suma a la regla general</option>
+                  <option value="match_client">Cobra igual que el cliente</option>
+                </select>
+              </label>
+              <label>Valor especial por hora <input name="specialCleanerRate" type="number" min="0"></label>
+              <div>
+                <strong class="subsection-title">Valores especiales por servicio</strong>
+                <p class="muted">Para el dueno o un cleaner especial puedes poner valores por limpieza normal, deep cleaning, oficina, urgente y mas.</p>
+                <div class="rules-editor compact-rules" id="specialCleanerRulesEditor"></div>
+              </div>
+              <button class="primary" type="submit">Guardar reglas de costos</button>
+              <div class="cost-rule-list" id="specialCostRulesList"></div>
+            </form>
+          </div>
+      <!-- Mobile Bottom Navigation Bar -->
+      <nav class="mobile-bottom-nav">
+        <button class="nav-item active" data-mobile-view="dashboard" type="button">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          <span>Panel</span>
+        </button>
+        <button class="nav-item" data-mobile-view="calendar" type="button">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          <span>Agenda</span>
+        </button>
+        <button class="nav-item-fab" id="mobileFabButton" type="button" aria-label="Nuevo Trabajo">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+        <button class="nav-item" data-mobile-view="clients" type="button">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          <span>Clientes</span>
+        </button>
+        <button class="nav-item" id="mobileMoreButton" type="button">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+          <span>Más</span>
+        </button>
+      </nav>
+
+      <!-- Mobile More Menu Modal -->
+      <div class="modal hidden" id="mobileMoreModal" role="dialog" aria-modal="true" aria-labelledby="mobileMoreTitle">
+        <div class="modal-card mobile-more-card">
+          <div class="panel-head">
+            <div>
+              <h3 id="mobileMoreTitle">Más opciones</h3>
+              <p class="muted">Navegación de JobVisto</p>
+            </div>
+            <button class="ghost" type="button" id="closeMobileMoreModal">Cerrar</button>
+          </div>
+          <div class="mobile-more-grid">
+            <button class="more-grid-item" data-more-view="cleaners" type="button">
+              <span class="more-grid-icon">🧹</span>
+              <strong>Cleaners</strong>
+            </button>
+            <button class="more-grid-item" data-more-view="jobs" type="button">
+              <span class="more-grid-icon">💼</span>
+              <strong>Trabajos</strong>
+            </button>
+            <button class="more-grid-item" data-more-view="clientLinks" type="button">
+              <span class="more-grid-icon">🔗</span>
+              <strong>Links Clientes</strong>
+            </button>
+            <button class="more-grid-item" data-more-view="reports" type="button">
+              <span class="more-grid-icon">📊</span>
+              <strong>Reportes</strong>
+            </button>
+            <button class="more-grid-item" data-more-view="payments" type="button" data-company-nav>
+              <span class="more-grid-icon">🧾</span>
+              <strong>Pagos</strong>
+            </button>
+            <button class="more-grid-item" data-more-view="settings" type="button">
+              <span class="more-grid-icon">⚙️</span>
+              <strong>Ajustes</strong>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <main class="client-portal-page hidden" id="clientPortalPage">
+      <section class="portal-header">
+        <a class="logo" href="./index.html">
+          <img src="./assets/Logo Jobvisto.png" alt="JobVisto Logo">
+        </a>
+        <div class="portal-actions">
+          <button class="ghost" type="button" id="clientPortalLogout">Cerrar sesion</button>
+          <div class="language-switch portal-language-switch" aria-label="Language">
+            <button class="active" type="button" data-language="en">EN</button>
+            <button type="button" data-language="es">ES</button>
+            <button type="button" data-language="ru">RU</button>
+          </div>
+          <span class="status-chip" data-i18n="clientPrivatePortal">Client private portal</span>
+        </div>
+      </section>
+      <section class="portal-lock client-access-card" id="clientPortalLock">
+        <div class="client-access-card-top">
+          <span class="client-access-icon"><img src="./assets/Logo Jobvisto.png" alt="JV Logo" style="height:32px; width:auto;"></span>
+          <div>
+            <p class="eyebrow" data-i18n="clientAccessEyebrow">Secure client portal</p>
+            <h1 data-i18n="clientAccessTitle">Client access</h1>
+          </div>
+        </div>
+        <p class="muted client-access-copy" data-i18n="clientAccessCopy">Enter the password sent by the company or cleaner to view jobs, photos and confirmations.</p>
+        <div class="client-access-trust">
+          <span data-i18n="clientAccessTrust1">Private link</span>
+          <span data-i18n="clientAccessTrust2">Service evidence</span>
+          <span data-i18n="clientAccessTrust3">Client confirmation</span>
+        </div>
+        <label class="client-access-field">
+          <span data-i18n="portalPassword">Portal password</span>
+          <input id="clientPortalPassword" placeholder="Example: JV-CAS-c1" data-i18n-placeholder="portalPasswordPlaceholder">
+        </label>
+        <button class="primary client-access-submit" id="unlockClientPortal" data-i18n="clientPortalEnter">Enter portal</button>
+      </section>
+      <section class="portal-content hidden" id="clientPortalContent">
+        <div class="client-public">
+          <section class="client-summary">
+            <span class="status-chip" data-i18n="clientLabel">Client</span>
+            <h3 data-i18n="privateServiceSummary">Private service summary</h3>
+            <div id="clientPortalSummary"></div>
+            <button class="primary" id="clientPortalConfirmButton" data-i18n="confirmServiceCompleted">Confirm service completed</button>
+          </section>
+          <section class="photo-board" id="clientPortalPhotos"></section>
+        </div>
+      </section>
+    </main>
+
+    <main class="client-portal-page cleaner-portal-page hidden" id="cleanerPortalPage">
+      <section class="portal-header">
+        <a class="logo" href="./index.html">
+          <span>JV</span>
+          <strong>JobVisto</strong>
+        </a>
+        <div class="portal-actions">
+          <button class="ghost" type="button" id="cleanerPortalLogout">Cerrar sesion</button>
+          <span class="status-chip">Acceso privado cleaner</span>
+        </div>
+      </section>
+      <section class="portal-lock" id="cleanerPortalLock">
+        <h1>Acceso del equipo</h1>
+        <p class="muted">Entra para ver tus trabajos asignados, tomar trabajos abiertos y registrar llegada, fotos y salida.</p>
+        <label>Clave de acceso <input id="cleanerPortalPassword" placeholder="JV-MARIA"></label>
+        <button class="primary" id="unlockCleanerPortal">Entrar</button>
+      </section>
+      <section class="portal-content hidden" id="cleanerPortalContent">
+        <div class="cleaner-tabs" role="tablist">
+          <button class="active" type="button" data-cleaner-tab="summary">Resumen</button>
+          <button type="button" data-cleaner-tab="jobs">Trabajos</button>
+          <button type="button" data-cleaner-tab="calendar">Calendario</button>
+          <button type="button" data-cleaner-tab="hours">Horas trabajadas</button>
+          <button type="button" data-cleaner-tab="payments">Pagos</button>
+          <button type="button" data-cleaner-tab="report">Reporte</button>
+        </div>
+        <div class="metric-grid cleaner-stats" id="cleanerStats"></div>
+        <div class="dashboard-grid cleaner-tab-panel active" id="cleanerTabSummary">
+          <section class="panel">
+            <div class="panel-head"><h3 id="cleanerPortalTitle">Tus trabajos</h3><span class="status-chip">Asignados</span></div>
+            <div class="client-list" id="cleanerAssignedJobs"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><h3>Trabajos abiertos</h3><span class="status-chip">Tomar</span></div>
+            <div class="client-list" id="cleanerOpenJobs"></div>
+          </section>
+        </div>
+        <section class="panel cleaner-tab-panel" id="cleanerTabJobs">
+          <div class="panel-head"><h3>Historial de trabajos</h3><span class="status-chip">Cerrados</span></div>
+          <div class="admin-history-unlock" id="cleanerHistoryAdminBox">
+            <div>
+              <strong>Correcciones con permiso admin</strong>
+              <p class="muted">Para agregar fotos a trabajos cerrados, ingresa la clave administrativa.</p>
+            </div>
+            <label>Clave admin <input id="cleanerHistoryAdminKey" placeholder="JV-ADMIN"></label>
+            <button class="ghost" type="button" id="unlockCleanerHistoryAdmin">Activar permiso</button>
+          </div>
+          <div class="client-list" id="cleanerHistoryJobs"></div>
+        </section>
+        <section class="panel cleaner-tab-panel" id="cleanerTabCalendar">
+          <div class="panel-head"><h3>Mi calendario</h3><span class="status-chip">Agenda</span></div>
+          <div id="cleanerCalendar"></div>
+        </section>
+        <section class="panel cleaner-tab-panel" id="cleanerTabHours">
+          <div class="panel-head"><h3>Horas trabajadas</h3><span class="status-chip">Mes actual</span></div>
+          <div id="cleanerHoursReport"></div>
+        </section>
+        <section class="panel cleaner-tab-panel" id="cleanerTabPayments">
+          <div class="panel-head"><h3>Pagos generados</h3><span class="status-chip">Firma requerida</span></div>
+          <div class="client-list" id="cleanerPaymentReceipts"></div>
+        </section>
+        <section class="panel cleaner-tab-panel" id="cleanerTabReport">
+          <div class="panel-head">
+            <h3>Reporte del cleaner</h3>
+            <label class="compact-filter">Mes <select id="cleanerReportMonth"></select></label>
+          </div>
+          <div id="cleanerMoneyReport"></div>
+        </section>
+      </section>
+    </main>
+
+    <div class="modal hidden" id="signatureModal" role="dialog" aria-modal="true" aria-labelledby="signatureTitle">
+      <div class="modal-card">
+        <div class="panel-head">
+          <div>
+            <h3 id="signatureTitle">Firma de pago recibido</h3>
+            <p class="muted">El cleaner firma con dedo o mouse para confirmar que recibio el pago externo.</p>
+          </div>
+          <button class="ghost" type="button" id="closeSignatureModal">Cerrar</button>
+        </div>
+        <label>Nombre de quien firma <input id="signatureReceiver" value="Maria Lopez"></label>
+        <canvas id="signatureCanvas" width="720" height="220"></canvas>
+        <div class="form-actions">
+          <button class="ghost" type="button" id="clearSignature">Limpiar firma</button>
+          <button class="primary" type="button" id="saveSignature">Guardar firma</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal hidden" id="photoModal" role="dialog" aria-modal="true" aria-labelledby="photoModalTitle">
+      <div class="modal-card photo-modal-card">
+        <div class="panel-head">
+          <div>
+            <h3 id="photoModalTitle">Evidencia</h3>
+            <p class="muted" id="photoModalMeta">Foto del trabajo</p>
+          </div>
+          <button class="ghost" type="button" id="closePhotoModal">Cerrar</button>
+        </div>
+        <img id="photoModalImage" class="photo-modal-image" alt="Evidencia del servicio">
+        <p class="photo-comment" id="photoModalComment"></p>
+      </div>
+    </div>
+
+    <div class="modal hidden" id="deleteJobModal" role="dialog" aria-modal="true" aria-labelledby="deleteJobTitle">
+      <div class="modal-card confirm-modal-card">
+        <div class="panel-head">
+          <div>
+            <h3 id="deleteJobTitle">Confirmar eliminacion</h3>
+            <p class="muted">Se eliminara solo el trabajo seleccionado.</p>
+          </div>
+          <button class="ghost" type="button" id="closeDeleteJobModal">Cerrar</button>
+        </div>
+        <div class="delete-job-summary" id="deleteJobSummary"></div>
+        <p class="muted">Si existen otros trabajos del mismo cliente, quedan guardados porque son registros separados.</p>
+        <div class="form-actions">
+          <button class="ghost" type="button" id="cancelDeleteJob">Cancelar</button>
+          <button class="mini-action danger confirm-danger" type="button" id="confirmDeleteJobButton">Eliminar este trabajo</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal hidden" id="archiveCleanerModal" role="dialog" aria-modal="true" aria-labelledby="archiveCleanerTitle">
+      <div class="modal-card confirm-modal-card">
+        <div class="panel-head">
+          <div>
+            <h3 id="archiveCleanerTitle">Archivar cleaner</h3>
+            <p class="muted">El cleaner sale del equipo activo, pero su historial queda guardado.</p>
+          </div>
+          <button class="ghost" type="button" id="closeArchiveCleanerModal">Cerrar</button>
+        </div>
+        <div class="delete-job-summary" id="archiveCleanerSummary"></div>
+        <p class="muted">Sus trabajos, pagos, fotos y firmas anteriores se mantienen para reportes e historial.</p>
+        <div class="form-actions">
+          <button class="ghost" type="button" id="cancelArchiveCleaner">Cancelar</button>
+          <button class="mini-action danger confirm-danger" type="button" id="confirmArchiveCleanerButton">Archivar cleaner</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal hidden" id="archiveClientModal" role="dialog" aria-modal="true" aria-labelledby="archiveClientTitle">
+      <div class="modal-card confirm-modal-card">
+        <div class="panel-head">
+          <div>
+            <h3 id="archiveClientTitle">Archivar cliente</h3>
+            <p class="muted">El cliente sale de la lista activa, pero su historial queda guardado.</p>
+          </div>
+          <button class="ghost" type="button" id="closeArchiveClientModal">Cerrar</button>
+        </div>
+        <div class="delete-job-summary" id="archiveClientSummary"></div>
+        <p class="muted">Sus trabajos, fotos y firmas anteriores se mantienen para reportes e historial.</p>
+        <div class="form-actions">
+          <button class="ghost" type="button" id="cancelArchiveClient">Cancelar</button>
+          <button class="mini-action danger confirm-danger" type="button" id="confirmArchiveClientButton">Archivar cliente</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal hidden" id="deleteReceiptModal" role="dialog" aria-modal="true" aria-labelledby="deleteReceiptTitle">
+      <div class="modal-card confirm-modal-card brand-confirm-card">
+        <div class="panel-head">
+          <div>
+            <span class="status-chip">JV</span>
+            <h3 id="deleteReceiptTitle">Eliminar comprobante</h3>
+            <p class="muted">Esta accion borra el comprobante y libera sus trabajos para generar otro pago.</p>
+          </div>
+          <button class="ghost" type="button" id="closeDeleteReceiptModal">Cerrar</button>
+        </div>
+        <div class="delete-job-summary" id="deleteReceiptSummary"></div>
+        <div class="form-actions">
+          <button class="ghost" type="button" id="cancelDeleteReceipt">Cancelar</button>
+          <button class="mini-action danger confirm-danger" type="button" id="confirmDeleteReceiptButton">Eliminar comprobante</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./supabase-config.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,9 @@
+.env
+.env.*
+!/.env.example
+website/supabase-config.js
+supabase/.temp/
+node_modules/
+dist/
+.netlify/
+

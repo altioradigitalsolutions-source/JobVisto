@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>JobVisto | Gestion simple para cleaners y empresas de limpieza</title>
+    <meta
+      name="description"
+      content="JobVisto organiza trabajos de limpieza con check-in, fotos, firma del cliente, calculo de horas y comprobantes de pago recibido."
+    >
+    <meta name="theme-color" content="#063f34">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="apple-touch-icon" href="./assets/jobvisto-icon-192.png">
+    <link rel="preconnect" href="https://images.unsplash.com">
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <header class="site-header" data-header>
+      <a class="brand" href="#top" aria-label="JobVisto home">
+        <img class="brand-logo" src="./assets/Logo Jobvisto.png" alt="JobVisto">
+        <span>JobVisto</span>
+      </a>
+      <nav class="nav-links" aria-label="Principal">
+        <a href="#features">Features</a>
+        <a href="#flows">How it works</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#proof">Testimonials</a>
+      </nav>
+      <div class="header-actions">
+        <button class="icon-button" type="button" data-lang-toggle aria-label="Cambiar idioma" title="Cambiar idioma">
+          <i data-lucide="languages"></i>
+          <span data-lang-label>ES</span>
+        </button>
+        <a class="button button-login" href="./app.html?intent=login&mode=company">Log in</a>
+        <a class="button button-light" href="./app.html?intent=signup&plan=free&mode=independent">Get started free</a>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-content">
+          <h1 id="hero-title">Run Your Cleaning Business</h1>
+          <p class="hero-copy">All-in-one software to manage your clients, cleaners, jobs, schedules and payments. Save time, stay organized and grow your business.</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="./app.html?intent=signup&plan=free&mode=independent">
+              <span>Get started free</span>
+              <i data-lucide="arrow-right"></i>
+            </a>
+            <a class="button button-ghost" href="#flows">
+              <span>Watch demo</span>
+              <i data-lucide="play-circle"></i>
+            </a>
+          </div>
+          <div class="hero-trust">
+            <span><i data-lucide="check-circle-2"></i>Free plan available</span>
+            <span><i data-lucide="check-circle-2"></i>No credit card required</span>
+            <span><i data-lucide="check-circle-2"></i>Cancel anytime</span>
+          </div>
+        </div>
+        <div class="hero-product" aria-label="JobVisto product preview">
+          <img class="hero-laptop" src="./assets/Dashboard desktop.png" alt="JobVisto desktop dashboard">
+          <img class="hero-phone" src="./assets/Dashboard CellPhone new.png" alt="JobVisto mobile dashboard">
+        </div>
+      </section>
+
+      <section class="feature-strip" id="features" aria-label="JobVisto features">
+        <article><i data-lucide="users-round"></i><strong>Manage Clients</strong><span>Keep client information, history and preferences in one place.</span></article>
+        <article><i data-lucide="user-round"></i><strong>Manage Cleaners</strong><span>Organize your team, schedules, availability and performance.</span></article>
+        <article><i data-lucide="calendar-days"></i><strong>Smart Scheduling</strong><span>Calendar, recurring jobs and automatic assignments.</span></article>
+        <article><i data-lucide="camera"></i><strong>Photo Evidence</strong><span>Before and after photos, signatures and job documentation.</span></article>
+        <article><i data-lucide="chart-no-axes-column-increasing"></i><strong>Reports & Insights</strong><span>Track performance, revenue and growth.</span></article>
+        <article><i data-lucide="credit-card"></i><strong>Payments</strong><span>Invoices, payment status and financial management.</span></article>
+      </section>
+
+      <section class="proof-strip" aria-label="Indicadores principales">
+        <div>
+          <strong>Built for cleaners</strong>
+          <span>Simple tools for daily operations</span>
+        </div>
+        <div>
+          <strong>Proof-first workflow</strong>
+          <span>Photos, signatures and job history</span>
+        </div>
+        <div>
+          <strong>Start free</strong>
+          <span>Try JobVisto with the free plan</span>
+        </div>
+        <div>
+          <strong>Scale when ready</strong>
+          <span>Upgrade as your team grows</span>
+        </div>
+      </section>
+
+      <section class="section how-section" id="flows">
+        <div class="how-heading">
+          <span class="how-kicker">How it works</span>
+          <h2>Asi de simple funciona JobVisto</h2>
+          <p>Un flujo de trabajo disenado para que tu empresa de limpieza sea mas organizada, eficiente y rentable.</p>
+        </div>
+
+        <div class="how-steps" aria-label="How JobVisto works">
+          <article class="how-step">
+            <div class="step-copy">
+              <span class="step-number">1</span>
+              <div>
+                <h3>Crea tu cuenta</h3>
+                <p>Registrate en minutos y configura tu empresa o tu cuenta independiente.</p>
+              </div>
+            </div>
+            <div class="step-icon"><i data-lucide="user-plus"></i></div>
+            <figure class="step-shot">
+              <img src="./assets/login%20de%20Jobvisto.png" alt="Pantalla real de registro de JobVisto">
+            </figure>
+          </article>
+
+          <article class="how-step">
+            <div class="step-copy">
+              <span class="step-number">2</span>
+              <div>
+                <h3>Agrega tus clientes</h3>
+                <p>Guarda la informacion importante de cada cliente y mantenla ordenada.</p>
+              </div>
+            </div>
+            <div class="step-icon"><i data-lucide="users-round"></i></div>
+            <figure class="step-shot">
+              <img src="./assets/Section%20Clients%20Desktop.png" alt="Pantalla real de clientes en JobVisto">
+            </figure>
+          </article>
+
+          <article class="how-step">
+            <div class="step-copy">
+              <span class="step-number">3</span>
+              <div>
+                <h3>Crea y asigna trabajos</h3>
+                <p>Programa trabajos, asigna cleaners y define fecha, hora y servicio.</p>
+              </div>
+            </div>
+            <div class="step-icon"><i data-lucide="calendar-plus"></i></div>
+            <figure class="step-shot">
+              <img src="./assets/seccion%20de%20job.png" alt="Pantalla real para crear trabajos en JobVisto">
+            </figure>
+          </article>
+
+          <article class="how-step phone-step">
+            <div class="step-copy">
+              <span class="step-number">4</span>
+              <div>
+                <h3>El cleaner realiza el trabajo</h3>
+                <p>El equipo ve sus trabajos desde el telefono y registra el progreso.</p>
+              </div>
+            </div>
+            <div class="step-icon"><i data-lucide="smartphone"></i></div>
+            <figure class="step-shot phone-shot">
+              <img src="./assets/Dashboard%20CellPhone%20new.png" alt="Pantalla movil real del cleaner en JobVisto">
+            </figure>
+          </article>
+
+          <article class="how-step">
+            <div class="step-copy">
+              <span class="step-number">5</span>
+              <div>
+                <h3>Evidencia y confirmacion</h3>
+                <p>Fotos, notas y firmas quedan registradas para revisar cada servicio.</p>
+              </div>
+            </div>
+            <div class="step-icon"><i data-lucide="camera"></i></div>
+            <figure class="step-shot">
+              <img src="./assets/link%20de%20cliente%20desktop.png" alt="Pantalla real de evidencia y firma del cliente en JobVisto">
+            </figure>
+          </article>
+
+          <article class="how-step">
+            <div class="step-copy">
+              <span class="step-number">6</span>
+              <div>
+                <h3>Reportes y control total</h3>
+                <p>Monitorea tu operacion, horas, trabajos y resultados desde el dashboard.</p>
+              </div>
+            </div>
+            <div class="step-icon"><i data-lucide="chart-no-axes-column-increasing"></i></div>
+            <figure class="step-shot">
+              <img src="./assets/Dashboard%20desktop.png" alt="Dashboard real de reportes y control de JobVisto">
+            </figure>
+          </article>
+        </div>
+
+        <div class="how-cta">
+          <div class="cta-icon"><i data-lucide="sparkles"></i></div>
+          <div>
+            <h3>Empieza a simplificar tu operacion hoy</h3>
+            <p>Unete a empresas de limpieza que ya estan creciendo con JobVisto.</p>
+          </div>
+          <a class="button button-primary" href="./app.html?intent=signup&plan=free&mode=independent">
+            <span>Empezar gratis</span>
+            <i data-lucide="arrow-right"></i>
+          </a>
+          <div class="cta-proof">
+            <span><i data-lucide="shield-check"></i>Plan gratis disponible</span>
+            <span><i data-lucide="credit-card"></i>Sin tarjeta</span>
+            <span><i data-lucide="check-circle-2"></i>Cancela cuando quieras</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section testimonial-section" id="proof">
+        <div class="testimonial-heading">
+          <span class="testimonial-kicker">Testimonials</span>
+          <h2>Probado en una operacion real de limpieza</h2>
+          <p>JobVisto empieza desde una necesidad real: ordenar trabajos, clientes, evidencia y pagos sin depender de mensajes sueltos.</p>
+        </div>
+
+        <article class="founder-testimonial">
+          <div class="testimonial-mark">
+            <i data-lucide="sparkles"></i>
+          </div>
+          <div class="testimonial-content">
+            <div class="rating-row" aria-label="5 star rating">
+              <i data-lucide="star"></i>
+              <i data-lucide="star"></i>
+              <i data-lucide="star"></i>
+              <i data-lucide="star"></i>
+              <i data-lucide="star"></i>
+            </div>
+            <blockquote>
+              “Yo empece JobVisto porque necesitaba ordenar trabajos, clientes, evidencia y pagos sin depender de WhatsApp o notas sueltas. Al usarlo, senti que por fin podia ver cada limpieza con claridad: quien fue, que hizo, que fotos subio y que quedo firmado.”
+            </blockquote>
+            <div class="testimonial-author">
+              <strong>Meir M.</strong>
+              <span>Founder de JobVisto · Usado en operacion real de limpieza</span>
+            </div>
+          </div>
+          <div class="testimonial-preview" aria-label="JobVisto real product preview">
+            <img src="./assets/Dashboard%20desktop.png" alt="Dashboard real de JobVisto">
+            <img src="./assets/Dashboard%20CellPhone%20new.png" alt="Vista movil real de JobVisto">
+          </div>
+        </article>
+
+        <div class="testimonial-trust">
+          <div><i data-lucide="briefcase-business"></i><strong>Built from real cleaning work</strong><span>Created around daily service operations</span></div>
+          <div><i data-lucide="list-checks"></i><strong>Designed for simple control</strong><span>Clients, cleaners, jobs and history in one place</span></div>
+          <div><i data-lucide="badge-check"></i><strong>Proof-first from day one</strong><span>Photos, signatures and payment records</span></div>
+          <div><i data-lucide="gift"></i><strong>Free plan available</strong><span>Start testing before upgrading</span></div>
+        </div>
+      </section>
+
+      <section class="section pricing" id="pricing">
+        <div class="pricing-heading">
+          <span class="pricing-kicker">Pricing</span>
+          <h2>The perfect plan for <span>every stage of your business</span></h2>
+          <p>Start with the free plan and scale when you are ready. No contracts. Cancel anytime.</p>
+          <div class="billing-toggle" aria-label="Billing period">
+            <span>Monthly</span>
+            <button class="toggle-switch" type="button" aria-label="Switch billing period">
+              <span></span>
+            </button>
+            <span>Annual</span>
+            <strong>Save 20%</strong>
+          </div>
+        </div>
+
+        <div class="price-grid">
+          <article class="price-card">
+            <div class="plan-icon"><i data-lucide="user-round"></i></div>
+            <h3>Freelancer Free</h3>
+            <p class="plan-subtitle">For testing JobVisto</p>
+            <p class="price">$0</p>
+            <p class="price-note">Free forever</p>
+            <div class="cleaner-limit"><i data-lucide="user-round"></i><strong>1 cleaner</strong></div>
+            <ul>
+              <li>Up to 3 clients</li>
+              <li>Up to 5 jobs per month</li>
+              <li>Basic calendar</li>
+              <li>Photo evidence</li>
+              <li>Digital signatures</li>
+              <li>Client portal</li>
+            </ul>
+            <a class="button plan-button secondary-plan" href="./app.html?intent=signup&plan=free&mode=independent">Get started free</a>
+            <small>No credit card required</small>
+          </article>
+
+          <article class="price-card">
+            <div class="plan-icon"><i data-lucide="user-round-check"></i></div>
+            <h3>Independent</h3>
+            <p class="plan-subtitle">For independent cleaners</p>
+            <p class="price">$9.99</p>
+            <p class="price-note">per month</p>
+            <div class="cleaner-limit"><i data-lucide="user-round"></i><strong>1 cleaner</strong></div>
+            <ul>
+              <li>Up to 20 clients</li>
+              <li>Unlimited jobs</li>
+              <li>Full calendar</li>
+              <li>Photo evidence and notes</li>
+              <li>Digital signatures</li>
+              <li>Arrival and departure tracking</li>
+              <li>Client portal</li>
+            </ul>
+            <a class="button plan-button" href="https://buy.stripe.com/dRmfZh20RcvVcAuedT2ZO0o">Choose plan</a>
+            <small>Cancel anytime</small>
+          </article>
+
+          <article class="price-card">
+            <div class="plan-icon"><i data-lucide="users-round"></i></div>
+            <h3>Company</h3>
+            <p class="plan-subtitle">For growing teams</p>
+            <p class="price">$29.99</p>
+            <p class="price-note">per month</p>
+            <div class="cleaner-limit"><i data-lucide="users-round"></i><strong>Up to 5 cleaners</strong></div>
+            <ul>
+              <li>Unlimited clients</li>
+              <li>Unlimited jobs</li>
+              <li>Calendar by cleaner</li>
+              <li>Photos, notes and checklist</li>
+              <li>Digital signatures</li>
+              <li>Client and cleaner portals</li>
+              <li>Operational reports</li>
+              <li>Email support</li>
+            </ul>
+            <a class="button plan-button" href="https://buy.stripe.com/eVq8wP8pfbrR1VQ8Tz2ZO0p">Choose plan</a>
+            <small>Cancel anytime</small>
+          </article>
+
+          <article class="price-card highlighted">
+            <div class="popular-ribbon">Most popular</div>
+            <div class="plan-icon"><i data-lucide="chart-no-axes-column-increasing"></i></div>
+            <h3>Pro</h3>
+            <p class="plan-subtitle">For established companies</p>
+            <p class="price">$59.99</p>
+            <p class="price-note">per month</p>
+            <div class="cleaner-limit"><i data-lucide="users-round"></i><strong>Up to 20 cleaners</strong></div>
+            <ul>
+              <li>Everything in Company</li>
+              <li>Cleaner payment receipts</li>
+              <li>Individual and consolidated payouts</li>
+              <li>Reports by cleaner, client and period</li>
+              <li>Advanced job history</li>
+              <li>Pending signature control</li>
+              <li>Simple data export</li>
+              <li>Priority support</li>
+            </ul>
+            <a class="button plan-button" href="https://buy.stripe.com/cNifZh7lb9jJfMG8Tz2ZO0q">Choose plan</a>
+            <small>Cancel anytime</small>
+          </article>
+
+          <article class="price-card enterprise-plan">
+            <div class="plan-icon"><i data-lucide="building-2"></i></div>
+            <h3>Enterprise</h3>
+            <p class="plan-subtitle">For large operations</p>
+            <p class="price sales-price">Talk to sales</p>
+            <div class="cleaner-limit"><i data-lucide="infinity"></i><strong>Custom cleaner limits</strong></div>
+            <ul>
+              <li>Multi-location support</li>
+              <li>Advanced roles and permissions</li>
+              <li>Personalized onboarding</li>
+              <li>Priority support</li>
+              <li>Custom workflow setup</li>
+              <li>Custom integrations if needed</li>
+            </ul>
+            <a class="button plan-button secondary-plan" href="mailto:hello@jobvisto.com?subject=JobVisto%20Enterprise">Contact sales</a>
+            <small>We help you grow</small>
+          </article>
+        </div>
+
+        <div class="pricing-trust">
+          <div><i data-lucide="shield-check"></i><strong>Free plan available</strong><span>Start with real jobs</span></div>
+          <div><i data-lucide="credit-card"></i><strong>No credit card</strong><span>Start without friction</span></div>
+          <div><i data-lucide="check-circle-2"></i><strong>Cancel anytime</strong><span>No contracts or commitments</span></div>
+          <div><i data-lucide="lock-keyhole"></i><strong>Safe and reliable</strong><span>Your data stays protected</span></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-main">
+        <div class="footer-brand">
+          <a class="footer-logo" href="#top" aria-label="JobVisto home">
+            <img src="./assets/Logo%20Jobvisto%20negativo.png" alt="JobVisto">
+          </a>
+          <p>Organiza trabajos de limpieza, clientes, evidencia, firmas y pagos desde una sola plataforma simple.</p>
+          <div class="footer-badges">
+            <span><i data-lucide="gift"></i>Free plan available</span>
+            <span><i data-lucide="shield-check"></i>Proof-first workflow</span>
+          </div>
+        </div>
+
+        <nav class="footer-column" aria-label="Product">
+          <h3>Product</h3>
+          <a href="#features">Features</a>
+          <a href="#flows">How it works</a>
+          <a href="#pricing">Pricing</a>
+          <a href="#proof">Testimonial</a>
+        </nav>
+
+        <nav class="footer-column" aria-label="Use cases">
+          <h3>For cleaning teams</h3>
+          <a href="./app.html?intent=signup&plan=free&mode=independent">Independent cleaner</a>
+          <a href="./app.html?intent=signup&mode=company">Cleaning company</a>
+          <a href="#pricing">Compare plans</a>
+          <a href="mailto:hello@jobvisto.com?subject=JobVisto%20Enterprise">Enterprise</a>
+        </nav>
+
+        <div class="footer-column footer-cta">
+          <h3>Start organizing today</h3>
+          <p>Use the free plan to try JobVisto and upgrade when your operation grows.</p>
+          <a class="button footer-button" href="./app.html?intent=signup&plan=free&mode=independent">
+            <span>Get started free</span>
+            <i data-lucide="arrow-right"></i>
+          </a>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <span>© 2026 JobVisto. All rights reserved.</span>
+        <div>
+          <a href="mailto:hello@jobvisto.com">hello@jobvisto.com</a>
+          <a href="#top">Back to top</a>
+        </div>
+      </div>
+    </footer>
+
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="./script.js"></script>
+  </body>
+</html>
