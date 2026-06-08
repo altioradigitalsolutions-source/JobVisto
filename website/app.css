@@ -60,16 +60,12 @@ a { color: inherit; text-decoration: none; }
   gap: 10px;
   font-weight: 900;
 }
-.auth-brand img,
-.saas-mobile-head img,
-.dashboard-mobile-head img,
-.portal-header .logo img {
+.auth-brand img {
   display: block;
   width: clamp(150px, 16vw, 210px);
   height: auto;
   max-height: 54px;
   object-fit: contain;
-  mix-blend-mode: multiply;
 }
 .auth-brand span, .logo span {
   display: grid;
@@ -2350,7 +2346,8 @@ button:disabled {
     margin-top: 8px;
   }
   .social-row {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
+    gap: 12px;
   }
   .google {
     min-height: 56px;

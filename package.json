@@ -5,10 +5,15 @@
   "main": "website/server.js",
   "scripts": {
     "start": "node website/server.js",
-    "dev": "node website/server.js"
+    "dev": "node website/server.js",
+    "stripe:listen": "node website/stripe-listen.js"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
+    "pg": "^8.21.0",
     "stripe": "^15.12.0"
+  },
+  "devDependencies": {
+    "@stripe/cli": "^0.0.1"
   }
 }
