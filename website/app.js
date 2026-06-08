@@ -46,7 +46,7 @@ async function loadStateFromSupabase() {
           phone: c.phone || "",
           email: c.email || "",
           address: "",
-          country: c.preferred_language || state.country,
+          country: state.country || "IL",
           paymentMethod: c.default_payment_method === 'cash' ? 'Efectivo' : 'Transferencia',
           notes: c.notes || ""
         }));
@@ -57,7 +57,10 @@ async function loadStateFromSupabase() {
       if (addresses) {
         state.clients.forEach(c => {
           const addr = addresses.find(a => a.client_id === c.id);
-          if (addr) c.address = addr.address_line;
+          if (addr) {
+            c.address = addr.address_line;
+            if (addr.country) c.country = addr.country;
+          }
         });
       }
 
@@ -70,7 +73,9 @@ async function loadStateFromSupabase() {
           phone: c.phone || "",
           email: c.email || "",
           status: c.status === 'available' ? 'Disponible' : 'Ocupada',
-          key: c.access_key
+          key: c.access_key,
+          country: c.country || state.country || "IL",
+          city: c.city || "Zona principal"
         }));
       }
 
@@ -118,13 +123,14 @@ async function loadStateFromSupabase() {
                     j.status === 'open' ? 'Disponible para tomar' : 
                     j.status === 'in_site' ? 'En progreso' :
                     j.status === 'cleaner_finished' ? 'Terminado por cleaner' :
-                    j.status === 'client_confirmed' ? 'Confirmado por cliente' : j.status,
+                    j.status === 'client_confirmed' ? 'Confirmado por cliente' :
+                    j.status === 'signed' ? 'Firmado' : j.status,
             tasks: j.checklist || [],
-            checkedIn: j.status === 'in_site' || j.status === 'cleaner_finished' || j.status === 'client_confirmed',
-            checkedOut: j.status === 'cleaner_finished' || j.status === 'client_confirmed' || jobSignatures.length > 0,
-            cleanerFinished: j.status === 'cleaner_finished' || j.status === 'client_confirmed' || jobSignatures.length > 0,
-            clientConfirmed: j.status === 'client_confirmed' || clientSig !== undefined,
-            signed: j.status === 'client_confirmed' || jobSignatures.length > 0,
+            checkedIn: j.status === 'in_site' || j.status === 'cleaner_finished' || j.status === 'client_confirmed' || j.status === 'signed',
+            checkedOut: j.status === 'cleaner_finished' || j.status === 'client_confirmed' || j.status === 'signed' || jobSignatures.length > 0,
+            cleanerFinished: j.status === 'cleaner_finished' || j.status === 'client_confirmed' || j.status === 'signed' || jobSignatures.length > 0,
+            clientConfirmed: j.status === 'client_confirmed' || j.status === 'signed' || clientSig !== undefined,
+            signed: j.status === 'client_confirmed' || j.status === 'signed' || jobSignatures.length > 0,
             siteSignature: siteSig ? siteSig.signature_data : "",
             siteSignerName: siteSig ? siteSig.signer_name : "",
             clientSignature: clientSig ? clientSig.signature_data : "",
@@ -244,7 +250,7 @@ async function asyncSaveToSupabase() {
         name: client.name,
         phone: client.phone,
         email: client.email,
-        preferred_language: client.country || state.language,
+        preferred_language: state.language || 'es',
         default_payment_method: client.paymentMethod === 'Efectivo' ? 'cash' : 'transfer',
         notes: client.notes
       });
@@ -253,7 +259,8 @@ async function asyncSaveToSupabase() {
         await supabaseClient.from('client_addresses').upsert({
           organization_id: state.orgId,
           client_id: client.id,
-          address_line: client.address
+          address_line: client.address,
+          country: client.country || state.country || 'IL'
         }, { onConflict: 'client_id' });
       }
     }
@@ -276,7 +283,10 @@ async function asyncSaveToSupabase() {
         phone: cleaner.phone,
         email: cleaner.email,
         access_key: cleaner.key,
-        status: cleaner.status === 'Disponible' ? 'available' : 'busy'
+        status: cleaner.status === 'Disponible' ? 'available' : 'busy',
+        country: cleaner.country || state.country || 'IL',
+        city: cleaner.city || 'Zona principal',
+        language: state.language || 'es'
       });
     }
 
@@ -297,9 +307,10 @@ async function asyncSaveToSupabase() {
       
       const dbStatus = job.status === 'Asignado' ? 'scheduled' :
                        job.status === 'Disponible para tomar' ? 'open' :
-                       job.status === 'En progreso' ? 'in_site' :
+                       (job.status === 'En progreso' || job.status === 'En sitio') ? 'in_site' :
                        job.status === 'Terminado por cleaner' ? 'cleaner_finished' :
-                       job.status === 'Confirmado por cliente' ? 'client_confirmed' : 'scheduled';
+                       job.status === 'Confirmado por cliente' ? 'client_confirmed' :
+                       job.status === 'Firmado' ? 'signed' : job.status;
 
       await supabaseClient.from('jobs').upsert({
         id: job.id,
