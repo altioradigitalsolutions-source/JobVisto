@@ -2010,7 +2010,9 @@ function toast(message) {
 function enterApp(mode) {
   portalCleanerAdmin = false;
   state.mode = mode;
-  state.country = $("#accountCountry").value;
+  if (!state.country || selectedAuthAction === "signup") {
+    state.country = $("#accountCountry").value || "IL";
+  }
   const account = currentDemoAccount();
   if (!state.user || !state.user.id) {
     state.user = account
@@ -4778,18 +4780,23 @@ function setupEvents() {
     const data = Object.fromEntries(new FormData(event.currentTarget));
     if (selectedAuthAction === "login") {
       toast("Iniciando sesion...");
-      const { data: authData, error } = await supabaseClient.auth.signInWithPassword({
-        email: data.email,
-        password: data.password
-      });
-      if (error) {
-        toast("Error: " + error.message);
-        return;
+      try {
+        const { data: authData, error } = await supabaseClient.auth.signInWithPassword({
+          email: data.email,
+          password: data.password
+        });
+        if (error) {
+          toast("Error: " + error.message);
+          return;
+        }
+        state.user = authData.user;
+        await loadStateFromSupabase();
+        enterApp(selectedAuthMode);
+        toast("Bienvenido a JobVisto.");
+      } catch (err) {
+        console.error("Error during login:", err);
+        toast("Error de inicio de sesion: " + err.message);
       }
-      state.user = authData.user;
-      await loadStateFromSupabase();
-      enterApp(selectedAuthMode);
-      toast("Bienvenido a JobVisto.");
       return;
     }
     
@@ -5375,32 +5382,43 @@ if (supabaseClient) {
 
       await loadStateFromSupabase();
 
-      // If they don't have an organization, they signed up via OAuth (Google/Microsoft)
+      // If they don't have an organization, they signed up via OAuth (Google/Microsoft) or email verification completed but profile/org weren't created due to RLS
       if (!state.orgId) {
-        // Create profile if not exists
-        const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', user.id).maybeSingle();
-        if (!profile) {
-          await supabaseClient.from('profiles').insert({
-            id: user.id,
-            full_name: user.user_metadata?.full_name || user.email.split('@')[0],
-            email: user.email,
-            phone: user.phone || "",
-            preferred_language: state.language || "es"
-          });
-        }
+        try {
+          // Create profile if not exists
+          const { data: profile, error: profileGetError } = await supabaseClient.from('profiles').select('*').eq('id', user.id).maybeSingle();
+          if (profileGetError) throw profileGetError;
+          
+          if (!profile) {
+            const { error: profileInsertError } = await supabaseClient.from('profiles').insert({
+              id: user.id,
+              full_name: user.user_metadata?.full_name || user.email.split('@')[0],
+              email: user.email,
+              phone: user.phone || "",
+              preferred_language: state.language || "es"
+            });
+            if (profileInsertError) throw profileInsertError;
+          }
 
-        // Create organization
-        const { data: org } = await supabaseClient.from('organizations').insert({
-          name: `${user.user_metadata?.full_name || user.email.split('@')[0]}'s Company`,
-          type: state.mode || 'independent',
-          owner_user_id: user.id,
-          country: state.country || 'IL',
-          default_language: state.language || 'es',
-          plan_id: 'free'
-        }).select().single();
-        
-        if (org) {
-          state.orgId = org.id;
+          // Create organization with a valid plan ID ('solo' for independent/free, 'starter' for company)
+          const dbPlanId = (state.mode === 'independent') ? 'solo' : 'starter';
+          const { data: org, error: orgError } = await supabaseClient.from('organizations').insert({
+            name: `${user.user_metadata?.full_name || user.email.split('@')[0]}'s Company`,
+            type: state.mode || 'independent',
+            owner_user_id: user.id,
+            country: state.country || 'IL',
+            default_language: state.language || 'es',
+            plan_id: dbPlanId
+          }).select().single();
+          
+          if (orgError) throw orgError;
+          
+          if (org) {
+            state.orgId = org.id;
+          }
+        } catch (err) {
+          console.error("Error auto-creating profile or organization:", err);
+          toast("Error al configurar perfil/empresa: " + err.message);
         }
       }
 
