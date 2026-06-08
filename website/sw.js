@@ -11,7 +11,8 @@ const APP_SHELL = [
   "./assets/Logo Jobvisto.png",
   "./assets/Logo Jobvisto white transparent.png",
   "./assets/jobvisto-icon-192.png",
-  "./assets/jobvisto-icon-512.png"
+  "./assets/jobvisto-icon-512.png",
+  "./assets/meir.jpg"
 ];
 
 self.addEventListener("install", (event) => {
