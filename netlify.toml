@@ -1,5 +1,6 @@
 [build]
   publish = "website"
+  functions = "netlify/functions"
 
 [[redirects]]
   from = "/app"
