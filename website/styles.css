@@ -400,11 +400,11 @@
   background: rgba(255, 255, 255, .06);
 }
 
-.footer-button {
+.footer-column .footer-button {
   width: 100%;
   min-height: 48px;
   margin-top: 6px;
-  color: #07302d;
+  color: #07302d !important;
   background: #fff;
 }
 
