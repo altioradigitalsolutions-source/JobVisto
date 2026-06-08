@@ -21,18 +21,27 @@
         <span>JobVisto</span>
       </a>
       <nav class="nav-links" aria-label="Principal">
-        <a href="#features">Features</a>
-        <a href="#flows">How it works</a>
-        <a href="#pricing">Pricing</a>
-        <a href="#proof">Testimonials</a>
+        <a href="#features" data-i18n="navFeatures">Features</a>
+        <a href="#flows" data-i18n="navHow">How it works</a>
+        <a href="#pricing" data-i18n="navPricing">Pricing</a>
+        <a href="#proof" data-i18n="navTestimonials">Testimonials</a>
       </nav>
       <div class="header-actions">
         <button class="icon-button" type="button" data-lang-toggle aria-label="Cambiar idioma" title="Cambiar idioma">
           <i data-lucide="languages"></i>
           <span data-lang-label>ES</span>
         </button>
-        <a class="button button-login" href="./app.html?intent=login&mode=company">Log in</a>
-        <a class="button button-light" href="./app.html?intent=signup&plan=free&mode=independent">Get started free</a>
+        <a class="button button-login" href="./app.html?intent=login&mode=company" data-i18n="navLogin">Log in</a>
+        <a class="button button-light" href="./app.html?intent=signup&plan=free&mode=independent" data-i18n="navSignup">Get started free</a>
+        <button class="menu-toggle" type="button" id="menuToggle" aria-label="Abrir menu" aria-expanded="false">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+      </div>
+      <div class="mobile-dropdown" id="mobileDropdown">
+        <a class="mobile-dropdown-btn button-login" href="./app.html?intent=login&mode=company" data-i18n="navLogin">Log in</a>
+        <a class="mobile-dropdown-btn button-primary" href="./app.html?intent=signup&plan=free&mode=independent" data-i18n="navSignup">Get started free</a>
       </div>
     </header>
 
@@ -53,9 +62,9 @@
             </a>
           </div>
           <div class="hero-trust">
-            <span><i data-lucide="check-circle-2"></i>Free plan available</span>
-            <span><i data-lucide="check-circle-2"></i>No credit card required</span>
-            <span><i data-lucide="check-circle-2"></i>Cancel anytime</span>
+            <span><i data-lucide="check-circle-2"></i><span data-i18n="trustFree">Free plan available</span></span>
+            <span><i data-lucide="check-circle-2"></i><span data-i18n="trustNoCard">No credit card required</span></span>
+            <span><i data-lucide="check-circle-2"></i><span data-i18n="trustCancel">Cancel anytime</span></span>
           </div>
         </div>
         <div class="hero-product" aria-label="JobVisto product preview">
@@ -65,30 +74,30 @@
       </section>
 
       <section class="feature-strip" id="features" aria-label="JobVisto features">
-        <article><i data-lucide="users-round"></i><strong>Manage Clients</strong><span>Keep client information, history and preferences in one place.</span></article>
-        <article><i data-lucide="user-round"></i><strong>Manage Cleaners</strong><span>Organize your team, schedules, availability and performance.</span></article>
-        <article><i data-lucide="calendar-days"></i><strong>Smart Scheduling</strong><span>Calendar, recurring jobs and automatic assignments.</span></article>
-        <article><i data-lucide="camera"></i><strong>Photo Evidence</strong><span>Before and after photos, signatures and job documentation.</span></article>
-        <article><i data-lucide="chart-no-axes-column-increasing"></i><strong>Reports & Insights</strong><span>Track performance, revenue and growth.</span></article>
-        <article><i data-lucide="credit-card"></i><strong>Payments</strong><span>Invoices, payment status and financial management.</span></article>
+        <article><i data-lucide="users-round"></i><strong data-i18n="featClientsTitle">Manage Clients</strong><span data-i18n="featClientsDesc">Keep client information, history and preferences in one place.</span></article>
+        <article><i data-lucide="user-round"></i><strong data-i18n="featCleanersTitle">Manage Cleaners</strong><span data-i18n="featCleanersDesc">Organize your team, schedules, availability and performance.</span></article>
+        <article><i data-lucide="calendar-days"></i><strong data-i18n="featSchedTitle">Smart Scheduling</strong><span data-i18n="featSchedDesc">Calendar, recurring jobs and automatic assignments.</span></article>
+        <article><i data-lucide="camera"></i><strong data-i18n="featEvidenceTitle">Photo Evidence</strong><span data-i18n="featEvidenceDesc">Before and after photos, signatures and job documentation.</span></article>
+        <article><i data-lucide="chart-no-axes-column-increasing"></i><strong data-i18n="featReportsTitle">Reports & Insights</strong><span data-i18n="featReportsDesc">Track performance, revenue and growth.</span></article>
+        <article><i data-lucide="credit-card"></i><strong data-i18n="featPaymentsTitle">Payments</strong><span data-i18n="featPaymentsDesc">Invoices, payment status and financial management.</span></article>
       </section>
 
       <section class="proof-strip" aria-label="Indicadores principales">
         <div>
-          <strong>Built for cleaners</strong>
-          <span>Simple tools for daily operations</span>
+          <strong data-i18n="proofBuiltTitle">Built for cleaners</strong>
+          <span data-i18n="proofBuiltDesc">Simple tools for daily operations</span>
         </div>
         <div>
-          <strong>Proof-first workflow</strong>
-          <span>Photos, signatures and job history</span>
+          <strong data-i18n="proofWorkflowTitle">Proof-first workflow</strong>
+          <span data-i18n="proofWorkflowDesc">Photos, signatures and job history</span>
         </div>
         <div>
-          <strong>Start free</strong>
-          <span>Try JobVisto with the free plan</span>
+          <strong data-i18n="proofStartTitle">Start free</strong>
+          <span data-i18n="proofStartDesc">Try JobVisto with the free plan</span>
         </div>
         <div>
-          <strong>Scale when ready</strong>
-          <span>Upgrade as your team grows</span>
+          <strong data-i18n="proofScaleTitle">Scale when ready</strong>
+          <span data-i18n="proofScaleDesc">Upgrade as your team grows</span>
         </div>
       </section>
 
@@ -237,10 +246,10 @@
         </article>
 
         <div class="testimonial-trust">
-          <div><i data-lucide="briefcase-business"></i><strong>Built from real cleaning work</strong><span>Created around daily service operations</span></div>
-          <div><i data-lucide="list-checks"></i><strong>Designed for simple control</strong><span>Clients, cleaners, jobs and history in one place</span></div>
-          <div><i data-lucide="badge-check"></i><strong>Proof-first from day one</strong><span>Photos, signatures and payment records</span></div>
-          <div><i data-lucide="gift"></i><strong>Free plan available</strong><span>Start testing before upgrading</span></div>
+          <div><i data-lucide="briefcase-business"></i><strong data-i18n="testiTrust1Title">Built from real cleaning work</strong><span data-i18n="testiTrust1Desc">Created around daily service operations</span></div>
+          <div><i data-lucide="list-checks"></i><strong data-i18n="testiTrust2Title">Designed for simple control</strong><span data-i18n="testiTrust2Desc">Clients, cleaners, jobs and history in one place</span></div>
+          <div><i data-lucide="badge-check"></i><strong data-i18n="testiTrust3Title">Proof-first from day one</strong><span data-i18n="testiTrust3Desc">Photos, signatures and payment records</span></div>
+          <div><i data-lucide="gift"></i><strong data-i18n="testiTrust4Title">Free plan available</strong><span data-i18n="testiTrust4Desc">Start testing before upgrading</span></div>
         </div>
       </section>
 
@@ -250,122 +259,122 @@
           <h2 data-i18n="priceTitle">The perfect plan for <span>every stage of your business</span></h2>
           <p data-i18n="priceCopy">Start with the free plan and scale when you are ready. No contracts. Cancel anytime.</p>
           <div class="billing-toggle" aria-label="Billing period">
-            <span>Monthly</span>
+            <span data-i18n="toggleMonthly">Monthly</span>
             <button class="toggle-switch" type="button" aria-label="Switch billing period">
               <span></span>
             </button>
-            <span>Annual</span>
-            <strong>Save 20%</strong>
+            <span data-i18n="toggleAnnual">Annual</span>
+            <strong data-i18n="toggleSave">Save 20%</strong>
           </div>
         </div>
 
         <div class="price-grid">
           <article class="price-card">
             <div class="plan-icon"><i data-lucide="user-round"></i></div>
-            <h3>Freelancer Free</h3>
-            <p class="plan-subtitle">For testing JobVisto</p>
-            <p class="price">$0</p>
-            <p class="price-note">Free forever</p>
-            <div class="cleaner-limit"><i data-lucide="user-round"></i><strong>1 cleaner</strong></div>
+            <h3 data-i18n="planFreeTitle">Freelancer Free</h3>
+            <p class="plan-subtitle" data-i18n="planFreeSubtitle">For testing JobVisto</p>
+            <p class="price" data-i18n="planFreePrice">$0</p>
+            <p class="price-note" data-i18n="planFreeNote">Free forever</p>
+            <div class="cleaner-limit"><i data-lucide="user-round"></i><strong data-i18n="planFreeLimit">1 cleaner</strong></div>
             <ul>
-              <li>Up to 3 clients</li>
-              <li>Up to 5 jobs per month</li>
-              <li>Basic calendar</li>
-              <li>Photo evidence</li>
-              <li>Digital signatures</li>
-              <li>Client portal</li>
+              <li data-i18n="planFreeItem1">Up to 3 clients</li>
+              <li data-i18n="planFreeItem2">Up to 5 jobs per month</li>
+              <li data-i18n="planFreeItem3">Basic calendar</li>
+              <li data-i18n="planFreeItem4">Photo evidence</li>
+              <li data-i18n="planFreeItem5">Digital signatures</li>
+              <li data-i18n="planFreeItem6">Client portal</li>
             </ul>
-            <a class="button plan-button secondary-plan" href="./app.html?intent=signup&plan=free&mode=independent">Get started free</a>
-            <small>No credit card required</small>
+            <a class="button plan-button secondary-plan" href="./app.html?intent=signup&plan=free&mode=independent" data-i18n="planFreeButton">Get started free</a>
+            <small data-i18n="planFreeCardNote">No credit card required</small>
           </article>
 
           <article class="price-card">
             <div class="plan-icon"><i data-lucide="user-round-check"></i></div>
-            <h3>Independent</h3>
-            <p class="plan-subtitle">For independent cleaners</p>
-            <p class="price">$9.99</p>
-            <p class="price-note">per month</p>
-            <div class="cleaner-limit"><i data-lucide="user-round"></i><strong>1 cleaner</strong></div>
+            <h3 data-i18n="planIndTitle">Independent</h3>
+            <p class="plan-subtitle" data-i18n="planIndSubtitle">For independent cleaners</p>
+            <p class="price" data-i18n="planIndPrice">$9.99</p>
+            <p class="price-note" data-i18n="planIndNote">per month</p>
+            <div class="cleaner-limit"><i data-lucide="user-round"></i><strong data-i18n="planIndLimit">1 cleaner</strong></div>
             <ul>
-              <li>Up to 20 clients</li>
-              <li>Unlimited jobs</li>
-              <li>Full calendar</li>
-              <li>Photo evidence and notes</li>
-              <li>Digital signatures</li>
-              <li>Arrival and departure tracking</li>
-              <li>Client portal</li>
+              <li data-i18n="planIndItem1">Up to 20 clients</li>
+              <li data-i18n="planIndItem2">Unlimited jobs</li>
+              <li data-i18n="planIndItem3">Full calendar</li>
+              <li data-i18n="planIndItem4">Photo evidence and notes</li>
+              <li data-i18n="planIndItem5">Digital signatures</li>
+              <li data-i18n="planIndItem6">Arrival and departure tracking</li>
+              <li data-i18n="planIndItem7">Client portal</li>
             </ul>
-            <a class="button plan-button" href="https://buy.stripe.com/dRmfZh20RcvVcAuedT2ZO0o">Choose plan</a>
-            <small>Cancel anytime</small>
+            <a class="button plan-button" href="https://buy.stripe.com/dRmfZh20RcvVcAuedT2ZO0o" data-i18n="planIndButton">Choose plan</a>
+            <small data-i18n="planIndCardNote">Cancel anytime</small>
           </article>
 
           <article class="price-card">
             <div class="plan-icon"><i data-lucide="users-round"></i></div>
-            <h3>Company</h3>
-            <p class="plan-subtitle">For growing teams</p>
-            <p class="price">$29.99</p>
-            <p class="price-note">per month</p>
-            <div class="cleaner-limit"><i data-lucide="users-round"></i><strong>Up to 5 cleaners</strong></div>
+            <h3 data-i18n="planCompTitle">Company</h3>
+            <p class="plan-subtitle" data-i18n="planCompSubtitle">For growing teams</p>
+            <p class="price" data-i18n="planCompPrice">$29.99</p>
+            <p class="price-note" data-i18n="planCompNote">per month</p>
+            <div class="cleaner-limit"><i data-lucide="users-round"></i><strong data-i18n="planCompLimit">Up to 5 cleaners</strong></div>
             <ul>
-              <li>Unlimited clients</li>
-              <li>Unlimited jobs</li>
-              <li>Calendar by cleaner</li>
-              <li>Photos, notes and checklist</li>
-              <li>Digital signatures</li>
-              <li>Client and cleaner portals</li>
-              <li>Operational reports</li>
-              <li>Email support</li>
+              <li data-i18n="planCompItem1">Unlimited clients</li>
+              <li data-i18n="planCompItem2">Unlimited jobs</li>
+              <li data-i18n="planCompItem3">Calendar by cleaner</li>
+              <li data-i18n="planCompItem4">Photos, notes and checklist</li>
+              <li data-i18n="planCompItem5">Digital signatures</li>
+              <li data-i18n="planCompItem6">Client and cleaner portals</li>
+              <li data-i18n="planCompItem7">Operational reports</li>
+              <li data-i18n="planCompItem8">Email support</li>
             </ul>
-            <a class="button plan-button" href="https://buy.stripe.com/eVq8wP8pfbrR1VQ8Tz2ZO0p">Choose plan</a>
-            <small>Cancel anytime</small>
+            <a class="button plan-button" href="https://buy.stripe.com/eVq8wP8pfbrR1VQ8Tz2ZO0p" data-i18n="planIndButton">Choose plan</a>
+            <small data-i18n="planIndCardNote">Cancel anytime</small>
           </article>
 
           <article class="price-card highlighted">
-            <div class="popular-ribbon">Most popular</div>
+            <div class="popular-ribbon" data-i18n="planProPopular">Most popular</div>
             <div class="plan-icon"><i data-lucide="chart-no-axes-column-increasing"></i></div>
-            <h3>Pro</h3>
-            <p class="plan-subtitle">For established companies</p>
-            <p class="price">$59.99</p>
-            <p class="price-note">per month</p>
-            <div class="cleaner-limit"><i data-lucide="users-round"></i><strong>Up to 20 cleaners</strong></div>
+            <h3 data-i18n="planProTitle">Pro</h3>
+            <p class="plan-subtitle" data-i18n="planProSubtitle">For established companies</p>
+            <p class="price" data-i18n="planProPrice">$59.99</p>
+            <p class="price-note" data-i18n="planProNote">per month</p>
+            <div class="cleaner-limit"><i data-lucide="users-round"></i><strong data-i18n="planProLimit">Up to 20 cleaners</strong></div>
             <ul>
-              <li>Everything in Company</li>
-              <li>Cleaner payment receipts</li>
-              <li>Individual and consolidated payouts</li>
-              <li>Reports by cleaner, client and period</li>
-              <li>Advanced job history</li>
-              <li>Pending signature control</li>
-              <li>Simple data export</li>
-              <li>Priority support</li>
+              <li data-i18n="planProItem1">Everything in Company</li>
+              <li data-i18n="planProItem2">Cleaner payment receipts</li>
+              <li data-i18n="planProItem3">Individual and consolidated payouts</li>
+              <li data-i18n="planProItem4">Reports by cleaner, client and period</li>
+              <li data-i18n="planProItem5">Advanced job history</li>
+              <li data-i18n="planProItem6">Pending signature control</li>
+              <li data-i18n="planProItem7">Simple data export</li>
+              <li data-i18n="planProItem8">Priority support</li>
             </ul>
-            <a class="button plan-button" href="https://buy.stripe.com/cNifZh7lb9jJfMG8Tz2ZO0q">Choose plan</a>
-            <small>Cancel anytime</small>
+            <a class="button plan-button" href="https://buy.stripe.com/cNifZh7lb9jJfMG8Tz2ZO0q" data-i18n="planIndButton">Choose plan</a>
+            <small data-i18n="planIndCardNote">Cancel anytime</small>
           </article>
 
           <article class="price-card enterprise-plan">
             <div class="plan-icon"><i data-lucide="building-2"></i></div>
-            <h3>Enterprise</h3>
-            <p class="plan-subtitle">For large operations</p>
-            <p class="price sales-price">Talk to sales</p>
-            <div class="cleaner-limit"><i data-lucide="infinity"></i><strong>Custom cleaner limits</strong></div>
+            <h3 data-i18n="planEntTitle">Enterprise</h3>
+            <p class="plan-subtitle" data-i18n="planEntSubtitle">For large operations</p>
+            <p class="price sales-price" data-i18n="planEntPrice">Talk to sales</p>
+            <div class="cleaner-limit"><i data-lucide="infinity"></i><strong data-i18n="planEntLimit">Custom cleaner limits</strong></div>
             <ul>
-              <li>Multi-location support</li>
-              <li>Advanced roles and permissions</li>
-              <li>Personalized onboarding</li>
-              <li>Priority support</li>
-              <li>Custom workflow setup</li>
-              <li>Custom integrations if needed</li>
+              <li data-i18n="planEntItem1">Multi-location support</li>
+              <li data-i18n="planEntItem2">Advanced roles and permissions</li>
+              <li data-i18n="planEntItem3">Personalized onboarding</li>
+              <li data-i18n="planEntItem4">Priority support</li>
+              <li data-i18n="planEntItem5">Custom workflow setup</li>
+              <li data-i18n="planEntItem6">Custom integrations if needed</li>
             </ul>
-            <a class="button plan-button secondary-plan" href="mailto:hello@jobvisto.com?subject=JobVisto%20Enterprise">Contact sales</a>
-            <small>We help you grow</small>
+            <a class="button plan-button secondary-plan" href="mailto:hello@jobvisto.com?subject=JobVisto%20Enterprise" data-i18n="enterpriseButton">Contact sales</a>
+            <small data-i18n="planFreeSubtitle">We help you grow</small>
           </article>
         </div>
 
         <div class="pricing-trust">
-          <div><i data-lucide="shield-check"></i><strong>Free plan available</strong><span>Start with real jobs</span></div>
-          <div><i data-lucide="credit-card"></i><strong>No credit card</strong><span>Start without friction</span></div>
-          <div><i data-lucide="check-circle-2"></i><strong>Cancel anytime</strong><span>No contracts or commitments</span></div>
-          <div><i data-lucide="lock-keyhole"></i><strong>Safe and reliable</strong><span>Your data stays protected</span></div>
+          <div><i data-lucide="shield-check"></i><strong data-i18n="priceTrust1Title">Free plan available</strong><span data-i18n="priceTrust1Desc">Start with real jobs</span></div>
+          <div><i data-lucide="credit-card"></i><strong data-i18n="priceTrust2Title">No credit card</strong><span data-i18n="priceTrust2Desc">Start without friction</span></div>
+          <div><i data-lucide="check-circle-2"></i><strong data-i18n="priceTrust3Title">Cancel anytime</strong><span data-i18n="priceTrust3Desc">No contracts or commitments</span></div>
+          <div><i data-lucide="lock-keyhole"></i><strong data-i18n="priceTrust4Title">Safe and reliable</strong><span data-i18n="priceTrust4Desc">Your data stays protected</span></div>
         </div>
       </section>
     </main>
@@ -378,41 +387,41 @@
           </a>
           <p>Organiza trabajos de limpieza, clientes, evidencia, firmas y pagos desde una sola plataforma simple.</p>
           <div class="footer-badges">
-            <span><i data-lucide="gift"></i>Free plan available</span>
-            <span><i data-lucide="shield-check"></i>Proof-first workflow</span>
+            <span><i data-lucide="gift"></i><span data-i18n="trustFree">Free plan available</span></span>
+            <span><i data-lucide="shield-check"></i><span data-i18n="proofWorkflowTitle">Proof-first workflow</span></span>
           </div>
         </div>
 
         <nav class="footer-column" aria-label="Product">
-          <h3>Product</h3>
-          <a href="#features">Features</a>
-          <a href="#flows">How it works</a>
-          <a href="#pricing">Pricing</a>
-          <a href="#proof">Testimonial</a>
+          <h3 data-i18n="footerColProduct">Product</h3>
+          <a href="#features" data-i18n="footerLinkFeatures">Features</a>
+          <a href="#flows" data-i18n="footerLinkHow">How it works</a>
+          <a href="#pricing" data-i18n="footerLinkPricing">Pricing</a>
+          <a href="#proof" data-i18n="footerLinkTestimonials">Testimonial</a>
         </nav>
 
         <nav class="footer-column" aria-label="Use cases">
-          <h3>For cleaning teams</h3>
-          <a href="./app.html?intent=signup&plan=free&mode=independent">Independent cleaner</a>
-          <a href="./app.html?intent=signup&mode=company">Cleaning company</a>
-          <a href="#pricing">Compare plans</a>
-          <a href="mailto:hello@jobvisto.com?subject=JobVisto%20Enterprise">Enterprise</a>
+          <h3 data-i18n="footerColForTeams">For cleaning teams</h3>
+          <a href="./app.html?intent=signup&plan=free&mode=independent" data-i18n="footerLinkInd">Independent cleaner</a>
+          <a href="./app.html?intent=signup&mode=company" data-i18n="footerLinkComp">Cleaning company</a>
+          <a href="#pricing" data-i18n="footerLinkCompare">Compare plans</a>
+          <a href="mailto:hello@jobvisto.com?subject=JobVisto%20Enterprise" data-i18n="footerLinkEnterprise">Enterprise</a>
         </nav>
 
         <div class="footer-column footer-cta">
-          <h3>Start organizing today</h3>
-          <p>Use the free plan to try JobVisto and upgrade when your operation grows.</p>
+          <h3 data-i18n="footerCTATitle">Start organizing today</h3>
+          <p data-i18n="footerCTADesc">Use the free plan to try JobVisto and upgrade when your operation grows.</p>
           <a class="button footer-button" href="./app.html?intent=signup&plan=free&mode=independent">
-            <span>Get started free</span>
+            <span data-i18n="startButton">Get started free</span>
             <i data-lucide="arrow-right"></i>
           </a>
         </div>
       </div>
 
       <div class="footer-bottom">
-        <span>© 2026 JobVisto. All rights reserved.</span>
+        <span data-i18n="footerCopyright">© 2026 JobVisto. All rights reserved.</span>
         <div>
-          <a href="#top">Back to top</a>
+          <a href="#top" data-i18n="footerBackToTop">Back to top</a>
         </div>
       </div>
     </footer>

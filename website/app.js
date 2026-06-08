@@ -5446,11 +5446,11 @@ if (supabaseClient) {
       const user = session.user;
       state.user = user;
 
-      await loadStateFromSupabase();
+      try {
+        await loadStateFromSupabase();
 
-      // If they don't have an organization, they signed up via OAuth (Google/Microsoft) or email verification completed but profile/org weren't created due to RLS
-      if (!state.orgId) {
-        try {
+        // If they don't have an organization, they signed up via OAuth (Google/Microsoft) or email verification completed but profile/org weren't created due to RLS
+        if (!state.orgId) {
           // Create profile if not exists
           const { data: profile, error: profileGetError } = await supabaseClient.from('profiles').select('*').eq('id', user.id).maybeSingle();
           if (profileGetError) throw profileGetError;
@@ -5482,13 +5482,17 @@ if (supabaseClient) {
           if (org) {
             state.orgId = org.id;
           }
-        } catch (err) {
-          console.error("Error auto-creating profile or organization:", err);
-          toast("Error al configurar perfil/empresa: " + err.message);
+        }
+
+        enterApp(state.mode);
+      } catch (err) {
+        console.error("Error during session load or profile setup:", err);
+        toast("Error de sesión: " + err.message);
+        if (loginBtn) {
+          loginBtn.disabled = false;
+          loginBtn.textContent = selectedAuthAction === "login" ? "Log in" : "Register";
         }
       }
-
-      enterApp(state.mode);
     } else {
       // Re-enable form buttons if they are signed out
       const loginBtn = $("#authForm button[type='submit']");
