@@ -4897,6 +4897,29 @@ function setupEvents() {
       toast("Supabase no esta configurado.");
     }
   });
+  const forgotBtn = $(".forgot-link");
+  if (forgotBtn) {
+    forgotBtn.addEventListener("click", async () => {
+      const email = $("#authForm")?.elements.email.value?.trim();
+      if (!email) {
+        toast("Por favor, ingresa tu correo electronico primero.");
+        return;
+      }
+      if (supabaseClient) {
+        toast("Enviando enlace de recuperacion...");
+        const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin + window.location.pathname
+        });
+        if (error) {
+          toast("Error: " + error.message);
+        } else {
+          toast("Enlace de recuperacion enviado. Revisa tu correo.");
+        }
+      } else {
+        toast("Supabase no esta configurado.");
+      }
+    });
+  }
   $("#mobileMenuToggle").addEventListener("click", toggleMobileMenu);
   $("#dashboardMobileMenu")?.addEventListener("click", toggleMobileMenu);
   $("#globalMobileMenu")?.addEventListener("click", toggleMobileMenu);
@@ -5376,6 +5399,18 @@ enterClientPortalFromUrl();
 
 if (supabaseClient) {
   supabaseClient.auth.onAuthStateChange(async (event, session) => {
+    if (event === "PASSWORD_RECOVERY") {
+      const newPassword = prompt("Ingresa tu nueva contraseña / Enter your new password:");
+      if (newPassword) {
+        toast("Actualizando contraseña...");
+        const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+        if (error) {
+          toast("Error: " + error.message);
+        } else {
+          toast("Contraseña actualizada con éxito.");
+        }
+      }
+    }
     if (session) {
       const user = session.user;
       state.user = user;
