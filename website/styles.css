@@ -26,6 +26,7 @@
   width: 46px;
   height: 46px;
   object-fit: contain;
+  mix-blend-mode: multiply;
 }
 
 .brand > span:not(.brand-mark) {
@@ -2381,6 +2382,7 @@ svg {
   width: 46px;
   height: 46px;
   object-fit: contain;
+  mix-blend-mode: multiply;
 }
 
 .brand-mark {

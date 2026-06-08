@@ -4811,6 +4811,15 @@ function setupEvents() {
       return;
     }
     
+    if (selectedPlan !== "free" && !stripePaymentReturn) {
+      toast("Redirigiendo a Stripe para realizar el pago...");
+      const link = stripePaymentLinks[selectedPlan] || stripePaymentLinks.independent;
+      setTimeout(() => {
+        location.href = `${link}?prefilled_email=${encodeURIComponent(data.email)}`;
+      }, 1000);
+      return;
+    }
+
     toast("Registrando cuenta...");
     let finalPlan = selectedPlan;
     
