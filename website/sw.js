@@ -1,4 +1,4 @@
-const CACHE_NAME = "jobvisto-app-v6";
+const CACHE_NAME = "jobvisto-app-v7";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -33,9 +33,26 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
+  // Avoid intercepting chrome-extension or external analytics calls
+  if (!event.request.url.startsWith(self.location.origin)) return;
+
   event.respondWith(
-    caches.match(event.request).then((cached) =>
-      cached || fetch(event.request).catch(() => caches.match("./app.html"))
-    )
+    fetch(event.request)
+      .then((response) => {
+        // Cache the fresh version for offline use
+        if (response.status === 200) {
+          const cacheCopy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, cacheCopy);
+          });
+        }
+        return response;
+      })
+      .catch(() => {
+        // Offline fallback: check cache
+        return caches.match(event.request).then((cached) => {
+          return cached || caches.match("./app.html");
+        });
+      })
   );
 });
