@@ -5416,6 +5416,13 @@ if (supabaseClient) {
       }
     }
     if (session) {
+      // Disable login button to prevent overlapping submissions
+      const loginBtn = $("#authForm button[type='submit']");
+      if (loginBtn) {
+        loginBtn.disabled = true;
+        loginBtn.textContent = event === "INITIAL_SESSION" ? "Cargando sesión..." : "Iniciando...";
+      }
+
       const user = session.user;
       state.user = user;
 
@@ -5462,6 +5469,24 @@ if (supabaseClient) {
       }
 
       enterApp(state.mode);
+    } else {
+      // Re-enable form buttons if they are signed out
+      const loginBtn = $("#authForm button[type='submit']");
+      if (loginBtn) {
+        loginBtn.disabled = false;
+        loginBtn.textContent = selectedAuthAction === "login" ? "Log in" : "Register";
+      }
+
+      // Clear current state to prevent stale data display
+      state.user = null;
+      state.orgId = null;
+      state.clients = [];
+      state.cleaners = [];
+      state.jobs = [];
+      state.receipts = [];
+
+      $("#appShell").classList.add("hidden");
+      $("#authScreen").classList.remove("hidden");
     }
   });
 }
