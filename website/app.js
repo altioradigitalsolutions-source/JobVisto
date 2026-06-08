@@ -4801,60 +4801,59 @@ function setupEvents() {
     }
     
     toast("Registrando cuenta...");
+    let finalPlan = selectedPlan;
+    
+    // Check for Stripe payment matching the email before signing up
+    let stripePayment = null;
+    try {
+      const { data: payment } = await supabaseClient
+        .from("stripe_payments")
+        .select("*")
+        .eq("email", data.email.toLowerCase())
+        .maybeSingle();
+      if (payment) {
+        stripePayment = payment;
+        finalPlan = payment.plan_id === "solo" ? "independent" : (payment.plan_id === "starter" ? "company" : payment.plan_id);
+      }
+    } catch (err) {
+      console.error("Error looking up Stripe payment:", err);
+    }
+
+    const dbPlanId = finalPlan === "independent" ? "solo" : (finalPlan === "company" ? "starter" : finalPlan);
+
     const { data: authData, error } = await supabaseClient.auth.signUp({
       email: data.email,
-      password: data.password
+      password: data.password,
+      options: {
+        data: {
+          full_name: data.fullName || data.email.split('@')[0],
+          phone: data.phone || "",
+          company_name: data.companyName || `${data.fullName || 'Mi Empresa'}`,
+          mode: finalPlan === "independent" ? "independent" : "company",
+          plan_id: dbPlanId,
+          country: state.country || "IL",
+          language: state.language || "es"
+        }
+      }
     });
+
     if (error) {
       toast("Error: " + error.message);
       return;
     }
+
     const user = authData.user;
     if (user) {
       state.user = user;
       
-      // Create profile
-      await supabaseClient.from('profiles').insert({
-        id: user.id,
-        full_name: data.fullName || data.email.split('@')[0],
-        email: data.email,
-        phone: data.phone || "",
-        preferred_language: state.language
-      });
-      
-      // Check for Stripe payment matching the email
-      let finalPlan = selectedPlan;
-      let stripePayment = null;
-      try {
-        const { data: payment } = await supabaseClient
-          .from("stripe_payments")
-          .select("*")
-          .eq("email", data.email.toLowerCase())
-          .maybeSingle();
-        if (payment) {
-          stripePayment = payment;
-          finalPlan = payment.plan_id === "solo" ? "independent" : (payment.plan_id === "starter" ? "company" : payment.plan_id);
-        }
-      } catch (err) {
-        console.error("Error looking up Stripe payment:", err);
-      }
-      
-      // Create organization
-      const dbPlanId = finalPlan === "independent" ? "solo" : (finalPlan === "company" ? "starter" : finalPlan);
-      const { data: org } = await supabaseClient.from('organizations').insert({
-        name: data.companyName || `${data.fullName || 'Mi Empresa'}`,
-        type: finalPlan === "independent" ? "independent" : "company",
-        owner_user_id: user.id,
-        country: state.country,
-        default_language: state.language,
-        plan_id: dbPlanId
-      }).select().single();
-      
-      if (org) {
-        state.orgId = org.id;
-        if (stripePayment) {
+      // If Stripe payment exists, associate it with the subscription in the database (will require orgId)
+      if (stripePayment && authData.session) {
+        // Wait briefly for trigger execution to complete organization setup
+        await new Promise(resolve => setTimeout(resolve, 800));
+        await loadStateFromSupabase();
+        if (state.orgId) {
           await supabaseClient.from("subscriptions").insert({
-            organization_id: org.id,
+            organization_id: state.orgId,
             plan_id: dbPlanId,
             status: "active",
             provider: "stripe",
@@ -4864,9 +4863,14 @@ function setupEvents() {
           });
         }
       }
-      
-      enterApp(finalPlan === "independent" ? "independent" : "company");
-      toast("Cuenta creada y activada.");
+
+      if (authData.session) {
+        await loadStateFromSupabase();
+        enterApp(finalPlan === "independent" ? "independent" : "company");
+        toast("Cuenta creada y activada.");
+      } else {
+        toast("Registro exitoso. Por favor verifica tu correo para activar tu cuenta.");
+      }
     }
   });
   $("#googleLogin").addEventListener("click", async () => {
