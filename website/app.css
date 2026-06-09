@@ -6228,3 +6228,355 @@ button:disabled {
 @media (max-width: 900px) {
   .pf-row-2 { grid-template-columns: 1fr; }
 }
+
+
+/* =====================================================
+   CLIENT PORTAL REDESIGN - Premium updated layout
+   ===================================================== */
+.cp-summary-eyebrow-redesign {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #35d17f;
+  background: rgba(53, 209, 127, 0.12);
+  padding: 3px 10px;
+  border-radius: 99px;
+  margin-bottom: 8px;
+}
+.cp-summary-title-redesign {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 16px 0;
+}
+.cp-summary-meta-redesign {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.cp-meta-row-redesign {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.88rem;
+  color: #b7cac2;
+}
+.cp-meta-icon-redesign {
+  width: 16px;
+  height: 16px;
+  color: #35d17f;
+  flex-shrink: 0;
+}
+.cp-payment-card-redesign {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #08211e;
+  border: 1px solid rgba(53, 209, 127, 0.2);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.cp-payment-card-redesign.cp-payment-locked {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.cp-payment-icon-circle {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(53, 209, 127, 0.15);
+  display: grid;
+  place-items: center;
+  color: #35d17f;
+  flex-shrink: 0;
+}
+.cp-payment-locked .cp-payment-icon-circle {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+.cp-payment-icon-circle svg {
+  width: 18px;
+  height: 18px;
+}
+.cp-payment-text-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+.cp-payment-label-redesign {
+  font-size: 0.75rem;
+  color: #b7cac2;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.cp-payment-amount-redesign {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #35d17f;
+}
+.cp-payment-locked .cp-payment-amount-redesign {
+  color: #f59e0b;
+}
+.cp-payment-desc-redesign {
+  margin: 4px 0 0 0;
+  font-size: 0.8rem;
+  color: #7a9e8f;
+  line-height: 1.35;
+}
+.cp-checklist-rows-redesign {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.02);
+  margin-bottom: 20px;
+}
+.cp-info-row-redesign {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.cp-info-row-redesign:last-child {
+  border-bottom: 0;
+}
+.cp-info-label-redesign {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #b7cac2;
+}
+.cp-row-icon-redesign {
+  width: 15px;
+  height: 15px;
+  color: #7acfaa;
+  opacity: 0.85;
+}
+.cp-info-value-redesign {
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Service Blocked Card */
+.cp-blocked-service-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  border-radius: 12px;
+  padding: 14px;
+}
+.cp-blocked-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.15);
+  display: grid;
+  place-items: center;
+  color: #ef4444;
+  flex-shrink: 0;
+}
+.cp-blocked-icon svg {
+  width: 14px;
+  height: 14px;
+}
+.cp-blocked-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cp-blocked-text strong {
+  font-size: 0.85rem;
+  color: #fff;
+}
+.cp-blocked-text p {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #fca5a5;
+  line-height: 1.35;
+}
+
+/* Redesigned Empty Evidence Card */
+.cp-empty-evidence-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  border: 2px dashed #c2d1c7;
+  border-radius: 16px;
+  background: #fbfdfb;
+  text-align: center;
+  margin: 10px 0;
+}
+.cp-empty-image-wrap {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: #e9f5ee;
+  display: grid;
+  place-items: center;
+  color: #35d17f;
+  margin-bottom: 16px;
+}
+.cp-empty-image-icon {
+  width: 26px;
+  height: 26px;
+}
+.cp-empty-evidence-card strong {
+  font-size: 1.05rem;
+  color: #07302d;
+  margin-bottom: 6px;
+}
+.cp-empty-evidence-card p {
+  margin: 0 0 20px 0;
+  font-size: 0.88rem;
+  color: #557067;
+  max-width: 320px;
+  line-height: 1.45;
+}
+.cp-history-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #07302d;
+  border: 1px solid #c2d1c7;
+  padding: 10px 18px;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.cp-history-btn:hover {
+  background: #e9f5ee;
+  border-color: #35d17f;
+}
+.cp-history-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Redesigned History Timeline List */
+.cp-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: relative;
+  margin-top: 14px;
+}
+.cp-history-list::before {
+  content: '';
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 9px;
+  width: 2px;
+  background: #e2ebe4;
+  z-index: 0;
+}
+.cp-history-item-new {
+  position: relative;
+  padding-left: 32px;
+  z-index: 1;
+}
+.cp-history-item-new::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #35d17f;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 3px rgba(53, 209, 127, 0.2);
+  z-index: 2;
+}
+.cp-history-item-new.past::before {
+  background: #aab8b0;
+  box-shadow: none;
+}
+.cp-history-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.cp-history-header-row strong {
+  font-size: 0.92rem;
+  color: #07302d;
+}
+.cp-history-details-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+.cp-history-detail-line {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #334d43;
+}
+.cp-history-sub-line {
+  font-size: 0.8rem;
+  color: #557067;
+}
+.cp-history-expand-btn {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #35d17f;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+.cp-history-expand-btn:hover {
+  text-decoration: underline;
+}
+.cp-history-job-expanded {
+  margin-top: 10px;
+  border-top: 1px solid #e2ebe4;
+  padding-top: 10px;
+}
+
+/* Timeline vertical connection lines in activity panel */
+.cp-activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  position: relative;
+}
+.cp-activity-list::before {
+  content: '';
+  position: absolute;
+  top: 20px;
+  bottom: 20px;
+  left: 19px; /* center of 38px circle */
+  width: 2px;
+  background: #e2ebe4;
+  z-index: 0;
+}
+.cp-act-item {
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  gap: 12px;
+  align-items: flex-start;
+  position: relative;
+  z-index: 1;
+}

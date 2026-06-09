@@ -2801,12 +2801,24 @@ function renderStandaloneCleanerPortal(unlocked = true) {
     });
   });
   $$("[data-take-job]").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       const job = state.jobs.find((item) => item.id === button.dataset.takeJob);
       if (!job) return;
       job.cleanerId = cleaner.id;
       job.status = "Asignado";
       save();
+
+      if (supabaseClient) {
+        try {
+          await supabaseClient.from("jobs").update({
+            assigned_cleaner_id: cleaner.id,
+            status: "scheduled"
+          }).eq("id", job.id);
+        } catch (err) {
+          console.error("Error taking job in portal mode:", err);
+        }
+      }
+
       renderStandaloneCleanerPortal(true);
       toast("Trabajo asignado a tu portal.");
     });
@@ -2826,7 +2838,7 @@ function renderStandaloneCleanerPortal(unlocked = true) {
     button.addEventListener("click", () => openSignatureModal(button.dataset.cleanerSignPayment));
   });
   $$("[data-cleaner-arrived]").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       const job = state.jobs.find((item) => item.id === button.dataset.cleanerArrived);
       if (!job) return;
       if (cleanerActionsLocked(job)) {
@@ -2841,6 +2853,19 @@ function renderStandaloneCleanerPortal(unlocked = true) {
       job.start = currentTime();
       job.status = "En sitio";
       save();
+
+      if (supabaseClient) {
+        try {
+          const scheduledStart = `${job.date}T${job.start}:00Z`;
+          await supabaseClient.from("jobs").update({
+            status: "in_site",
+            scheduled_start: scheduledStart
+          }).eq("id", job.id);
+        } catch (err) {
+          console.error("Error saving arrival in portal mode:", err);
+        }
+      }
+
       renderStandaloneCleanerPortal(true);
       toast("Llegada marcada y visible para el cliente.");
     });
@@ -2892,6 +2917,24 @@ function renderStandaloneCleanerPortal(unlocked = true) {
           photo.fileName = files[0].name;
         }
         save();
+
+        if (supabaseClient) {
+          try {
+            const dbPhase = photo.phase === "Antes" ? "before" : "after";
+            await supabaseClient.from("job_evidence").upsert({
+              id: photo.id,
+              organization_id: job.organizationId || state.orgId,
+              job_id: job.id,
+              area: photo.section,
+              phase: dbPhase,
+              file_path: photo.url,
+              caption: photo.comment
+            });
+          } catch (err) {
+            console.error("Error updating evidence in portal mode:", err);
+          }
+        }
+
         renderStandaloneCleanerPortal(true);
         toast("Evidencia corregida.");
         return;
@@ -2902,15 +2945,34 @@ function renderStandaloneCleanerPortal(unlocked = true) {
       }
       const createdAt = new Date().toISOString();
       for (const file of files) {
-        evidenceFor(job).push({
+        const compressedUrl = await compressImageFile(file);
+        const newEv = {
           id: safeId(),
           section,
           phase,
           comment,
-          url: await compressImageFile(file),
+          url: compressedUrl,
           fileName: file.name,
           createdAt
-        });
+        };
+        evidenceFor(job).push(newEv);
+
+        if (supabaseClient) {
+          try {
+            const dbPhase = newEv.phase === "Antes" ? "before" : "after";
+            await supabaseClient.from("job_evidence").insert({
+              id: newEv.id,
+              organization_id: job.organizationId || state.orgId,
+              job_id: job.id,
+              area: newEv.section,
+              phase: dbPhase,
+              file_path: newEv.url,
+              caption: newEv.comment
+            });
+          } catch (err) {
+            console.error("Error inserting evidence in portal mode:", err);
+          }
+        }
       }
       job.photos = evidenceCount(job);
       save();
@@ -2944,7 +3006,7 @@ function renderStandaloneCleanerPortal(unlocked = true) {
     });
   });
   $$("[data-cleaner-finish]").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       const job = state.jobs.find((item) => item.id === button.dataset.cleanerFinish);
       if (!job) return;
       if (cleanerActionsLocked(job)) {
@@ -2965,6 +3027,22 @@ function renderStandaloneCleanerPortal(unlocked = true) {
       job.actualEnd = currentTime();
       job.status = portalCleanerAdmin ? "Terminado por administrador" : "Terminado por cleaner";
       save();
+
+      if (supabaseClient) {
+        try {
+          const actualEnd = `${job.date}T${job.actualEnd}:00Z`;
+          const scheduledStart = `${job.date}T${job.start}:00Z`;
+          const statusStr = portalCleanerAdmin ? "Terminado por administrador" : "cleaner_finished";
+          await supabaseClient.from("jobs").update({
+            status: statusStr,
+            scheduled_start: scheduledStart,
+            actual_end: actualEnd
+          }).eq("id", job.id);
+        } catch (err) {
+          console.error("Error finishing job in portal mode:", err);
+        }
+      }
+
       renderStandaloneCleanerPortal(true);
       openJobSignatureModal(job.id);
       toast(portalCleanerAdmin ? "Trabajo terminado por administrador. Falta firma en sitio." : "Trabajo terminado. Falta firma en sitio.");
@@ -3010,16 +3088,35 @@ async function handleCleanerHistoryEvidenceSubmit(event) {
   const comment = data.get("comment") || "Foto historica agregada con permiso admin.";
   const createdAt = new Date().toISOString();
   for (const file of files) {
-    evidenceFor(job).push({
+    const compressedUrl = await compressImageFile(file);
+    const newEv = {
       id: safeId(),
       section,
       phase,
       comment: `Admin: ${comment}`,
-      url: await compressImageFile(file),
+      url: compressedUrl,
       fileName: file.name,
       createdAt,
       source: "admin-history"
-    });
+    };
+    evidenceFor(job).push(newEv);
+
+    if (supabaseClient) {
+      try {
+        const dbPhase = newEv.phase === "Antes" ? "before" : "after";
+        await supabaseClient.from("job_evidence").insert({
+          id: newEv.id,
+          organization_id: job.organizationId || state.orgId,
+          job_id: job.id,
+          area: newEv.section,
+          phase: dbPhase,
+          file_path: newEv.url,
+          caption: newEv.comment
+        });
+      } catch (err) {
+        console.error("Error inserting historical evidence in portal mode:", err);
+      }
+    }
   }
   job.photos = evidenceCount(job);
   save();
@@ -4487,6 +4584,7 @@ function renderClientLinks() {
           <div class="client-link-history">
             <strong>${activeCount} activo/proximo</strong>
             <span>${historyCount} en historial</span>
+          </div>
           <div class="client-link-key">
             <code>${escapeHtml(portalPassword)}</code>
             <button type="button" title="Copiar clave" data-copy-client-key="${client.id}">⧉</button>
@@ -4663,13 +4761,22 @@ function bindPhotoActions(canDelete = false) {
   });
   if (!canDelete) return;
   $$("[data-delete-photo]").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       const found = findEvidence(button.dataset.deletePhoto);
       if (!found) return;
       if (!window.confirm(t("confirmDeletePhoto"))) return;
       found.job.evidence = evidenceFor(found.job).filter((item) => item.id !== button.dataset.deletePhoto);
       found.job.photos = evidenceCount(found.job);
       save();
+
+      if (supabaseClient) {
+        try {
+          await supabaseClient.from("job_evidence").delete().eq("id", button.dataset.deletePhoto);
+        } catch (err) {
+          console.error("Error deleting evidence in portal mode:", err);
+        }
+      }
+
       if (!$("#cleanerPortalPage")?.classList.contains("hidden")) {
         renderStandaloneCleanerPortal(true);
       } else {
@@ -5725,8 +5832,7 @@ function setupEvents() {
   $("#confirmDeleteReceiptButton").addEventListener("click", deletePendingReceipt);
   $("#deleteReceiptModal").addEventListener("click", (event) => {
     if (event.target.id === "deleteReceiptModal") closeDeleteReceiptModal();
-  });
-  $("#clientPortalConfirmButton").addEventListener("click", () => {
+  });  $("#clientPortalConfirmButton").addEventListener("click", async () => {
     const client = state.clients.find((item) => item.id === portalClientId);
     const job = currentClientJob(client?.id);
     if (!job) return;
@@ -5738,9 +5844,31 @@ function setupEvents() {
     job.clientSignature = true;
     job.status = "Confirmado por cliente";
     save();
+
+    // Direct Supabase Write for portal-based confirm
+    if (supabaseClient) {
+      try {
+        await supabaseClient.from("jobs").update({
+          status: "client_confirmed"
+        }).eq("id", job.id);
+
+        await supabaseClient.from("client_signatures").delete().eq("job_id", job.id).eq("signed_from", "private_link");
+        await supabaseClient.from("client_signatures").insert({
+          organization_id: job.organizationId || state.orgId,
+          job_id: job.id,
+          signer_name: "Cliente",
+          signature_data: "Confirmado via portal seguro",
+          signed_from: "private_link"
+        });
+      } catch (err) {
+        console.error("Error saving client confirmation in portal mode:", err);
+      }
+    }
+
     renderStandaloneClientPortal(true);
     toast("Cliente confirmo el servicio.");
   });
+
   $("#paymentForm").addEventListener("submit", (event) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
@@ -5917,7 +6045,7 @@ function setupEvents() {
   });
   $("#closeSignatureModal").addEventListener("click", closeSignatureModal);
   $("#clearSignature").addEventListener("click", prepareSignaturePad);
-  $("#saveSignature").addEventListener("click", () => {
+  $("#saveSignature").addEventListener("click", async () => {
     if (signingJobId) {
       const job = state.jobs.find((item) => item.id === signingJobId);
       if (!job) return;
@@ -5925,6 +6053,22 @@ function setupEvents() {
       job.siteSignerName = $("#signatureReceiver").value;
       job.siteSignature = $("#signatureCanvas").toDataURL("image/png");
       save();
+
+      if (supabaseClient) {
+        try {
+          await supabaseClient.from("client_signatures").delete().eq("job_id", job.id).eq("signed_from", "cleaner_device");
+          await supabaseClient.from("client_signatures").insert({
+            organization_id: job.organizationId || state.orgId,
+            job_id: job.id,
+            signer_name: job.siteSignerName || "Persona en sitio",
+            signature_data: job.siteSignature,
+            signed_from: "cleaner_device"
+          });
+        } catch (err) {
+          console.error("Error saving site signature in portal mode:", err);
+        }
+      }
+
       renderStandaloneCleanerPortal(true);
       closeSignatureModal();
       toast("Firma de salida guardada.");
@@ -5936,6 +6080,27 @@ function setupEvents() {
     receipt.signature = $("#signatureCanvas").toDataURL("image/png");
     receipt.status = "signed";
     save();
+
+    if (supabaseClient) {
+      try {
+        const cleanerId = receipt.cleanerId || state.cleaners.find(c => c.name === receipt.cleaner)?.id;
+        const [start, end] = receipt.period ? receipt.period.split(" - ") : [today(), today()];
+        await supabaseClient.from("payment_receipts").upsert({
+          id: receipt.id,
+          organization_id: receipt.organizationId || state.orgId,
+          cleaner_id: cleanerId || null,
+          period_start: start,
+          period_end: end,
+          amount: receipt.amount,
+          payment_method: receipt.method === "Efectivo" ? "cash" : "transfer",
+          receiver_signature_data: receipt.signature,
+          status: "signed"
+        });
+      } catch (err) {
+        console.error("Error saving receipt signature in portal mode:", err);
+      }
+    }
+
     if (!$("#cleanerPortalPage")?.classList.contains("hidden")) {
       renderStandaloneCleanerPortal(true);
     } else {
