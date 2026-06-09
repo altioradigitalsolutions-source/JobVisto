@@ -1,8 +1,10 @@
-const CACHE_NAME = "jobvisto-app-v8";
+const CACHE_NAME = "jobvisto-app-v20";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./app.html",
+  "./portal-clientes.html",
+  "./portal-cleaners.html",
   "./styles.css",
   "./script.js",
   "./app.css",

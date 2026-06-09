@@ -4,6 +4,13 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>JobVisto | Gestion simple para cleaners y empresas de limpieza</title>
+    <script>
+      // Redirigir automaticamente si el usuario olvida el .html en los links del portal
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get("portal")) {
+        window.location.replace("./app.html" + window.location.search);
+      }
+    </script>
     <meta
       name="description"
       content="JobVisto organiza trabajos de limpieza con check-in, fotos, firma del cliente, calculo de horas y comprobantes de pago recibido."
@@ -24,7 +31,8 @@
         <a href="#features" data-i18n="navFeatures">Features</a>
         <a href="#flows" data-i18n="navHow">How it works</a>
         <a href="#pricing" data-i18n="navPricing">Pricing</a>
-        <a href="#proof" data-i18n="navTestimonials">Testimonials</a>
+        <a href="./portal-clientes.html" style="font-weight: 500; color: #1dd179;">Portal Clientes</a>
+        <a href="./portal-cleaners.html" style="font-weight: 500; color: #1dd179;">Portal Cleaners</a>
       </nav>
       <div class="header-actions">
         <button class="icon-button" type="button" data-lang-toggle aria-label="Cambiar idioma" title="Cambiar idioma">
@@ -42,6 +50,8 @@
       <div class="mobile-dropdown" id="mobileDropdown">
         <a class="mobile-dropdown-btn button-login" href="./app.html?intent=login&mode=company" data-i18n="navLogin">Log in</a>
         <a class="mobile-dropdown-btn button-primary" href="./app.html?intent=signup&plan=free&mode=independent" data-i18n="navSignup">Get started free</a>
+        <a class="mobile-dropdown-btn" href="./portal-clientes.html">Portal Clientes</a>
+        <a class="mobile-dropdown-btn" href="./portal-cleaners.html">Portal Cleaners</a>
       </div>
     </header>
 
@@ -221,7 +231,7 @@
 
         <article class="founder-testimonial">
           <div class="testimonial-mark" style="overflow: hidden;">
-            <img src="./assets/meir.jpg" alt="Meir M." style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
+            <img src="./assets/client1.png" alt="Usuario" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
           </div>
           <div class="testimonial-content">
             <div class="rating-row" aria-label="5 star rating">
@@ -235,7 +245,7 @@
               “Yo empece JobVisto porque necesitaba ordenar trabajos, clientes, evidencia y pagos sin depender de WhatsApp o notas sueltas. Al usarlo, senti que por fin podia ver cada limpieza con claridad: quien fue, que hizo, que fotos subio y que quedo firmado.”
             </blockquote>
             <div class="testimonial-author">
-              <strong>Meir M.</strong>
+              <strong>Carlos M.</strong>
               <span>Founder de JobVisto · Usado en operacion real de limpieza</span>
             </div>
           </div>

@@ -15,6 +15,24 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./app.css">
+    <style>
+      /* Ensure admin screens NEVER show on this dedicated cleaner page */
+      #authScreen, #appShell, #clientPortalPage { display: none !important; }
+      #cleanerPortalPage { display: block !important; }
+      
+      /* Hide cleaner sidebar and topbar until unlocked */
+      #cleanerPortalPage:not(.is-unlocked) .cleaner-sidebar,
+      #cleanerPortalPage:not(.is-unlocked) .cleaner-topbar,
+      #cleanerPortalPage:not(.is-unlocked) .cleaner-tabs {
+        display: none !important;
+      }
+      #cleanerPortalPage:not(.is-unlocked) .cleaner-portal-wrapper {
+        display: block !important;
+      }
+      #cleanerPortalPage.is-unlocked .cleaner-locked-header {
+        display: none !important;
+      }
+    </style>
   </head>
   <body>
     <div class="auth-screen" id="authScreen">
@@ -1067,16 +1085,6 @@
               </div>
               <div id="clientPortalPhotos"></div>
             </section>
-            
-            <section class="panel cp-history-panel-separate">
-              <div class="panel-head">
-                <div class="cp-panel-title">
-                  <span class="cp-panel-icon">⏳</span>
-                  <h3 data-i18n="serviceHistory">Historial de servicios</h3>
-                </div>
-              </div>
-              <div id="clientPortalHistoryList"></div>
-            </section>
           </div>
           <!-- Right: Activity Timeline -->
           <aside class="cp-right-col">
@@ -1108,6 +1116,17 @@
     </main>
 
     <main class="client-portal-page cleaner-portal-page hidden" id="cleanerPortalPage">
+      
+      <!-- Locked Header (Visible only when locked) -->
+      <section class="portal-header cleaner-locked-header">
+        <a class="logo" href="./index.html">
+          <img src="./assets/Logo Jobvisto.png" alt="JobVisto Logo">
+        </a>
+        <div class="portal-actions">
+          <span class="status-chip">Portal privado cleaner</span>
+        </div>
+      </section>
+
       <div class="cleaner-portal-wrapper">
         <!-- Left Sidebar -->
         <aside class="cleaner-sidebar">
@@ -1201,11 +1220,24 @@
           </div>
 
           <!-- Lock Screen (for access validation) -->
-          <section class="portal-lock" id="cleanerPortalLock">
-            <h1>Acceso del equipo</h1>
-            <p class="muted">Entra para ver tus trabajos asignados, tomar trabajos abiertos y registrar llegada, fotos y salida.</p>
-            <label>Clave de acceso <input id="cleanerPortalPassword" placeholder="JV-MARIA"></label>
-            <button class="primary" id="unlockCleanerPortal">Entrar</button>
+          <section class="portal-lock client-access-card" id="cleanerPortalLock">
+            <div class="client-access-card-top">
+              <div>
+                <p class="eyebrow">PORTAL SEGURO DEL CLEANER</p>
+                <h1>Acceso del equipo</h1>
+              </div>
+            </div>
+            <p class="muted client-access-copy">Entra para ver tus trabajos asignados, tomar trabajos abiertos y registrar llegada, fotos y salida.</p>
+            <div class="client-access-trust">
+              <span>Link privado</span>
+              <span>Subida de evidencia</span>
+              <span>Registro de horas</span>
+            </div>
+            <label class="client-access-field">
+              <span>Clave de acceso</span>
+              <input id="cleanerPortalPassword" placeholder="Ejemplo: JV-MARIA">
+            </label>
+            <button class="primary client-access-submit" id="unlockCleanerPortal">Entrar al portal</button>
           </section>
 
           <!-- Tabs Panels Workspace -->

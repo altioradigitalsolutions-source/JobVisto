@@ -155,6 +155,19 @@ async function loadStateFromSupabase() {
           date: new Date(r.paid_at).toLocaleDateString('es')
         }));
       }
+
+      // Fetch organization settings
+      const { data: settings } = await supabaseClient.from('organization_settings').select('*').eq('organization_id', orgId);
+      if (settings) {
+        const vatSetting = settings.find(s => s.key === 'vat_rate');
+        if (vatSetting) {
+          state.vatRate = Number(vatSetting.value?.rate !== undefined ? vatSetting.value.rate : 18);
+        }
+        const currencySetting = settings.find(s => s.key === 'currency_symbol');
+        if (currencySetting) {
+          state.currencySymbol = currencySetting.value?.symbol || (state.country === 'IL' ? '₪' : '$');
+        }
+      }
     }
   } catch (e) {
     console.error("Error loading state from Supabase: ", e);
@@ -400,6 +413,18 @@ async function asyncSaveToSupabase() {
         status: receipt.status === 'signed' ? 'signed' : 'draft'
       });
     }
+
+    // 12. Sync organization settings (vat_rate and currency_symbol)
+    await supabaseClient.from('organization_settings').upsert({
+      organization_id: state.orgId,
+      key: 'vat_rate',
+      value: { rate: state.vatRate }
+    });
+    await supabaseClient.from('organization_settings').upsert({
+      organization_id: state.orgId,
+      key: 'currency_symbol',
+      value: { symbol: state.currencySymbol }
+    });
   } catch (e) {
     console.error("Error saving state to Supabase: ", e);
   }
@@ -461,7 +486,9 @@ const state = {
     specialRules: [
       { id: "cr1", cleanerId: "cl1", cleanerName: "Maria Lopez", rate: 60, mode: "replace" }
     ]
-  }
+  },
+  vatRate: Number(localStorage.getItem("jobvisto-vat-rate") !== null ? localStorage.getItem("jobvisto-vat-rate") : 18),
+  currencySymbol: localStorage.getItem("jobvisto-currency-symbol") || (localStorage.getItem("jobvisto-country") === "IL" ? "₪" : "$")
 };
 
 if (state.companyProfile?.ownerName === "Alex Morgan") {
@@ -538,7 +565,7 @@ const stripePaymentLinks = {
 };
 
 const demoAccounts = {
-  "meir.meiras1@gmail.com": {
+  "admin@jobvisto.com": {
     mode: "company",
     name: "Altiora Cleaning",
     plan: "pro",
@@ -1342,6 +1369,8 @@ function save() {
   localStorage.setItem("jobvisto-client-price-rules", JSON.stringify(state.clientPriceRules));
   localStorage.setItem("jobvisto-cost-rules", JSON.stringify(state.costRules));
   localStorage.setItem("jobvisto-company-profile", JSON.stringify(state.companyProfile));
+  localStorage.setItem("jobvisto-vat-rate", String(state.vatRate));
+  localStorage.setItem("jobvisto-currency-symbol", state.currencySymbol);
   
   if (supabaseClient && state.orgId && state.user) {
     asyncSaveToSupabase();
@@ -1481,7 +1510,7 @@ function minutesLabel(minutes) {
 
 function money(value) {
   const amount = Number(value || 0);
-  return `$${amount.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+  return `${state.currencySymbol || '$'}${amount.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
 }
 
 function firstName(value) {
@@ -1604,11 +1633,13 @@ function cleanerPortalPassword(cleaner) {
 }
 
 function localClientPortalUrl(client) {
-  return `${location.origin}${location.pathname}?portal=client&id=${encodeURIComponent(client.id)}&clave=${encodeURIComponent(clientPortalPassword(client))}`;
+  const basePath = location.pathname.replace(/\/[^/]*$/, "");
+  return `${location.origin}${basePath}/portal-clientes.html?id=${encodeURIComponent(client.id)}&clave=${encodeURIComponent(clientPortalPassword(client))}`;
 }
 
 function localCleanerPortalUrl(cleaner) {
-  return `${location.origin}${location.pathname}?portal=cleaner&id=${encodeURIComponent(cleaner.id)}&clave=${encodeURIComponent(cleanerPortalPassword(cleaner))}`;
+  const basePath = location.pathname.replace(/\/[^/]*$/, "");
+  return `${location.origin}${basePath}/portal-cleaners.html?id=${encodeURIComponent(cleaner.id)}&clave=${encodeURIComponent(cleanerPortalPassword(cleaner))}`;
 }
 
 function currentTime() {
@@ -1844,6 +1875,80 @@ function clientHistoryHtml(historyJobs) {
       </details>
     `;
   }).join("");
+}
+
+function clientHistoryTimelineHtml(historyJobs, currentJob) {
+  const allJobs = [];
+  if (currentJob) {
+    allJobs.push({ ...currentJob, isCurrent: true });
+  }
+  historyJobs.forEach(job => {
+    allJobs.push({ ...job, isCurrent: false });
+  });
+
+  if (!allJobs.length) {
+    return `<p class="muted">${t("noClosedJobsHistory")}</p>`;
+  }
+
+  return `
+    <div class="cp-history-list">
+      ${allJobs.map((job, index) => {
+        const client = clientFor(job);
+        const isCurrent = job.isCurrent;
+        const badgeClass = isCurrent ? 'cp-status-assigned' : 'cp-status-done';
+        const badgeLabel = isCurrent ? (job.status || 'Programado') : 'Terminado por cleaner';
+        const hasPayableAmount = hasRealBillingTimes(job);
+        const formattedDate = new Date(job.date + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+        
+        return `
+          <div class="cp-history-item-new ${isCurrent ? 'current' : 'past'}">
+            <div class="cp-history-header-row">
+              <strong>${formattedDate} &bull; ${isCurrent ? 'Próximo servicio' : escapeHtml(client.name)}</strong>
+              <span class="cp-job-status-badge ${badgeClass}" style="padding: 2px 8px; border-radius: 99px;">${badgeLabel}</span>
+            </div>
+            <div class="cp-history-details-row">
+              <span class="cp-history-detail-line">${escapeHtml(job.serviceType)} &bull; ${job.start}–${job.actualEnd || job.end || '—'}</span>
+              ${!isCurrent ? `
+                <span class="cp-history-sub-line">${evidenceCount(job)} fotos &bull; ${job.clientConfirmed ? t("confirmedByClient") : t("noClientConfirmation")} &bull; ${hasPayableAmount ? money(estimateJob(job)) : localText("amountPendingLower")}</span>
+              ` : `
+                <span class="cp-history-sub-line">Estado: ${escapeHtml(job.status)}</span>
+              `}
+            </div>
+            <button class="text-link cp-history-expand-btn" type="button" onclick="toggleHistoryJobDetails('${job.id}')">
+              Ver detalles &gt;
+            </button>
+            <div class="cp-history-job-expanded hidden" id="history-details-${job.id}">
+              ${evidenceCount(job) ? photoBoardHtml(job, true) : `<p class="muted" style="margin: 8px 0 0; font-size: 0.8rem;">Sin evidencias cargadas.</p>`}
+            </div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+    <div style="margin-top: 16px; text-align: center;">
+      <button class="ghost" type="button" style="font-size: 0.85rem; font-weight: 600; padding: 8px 16px; border-radius: 8px; border: 1px solid #e2ebe4; color: #07302d;" onclick="toast('Mostrando todo el historial.')">
+        Ver todos los servicios &gt;
+      </button>
+    </div>
+  `;
+}
+
+window.toggleHistoryJobDetails = function(jobId) {
+  const el = document.getElementById(`history-details-${jobId}`);
+  if (el) {
+    el.classList.toggle("hidden");
+  }
+};
+
+async function copyClientKey(clientId) {
+  const client = state.clients.find((item) => item.id === clientId);
+  if (!client) return;
+  const key = clientPortalPassword(client);
+  try {
+    await navigator.clipboard.writeText(key);
+    toast("Clave copiada: " + key);
+  } catch {
+    window.prompt("Copia esta clave:", key);
+  }
 }
 
 function jobStatusLabel(job) {
@@ -2084,31 +2189,257 @@ function validateDemoAccount(action, data = {}) {
   return true;
 }
 
-function enterClientPortalFromUrl() {
+async function enterClientPortalFromUrl() {
   const params = new URLSearchParams(location.search);
-  if (params.get("portal") === "cleaner") return enterCleanerPortalFromUrl(params);
+  if (params.get("portal") === "cleaner") return await enterCleanerPortalFromUrl(params);
   if (params.get("portal") !== "client") return false;
   portalCleanerAdmin = false;
-  const client = clientFromPortalAccess(params.get("id"), params.get("clave"));
+  const clientId = params.get("id");
   const accessKey = normalizeKey(params.get("clave"));
+
+  if (supabaseClient && (!state.clients || state.clients.length === 0 || !state.clients.some(c => c.id === clientId))) {
+    try {
+      const { data, error } = await supabaseClient.rpc('get_portal_client', {
+        client_id: clientId,
+        client_key: accessKey
+      });
+      if (!error && data) {
+        const cl = data.client;
+        const org = data.organization;
+        state.orgId = cl.organization_id;
+        state.country = org.country || "IL";
+        state.currencySymbol = org.currency === "ILS" ? "₪" : (org.currency === "USD" ? "$" : org.currency);
+
+        const { data: settings } = await supabaseClient.from('organization_settings').select('*').eq('organization_id', cl.organization_id);
+        if (settings) {
+          const vatSetting = settings.find(s => s.key === 'vat_rate');
+          if (vatSetting) state.vatRate = Number(vatSetting.value?.rate !== undefined ? vatSetting.value.rate : 18);
+          const currencySetting = settings.find(s => s.key === 'currency_symbol');
+          if (currencySetting) state.currencySymbol = currencySetting.value?.symbol || state.currencySymbol;
+        }
+
+        state.clients = [{
+          id: cl.id,
+          name: cl.name,
+          phone: cl.phone || "",
+          email: cl.email || "",
+          address: "",
+          country: state.country || "IL",
+          paymentMethod: cl.default_payment_method === 'cash' ? 'Efectivo' : 'Transferencia',
+          notes: cl.notes || ""
+        }];
+
+        const { data: addresses } = await supabaseClient.from('client_addresses').select('*').eq('client_id', cl.id);
+        if (addresses && addresses[0]) {
+          state.clients[0].address = addresses[0].address_line;
+        }
+
+        state.cleaners = (data.cleaners || []).map(c => ({
+          id: c.id,
+          name: c.name,
+          phone: c.phone || "",
+          email: c.email || "",
+          status: c.status === 'available' ? 'Disponible' : 'Ocupada',
+          key: c.access_key,
+          country: c.country || state.country || "IL",
+          city: c.city || "Zona principal"
+        }));
+
+        state.jobs = (data.jobs || []).map(j => {
+          const dateStr = j.scheduled_start ? j.scheduled_start.slice(0, 10) : today();
+          const startStr = j.scheduled_start ? new Date(j.scheduled_start).toISOString().slice(11, 16) : "08:00";
+          const endStr = j.scheduled_end ? new Date(j.scheduled_end).toISOString().slice(11, 16) : "12:00";
+          const actualEndStr = j.actual_end ? new Date(j.actual_end).toISOString().slice(11, 16) : "";
+          
+          const jobEvidence = (data.evidence || []).filter(e => e.job_id === j.id).map(e => ({
+            id: e.id,
+            section: e.area,
+            phase: e.phase === 'before' ? 'Antes' : 'Despues',
+            comment: e.caption || "",
+            url: e.file_path,
+            createdAt: e.created_at
+          }));
+
+          const jobSignatures = (data.signatures || []).filter(s => s.job_id === j.id);
+          const siteSig = jobSignatures.find(s => s.signed_from === 'cleaner_device');
+          const clientSig = jobSignatures.find(s => s.signed_from === 'private_link') || jobSignatures[0];
+
+          return {
+            id: j.id,
+            clientId: j.client_id,
+            cleanerId: j.assigned_cleaner_id || "",
+            date: dateStr,
+            start: startStr,
+            end: endStr,
+            actualEnd: actualEndStr,
+            serviceType: j.service_type || "Limpieza normal",
+            rate: Number(j.client_hourly_rate || 65),
+            extras: Number(j.extras_amount || 0),
+            status: j.status === 'scheduled' ? 'Asignado' : 
+                    j.status === 'open' ? 'Disponible para tomar' : 
+                    j.status === 'in_site' ? 'En progreso' :
+                    j.status === 'cleaner_finished' ? 'Terminado por cleaner' :
+                    j.status === 'client_confirmed' ? 'Confirmado por cliente' :
+                    j.status === 'signed' ? 'Firmado' : j.status,
+            tasks: j.checklist || [],
+            checkedIn: j.status === 'in_site' || j.status === 'cleaner_finished' || j.status === 'client_confirmed' || j.status === 'signed',
+            checkedOut: j.status === 'cleaner_finished' || j.status === 'client_confirmed' || j.status === 'signed' || jobSignatures.length > 0,
+            cleanerFinished: j.status === 'cleaner_finished' || j.status === 'client_confirmed' || j.status === 'signed' || jobSignatures.length > 0,
+            clientConfirmed: j.status === 'client_confirmed' || j.status === 'signed' || clientSig !== undefined,
+            signed: j.status === 'client_confirmed' || j.status === 'signed' || jobSignatures.length > 0,
+            siteSignature: siteSig ? siteSig.signature_data : "",
+            siteSignerName: siteSig ? siteSig.signer_name : "",
+            clientSignature: clientSig ? clientSig.signature_data : "",
+            evidence: jobEvidence,
+            photos: jobEvidence.length
+          };
+        });
+      }
+    } catch (err) {
+      console.error("Error loading client portal dynamically: ", err);
+    }
+  }
+
+  const client = clientFromPortalAccess(clientId, accessKey);
   const shouldUnlock = Boolean(client && (!accessKey || clientPortalKeyMatches(client, accessKey)));
   portalClientId = client?.id || null;
+  
+  // Force hide auth screen and shell
   $("#authScreen").classList.add("hidden");
+  $("#authScreen").style.display = "none"; 
   $("#appShell").classList.add("hidden");
+  $("#appShell").style.display = "none";
+  
   $("#clientPortalPage").classList.remove("hidden");
   $("#clientPortalPassword").value = params.get("clave") || (client ? clientPortalPassword(client) : "");
   renderStandaloneClientPortal(shouldUnlock);
   return true;
 }
 
-function enterCleanerPortalFromUrl(params = new URLSearchParams(location.search)) {
+async function enterCleanerPortalFromUrl(params = new URLSearchParams(location.search)) {
   const access = parsedCleanerAccess(params);
   portalCleanerAdmin = access.key === normalizeKey(ADMIN_CLEANER_KEY);
+
+  if (supabaseClient && (!state.cleaners || state.cleaners.length === 0 || !state.cleaners.some(c => c.id === access.id))) {
+    try {
+      const { data, error } = await supabaseClient.rpc('get_portal_cleaner', {
+        cleaner_id: access.id,
+        cleaner_key: access.key
+      });
+      if (!error && data) {
+        const cl = data.cleaner;
+        const org = data.organization;
+        state.orgId = cl.organization_id;
+        state.country = org.country || "IL";
+        state.currencySymbol = org.currency === "ILS" ? "₪" : (org.currency === "USD" ? "$" : org.currency);
+
+        const { data: settings } = await supabaseClient.from('organization_settings').select('*').eq('organization_id', cl.organization_id);
+        if (settings) {
+          const vatSetting = settings.find(s => s.key === 'vat_rate');
+          if (vatSetting) state.vatRate = Number(vatSetting.value?.rate !== undefined ? vatSetting.value.rate : 18);
+          const currencySetting = settings.find(s => s.key === 'currency_symbol');
+          if (currencySetting) state.currencySymbol = currencySetting.value?.symbol || state.currencySymbol;
+        }
+
+        state.cleaners = [{
+          id: cl.id,
+          name: cl.name,
+          phone: cl.phone || "",
+          email: cl.email || "",
+          status: cl.status === 'available' ? 'Disponible' : 'Ocupada',
+          key: cl.access_key,
+          country: cl.country || state.country || "IL",
+          city: cl.city || "Zona principal"
+        }];
+
+        state.clients = (data.clients || []).map(c => ({
+          id: c.id,
+          name: c.name,
+          phone: c.phone || "",
+          email: c.email || "",
+          address: "",
+          country: state.country || "IL",
+          paymentMethod: c.default_payment_method === 'cash' ? 'Efectivo' : 'Transferencia',
+          notes: c.notes || ""
+        }));
+
+        state.jobs = (data.jobs || []).map(j => {
+          const dateStr = j.scheduled_start ? j.scheduled_start.slice(0, 10) : today();
+          const startStr = j.scheduled_start ? new Date(j.scheduled_start).toISOString().slice(11, 16) : "08:00";
+          const endStr = j.scheduled_end ? new Date(j.scheduled_end).toISOString().slice(11, 16) : "12:00";
+          const actualEndStr = j.actual_end ? new Date(j.actual_end).toISOString().slice(11, 16) : "";
+          
+          const jobEvidence = (data.evidence || []).filter(e => e.job_id === j.id).map(e => ({
+            id: e.id,
+            section: e.area,
+            phase: e.phase === 'before' ? 'Antes' : 'Despues',
+            comment: e.caption || "",
+            url: e.file_path,
+            createdAt: e.created_at
+          }));
+
+          const jobSignatures = (data.signatures || []).filter(s => s.job_id === j.id);
+          const siteSig = jobSignatures.find(s => s.signed_from === 'cleaner_device');
+          const clientSig = jobSignatures.find(s => s.signed_from === 'private_link') || jobSignatures[0];
+
+          return {
+            id: j.id,
+            clientId: j.client_id,
+            cleanerId: j.assigned_cleaner_id || "",
+            date: dateStr,
+            start: startStr,
+            end: endStr,
+            actualEnd: actualEndStr,
+            serviceType: j.service_type || "Limpieza normal",
+            rate: Number(j.client_hourly_rate || 65),
+            extras: Number(j.extras_amount || 0),
+            status: j.status === 'scheduled' ? 'Asignado' : 
+                    j.status === 'open' ? 'Disponible para tomar' : 
+                    j.status === 'in_site' ? 'En progreso' :
+                    j.status === 'cleaner_finished' ? 'Terminado por cleaner' :
+                    j.status === 'client_confirmed' ? 'Confirmado por cliente' :
+                    j.status === 'signed' ? 'Firmado' : j.status,
+            tasks: j.checklist || [],
+            checkedIn: j.status === 'in_site' || j.status === 'cleaner_finished' || j.status === 'client_confirmed' || j.status === 'signed',
+            checkedOut: j.status === 'cleaner_finished' || j.status === 'client_confirmed' || j.status === 'signed' || jobSignatures.length > 0,
+            cleanerFinished: j.status === 'cleaner_finished' || j.status === 'client_confirmed' || j.status === 'signed' || jobSignatures.length > 0,
+            clientConfirmed: j.status === 'client_confirmed' || j.status === 'signed' || clientSig !== undefined,
+            signed: j.status === 'client_confirmed' || j.status === 'signed' || jobSignatures.length > 0,
+            siteSignature: siteSig ? siteSig.signature_data : "",
+            siteSignerName: siteSig ? siteSig.signer_name : "",
+            clientSignature: clientSig ? clientSig.signature_data : "",
+            evidence: jobEvidence,
+            photos: jobEvidence.length
+          };
+        });
+
+        state.receipts = (data.receipts || []).map(r => ({
+          id: r.id,
+          cleanerId: r.cleaner_id,
+          cleaner: state.cleaners.find(c => c.id === r.cleaner_id)?.name || 'Cleaner',
+          amount: Number(r.amount),
+          method: r.payment_method === 'cash' ? 'Efectivo' : 'Transferencia',
+          period: `${r.period_start} - ${r.period_end}`,
+          status: r.status === 'draft' ? 'pending_signature' : 'signed',
+          signature: r.receiver_signature_data,
+          date: new Date(r.paid_at).toLocaleDateString('es')
+        }));
+      }
+    } catch (err) {
+      console.error("Error loading cleaner portal dynamically: ", err);
+    }
+  }
+
   const cleaner = cleanerFromPortalAccess(access.id, access.key);
   const shouldUnlock = Boolean(cleaner && (portalCleanerAdmin || !access.key || normalizeKey(cleanerPortalPassword(cleaner)) === access.key));
   portalCleanerId = cleaner?.id;
+  
+  // Force hide auth screen and shell
   $("#authScreen").classList.add("hidden");
+  $("#authScreen").style.display = "none";
   $("#appShell").classList.add("hidden");
+  $("#appShell").style.display = "none";
+  
   $("#clientPortalPage").classList.add("hidden");
   $("#cleanerPortalPage").classList.remove("hidden");
   $("#cleanerPortalPassword").value = access.key || (cleaner ? cleanerPortalPassword(cleaner) : "");
@@ -2130,55 +2461,172 @@ function renderStandaloneClientPortal(unlocked = true) {
   const hasPayableAmount = job && hasRealBillingTimes(job);
   $("#clientPortalLock").classList.toggle("hidden", unlocked);
   $("#clientPortalContent").classList.toggle("hidden", !unlocked);
+  document.querySelector(".portal-header")?.classList.toggle("hidden", !unlocked);
+
+  // Build the left summary card
+  const statusMap = {
+    "Asignado": { label: "Asignado", cls: "cp-status-assigned" },
+    "En progreso": { label: "En sitio / en proceso", cls: "cp-status-inprogress" },
+    "En sitio": { label: "En sitio / en proceso", cls: "cp-status-inprogress" },
+    "Terminado por cleaner": { label: "Terminado por cleaner", cls: "cp-status-done" },
+    "Terminado por cliente": { label: "Terminado por cliente", cls: "cp-status-done" },
+    "Terminado por administrador": { label: "Terminado por administrador", cls: "cp-status-done" },
+  };
+  const jobStatus = job ? (statusMap[job.status] || { label: job.status, cls: "cp-status-assigned" }) : null;
+
+  const mkRow = (iconName, label, value, valueCls = "") => `
+    <div class="cp-info-row-redesign">
+      <span class="cp-info-label-redesign">
+        <i data-lucide="${iconName}" class="cp-row-icon-redesign"></i>
+        ${label}
+      </span>
+      <span class="cp-info-value-redesign${valueCls ? ' ' + valueCls : ''}">${value}</span>
+    </div>`;
+
+  const pendingText = `<span style="color: #f59e0b; font-weight: 700;">${t("pending")}</span>`;
+  const doneText = `<span style="color: #35d17f; font-weight: 700;">✓</span>`;
+  const blockedText = `<span style="color: #ef4444; font-weight: 700;">${localText("serviceLocked")}</span>`;
+  const initials = String(client.name || "JV").split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
+
   $("#clientPortalSummary").innerHTML = job ? `
-    <p class="muted">${localText("client")}: ${client.name}</p>
-    <p>${t("currentService")}: <strong>${job.serviceType}</strong></p>
-    <p>${localText("dateAndTime")}: <strong>${job.date} - ${job.start}-${job.end || t("undefinedTime")}</strong></p>
-    <div class="client-payment-due ${hasPayableAmount ? "" : "is-locked"}">
-      <span>${localText("amountToPay")}</span>
-      <strong>${hasPayableAmount ? money(estimateJob(job)) : localText("amountPending")}</strong>
-      <small>${hasPayableAmount ? `${localText("paymentMethodExpected")}: ${client.paymentMethod || t("undefinedTime")}` : localText("billingPendingCopy")}</small>
+    <span class="cp-summary-eyebrow-redesign">Cliente</span>
+    <h2 class="cp-summary-title-redesign">${t("privateServiceSummary")}</h2>
+    
+    <div class="cp-summary-meta-redesign">
+      <div class="cp-meta-row-redesign">
+        <i data-lucide="user" class="cp-meta-icon-redesign"></i>
+        <span><strong>Cliente:</strong> ${client.name}</span>
+      </div>
+      <div class="cp-meta-row-redesign">
+        <i data-lucide="briefcase" class="cp-meta-icon-redesign"></i>
+        <span><strong>Servicio actual/próximo:</strong> ${job.serviceType}</span>
+      </div>
+      <div class="cp-meta-row-redesign">
+        <i data-lucide="calendar" class="cp-meta-icon-redesign"></i>
+        <span><strong>Fecha y hora:</strong> ${job.date} &bull; ${job.start}–${job.end || t("undefinedTime")}</span>
+      </div>
     </div>
-    <p>${t("serviceStatus")}: <strong>${jobStatusLabel(job)}</strong></p>
-    <p>${t("cleanerArrival")}: <strong>${job.checkedIn ? job.start : t("pending")}</strong></p>
-    <p>${t("cleanerDeparture")}: <strong>${job.checkedOut ? (job.actualEnd || job.end) : t("pending")}</strong></p>
-    <p>${t("visiblePhotos")}: <strong>${evidenceCount(job)}</strong></p>
-    <p>${t("cleanerFinished")}: <strong>${job.cleanerFinished || job.checkedOut ? t("yes") : t("pending")}</strong></p>
-    <p>${t("clientConfirmation")}: <strong>${job.clientConfirmed ? t("confirmed") : t("pending")}</strong></p>
-    <p>${t("clientSignature")}: <strong>${job.clientSignature ? t("signed") : t("pending")}</strong></p>
-    <p>${t("onsiteSignature")}: <strong>${job.siteSignature ? `${t("signedBy")} ${job.siteSignerName || t("onsitePerson")}` : t("pending")}</strong></p>
-    <p>${t("checklist")}: <strong>${job.tasks.join(", ")}</strong></p>
-  ` : `
-    <p class="muted">${localText("client")}: ${client.name}</p>
-    <p>${t("currentService")}: <strong>${t("noActiveJobs")}</strong></p>
-    <div class="client-payment-due is-empty">
-      <span>${localText("amountToPay")}</span>
-      <strong>${money(0)}</strong>
-      <small>${localText("noActivePaymentCopy")}</small>
+
+    <div class="cp-payment-card-redesign ${hasPayableAmount ? '' : 'cp-payment-locked'}">
+      <div class="cp-payment-icon-circle">
+        <i data-lucide="dollar-sign"></i>
+      </div>
+      <div class="cp-payment-text-wrap">
+        <span class="cp-payment-label-redesign">${localText("amountToPay")}</span>
+        <strong class="cp-payment-amount-redesign">${hasPayableAmount ? money(estimateJob(job)) : localText("amountPending")}</strong>
+        <p class="cp-payment-desc-redesign">${hasPayableAmount ? `${localText("paymentMethodExpected")}: ${client.paymentMethod || '—'}` : localText("billingPendingCopy")}</p>
+      </div>
     </div>
-    <p>${t("portalHistoryAvailable")}</p>
-  `;
-  $("#clientPortalConfirmButton").disabled = !clientCanConfirmJob(job);
-  $("#clientPortalConfirmButton").textContent = !job
-    ? t("noActiveService")
-    : job.clientConfirmed
-      ? t("serviceConfirmed")
-      : hasPayableAmount
-        ? t("confirmServiceCompleted")
-        : localText("serviceLocked");
-  $("#clientPortalPhotos").innerHTML = job ? `
-    ${photoSectionsHtml(job)}
-    <section class="panel client-history-panel">
-      <h2>${t("serviceHistory")}</h2>
-      ${clientHistoryHtml(historyJobs)}
-    </section>
+
+    <div class="cp-checklist-rows-redesign">
+      ${mkRow("file-text", t("serviceStatus") || "Estado del servicio", `<span class="cp-job-status-badge ${jobStatus?.cls || ''}" style="padding: 2px 8px; border-radius: 99px;">${jobStatus?.label || job.status}</span>`)}
+      ${mkRow("clock", t("cleanerArrival") || "Llegada del cleaner", job.checkedIn ? job.start : pendingText)}
+      ${mkRow("clock", t("cleanerDeparture") || "Salida del cleaner", job.checkedOut ? (job.actualEnd || job.end) : pendingText)}
+      ${mkRow("camera", t("visiblePhotos") || "Fotos visibles", `<strong>${evidenceCount(job)}</strong>`)}
+      ${mkRow("help-circle", t("cleanerFinished") || "Cleaner marco terminado", (job.cleanerFinished || job.checkedOut) ? doneText : pendingText)}
+      ${mkRow("check-circle", t("clientConfirmation") || "Confirmacion del cliente", job.clientConfirmed ? doneText : pendingText)}
+      ${mkRow("edit-3", t("clientSignature") || "Firma del cliente", job.clientSignature ? doneText : pendingText)}
+      ${mkRow("edit-3", t("onsiteSignature") || "Firma en sitio", job.siteSignature ? `${doneText} ${job.siteSignerName || ''}` : pendingText)}
+      ${mkRow("clipboard-list", t("checklist") || "Checklist", `<span class="cp-tasks">${(job.tasks || []).join(", ") || '—'}</span>`)}
+    </div>
+
+    ${!hasPayableAmount ? `
+      <div class="cp-blocked-service-card">
+        <div class="cp-blocked-icon">
+          <i data-lucide="lock"></i>
+        </div>
+        <div class="cp-blocked-text">
+          <strong>${t("serviceLocked") || "Servicio bloqueado"}</strong>
+          <p>Este servicio estará disponible para registro de horas reales al momento de entrada y salida.</p>
+        </div>
+      </div>
+    ` : ''}
+
+    <button class="primary cp-confirm-btn" id="clientPortalConfirmButton" ${!clientCanConfirmJob(job) ? 'disabled' : ''} data-i18n="confirmServiceCompleted" style="margin-top: 16px;">
+      ${job.clientConfirmed ? t("serviceConfirmed") : hasPayableAmount ? t("confirmServiceCompleted") : blockedText}
+    </button>
   ` : `
-    <section class="panel client-history-panel">
-      <h2>${t("serviceHistory")}</h2>
-      ${clientHistoryHtml(historyJobs)}
-    </section>
+    <span class="cp-summary-eyebrow-redesign">Cliente</span>
+    <h2 class="cp-summary-title-redesign">${t("privateServiceSummary")}</h2>
+    <div class="cp-client-info-empty" style="margin-top: 16px; display: flex; align-items: center; gap: 12px;">
+      <div class="cp-client-avatar">${initials}</div>
+      <strong style="color: #fff;">${client.name}</strong>
+    </div>
+    <div class="cp-payment-card-redesign cp-payment-locked" style="margin-top: 20px;">
+      <div class="cp-payment-icon-circle">
+        <i data-lucide="dollar-sign"></i>
+      </div>
+      <div class="cp-payment-text-wrap">
+        <span class="cp-payment-label-redesign">${localText("amountToPay")}</span>
+        <strong class="cp-payment-amount-redesign">${money(0)}</strong>
+        <p class="cp-payment-desc-redesign">${localText("noActivePaymentCopy")}</p>
+      </div>
+    </div>
+    <p class="muted" style="margin-top:16px;">${t("portalHistoryAvailable")}</p>
+    <button class="primary cp-confirm-btn" id="clientPortalConfirmButton" disabled>${t("noActiveService")}</button>
   `;
+
+  // Activity timeline (right column)
+  const activityEl = $("#clientPortalActivity");
+  if (activityEl) {
+    if (!job) {
+      activityEl.innerHTML = "<p class='muted'>Sin actividad reciente.</p>";
+    } else {
+      const activities = [
+        { icon: "👤", color: "cp-act-green", label: t("serviceAssigned") || "Servicio asignado", detail: `${client.name}`, time: job.date, show: true },
+        { icon: "📅", color: "cp-act-blue", label: t("scheduledJob") || "Trabajo programado", detail: `${job.date} • ${job.start}–${job.end || '—'}`, time: job.date, show: true },
+        { icon: "🔔", color: "cp-act-orange", label: t("cleanerArrival") || "Pendiente de llegada", detail: job.checkedIn ? `Llegó a las ${job.start}` : "El cleaner registrará su entrada al llegar al sitio.", time: "", show: true },
+        { icon: "📷", color: "cp-act-purple", label: t("visiblePhotos") || "Pendiente de fotos", detail: evidenceCount(job) > 0 ? `${evidenceCount(job)} fotos subidas` : "Las fotos se cargarán al finalizar cada área del checklist.", time: "", show: true },
+        { icon: "✅", color: "cp-act-teal", label: t("clientConfirmation") || "Pendiente de confirmación", detail: job.clientConfirmed ? "Servicio confirmado" : "El cliente deberá confirmar la finalización del servicio.", time: "", show: true },
+        { icon: "✍", color: "cp-act-gray", label: t("clientSignature") || "Pendiente de firma", detail: job.clientSignature ? "Firma registrada" : "Se solicitará firma digital en el sitio.", time: "", show: true },
+      ];
+      activityEl.innerHTML = activities.filter(a => a.show).map(a => `
+        <div class="cp-act-item">
+          <div class="cp-act-icon ${a.color}">${a.icon}</div>
+          <div class="cp-act-body">
+            <strong>${a.label}</strong>
+            <span>${a.detail}</span>
+            ${a.time ? `<time>${a.time}</time>` : ''}
+          </div>
+        </div>
+      `).join("");
+    }
+  }
+
+  // Photos (Evidence)
+  const photosEl = $("#clientPortalPhotos");
+  if (photosEl) {
+    if (job && job.photos > 0) {
+      photosEl.innerHTML = photoSectionsHtml(job);
+    } else {
+      photosEl.innerHTML = `
+        <div class="cp-empty-evidence-card">
+          <div class="cp-empty-image-wrap">
+            <i data-lucide="image" class="cp-empty-image-icon"></i>
+          </div>
+          <strong>Aún no hay fotos cargadas</strong>
+          <p>Las fotos y evidencias serán visibles aquí una vez que se carguen.</p>
+          <button class="ghost cp-history-btn" type="button" onclick="document.querySelector('.cp-history-panel-separate').scrollIntoView({ behavior: 'smooth' })">
+            <i data-lucide="folder-open"></i>
+            Ver historial de evidencias &gt;
+          </button>
+        </div>
+      `;
+    }
+  }
+
+  // History List
+  const historyEl = $("#clientPortalHistoryList");
+  if (historyEl) {
+    historyEl.innerHTML = clientHistoryTimelineHtml(historyJobs, job);
+  }
+
   bindPhotoActions();
+
+  // Instantiate Lucide icons
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
 }
 
 function renderStandaloneCleanerPortal(unlocked = true) {
@@ -2205,7 +2653,19 @@ function renderStandaloneCleanerPortal(unlocked = true) {
   const cleanerReceipts = receiptsForCleaner(cleaner);
   $("#cleanerPortalLock").classList.toggle("hidden", unlocked);
   $("#cleanerPortalContent").classList.toggle("hidden", !unlocked);
+  $("#cleanerPortalPage").classList.toggle("is-unlocked", unlocked);
   $("#cleanerPortalTitle").textContent = portalCleanerAdmin ? "Vista administrador de cleaners" : `Hola, ${cleaner.name}`;
+  // Update greeting and avatar with real name
+  const cleanerFirstName = (cleaner.name || "").split(" ")[0];
+  const cleanerInitials = (cleaner.name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  if ($("#cleanerWelcomeGreeting")) $("#cleanerWelcomeGreeting").textContent = `Hola, ${cleanerFirstName} \u{1F44B}`;
+  if ($("#cleanerWidgetName")) $("#cleanerWidgetName").textContent = cleaner.name;
+  const avatarEl = document.querySelector(".widget-avatar");
+  if (avatarEl) {
+    avatarEl.innerHTML = cleaner.photo
+      ? `<img src="${cleaner.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" alt="">`
+      : cleanerInitials;
+  }
   const historyAdminActive = isCleanerHistoryAdminActive();
   $("#cleanerHistoryAdminBox").classList.toggle("is-unlocked", historyAdminActive || portalCleanerAdmin);
   $("#cleanerHistoryAdminBox").querySelector("p").textContent = (historyAdminActive || portalCleanerAdmin)
@@ -2213,16 +2673,105 @@ function renderStandaloneCleanerPortal(unlocked = true) {
       ? "Acceso maestro activo. Puedes agregar fotos a trabajos cerrados."
       : `Permiso activo por ${cleanerHistoryAdminTimeLeftLabel()}. Puedes agregar fotos a trabajos cerrados.`
     : "Para agregar fotos a trabajos cerrados, ingresa la clave administrativa.";
-  $("#cleanerStats").innerHTML = `
-    <article><span>Pendientes</span><strong>${activeAssignedJobs.length}</strong><small>por hacer</small></article>
-    <article><span>Hoy trabajado</span><strong>${minutesLabel(todayMinutes)}</strong><small>${money(todayEarned)} estimado</small></article>
-    <article><span>Mes trabajado</span><strong>${minutesLabel(totalMinutes)}</strong><small>${money(earned)} estimado</small></article>
-    <article><span>Terminados</span><strong>${completedJobs.length}</strong><small>listos para confirmar</small></article>
+  const todayStr = today();
+  const urgentJobs = activeAssignedJobs.filter(j => j.date <= todayStr);
+  const hasPriority = urgentJobs.length > 0;
+  const lastWeekJobs = assignedJobs.filter(j => {
+    if (!isBillableDone(j)) return false;
+    const d = new Date(j.date || "");
+    const diff = (new Date() - d) / (1000 * 60 * 60 * 24);
+    return diff >= 7 && diff < 14;
+  });
+  const lastWeekMinutes = lastWeekJobs.reduce((s, j) => s + billableMinutes(j), 0);
+  const trendLabel = lastWeekMinutes > 0
+    ? (totalMinutes > lastWeekMinutes
+      ? `\u2197 ${Math.round(((totalMinutes - lastWeekMinutes) / lastWeekMinutes) * 100)}% m\u00e1s que sem. pasada`
+      : `\u2198 ${Math.round(((lastWeekMinutes - totalMinutes) / lastWeekMinutes) * 100)}% menos que sem. pasada`)
+    : (totalMinutes > 0 ? "\u2197 \u00a1Buen trabajo!" : "\u2014 Sin registros hoy");
+  const kpiHtml = `
+    <article class="cleaner-kpi-card${hasPriority ? ' kpi-alert' : ''}">
+      <div class="kpi-icon-wrap"><span class="kpi-icon">\u{1F4CB}</span></div>
+      <div class="kpi-body">
+        <span class="kpi-label">Pendientes</span>
+        <strong class="kpi-value">${activeAssignedJobs.length}</strong>
+        <small class="kpi-note">por hacer</small>
+      </div>
+      ${hasPriority ? `<span class="kpi-badge kpi-badge-red">\u2691 Prioridad alta: ${urgentJobs.length}</span>` : ''}
+    </article>
+    <article class="cleaner-kpi-card">
+      <div class="kpi-icon-wrap"><span class="kpi-icon">\u23F1</span></div>
+      <div class="kpi-body">
+        <span class="kpi-label">Hoy trabajado</span>
+        <strong class="kpi-value">${minutesLabel(todayMinutes)}</strong>
+        <small class="kpi-note">${money(todayEarned)} estimado</small>
+      </div>
+      <span class="kpi-trend ${todayMinutes > 0 ? 'kpi-trend-up' : 'kpi-trend-neutral'}">${todayMinutes > 0 ? '\u2197 Activo hoy' : '\u2014 Sin registros hoy'}</span>
+    </article>
+    <article class="cleaner-kpi-card">
+      <div class="kpi-icon-wrap"><span class="kpi-icon">\u{1F4C5}</span></div>
+      <div class="kpi-body">
+        <span class="kpi-label">Mes trabajado</span>
+        <strong class="kpi-value">${minutesLabel(totalMinutes)}</strong>
+        <small class="kpi-note">${money(earned)} estimado</small>
+      </div>
+      <span class="kpi-trend ${totalMinutes >= lastWeekMinutes ? 'kpi-trend-up' : 'kpi-trend-down'}">${trendLabel}</span>
+    </article>
+    <article class="cleaner-kpi-card">
+      <div class="kpi-icon-wrap"><span class="kpi-icon">\u2705</span></div>
+      <div class="kpi-body">
+        <span class="kpi-label">Terminados</span>
+        <strong class="kpi-value">${completedJobs.length}</strong>
+        <small class="kpi-note">listos para confirmar</small>
+      </div>
+      <span class="kpi-trend ${completedJobs.length > 0 ? 'kpi-trend-up' : 'kpi-trend-neutral'}">${completedJobs.length > 0 ? '\u2197 \u00a1Buen trabajo!' : '\u2014 Sin completados'}</span>
+    </article>
   `;
+  $("#cleanerStats").innerHTML = kpiHtml;
   if (portalCleanerAdmin) {
     $("#cleanerStats").insertAdjacentHTML("afterbegin", `
-      <article class="admin-stat"><span>Acceso maestro</span><strong>${state.cleaners.length}</strong><small>cleaners visibles</small></article>
+      <article class="cleaner-kpi-card admin-stat">
+        <div class="kpi-icon-wrap"><span class="kpi-icon">\u{1F451}</span></div>
+        <div class="kpi-body">
+          <span class="kpi-label">Acceso maestro</span>
+          <strong class="kpi-value">${state.cleaners.length}</strong>
+          <small class="kpi-note">cleaners visibles</small>
+        </div>
+      </article>
     `);
+  }
+  // Render recent activity timeline
+  const recentEl = $("#cleanerRecentActivity");
+  if (recentEl) {
+    const allJobsForCleaner = portalCleanerAdmin ? state.jobs : state.jobs.filter(j => j.cleanerId === cleaner.id);
+    const recent = [...allJobsForCleaner]
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
+      .slice(0, 5);
+    if (recent.length === 0) {
+      recentEl.innerHTML = "<p class='muted'>Sin actividad reciente.</p>";
+    } else {
+      recentEl.innerHTML = recent.map(job => {
+        const client = clientFor(job);
+        const isDone = job.checkedOut || job.cleanerFinished;
+        const hasPhotos = evidenceCount(job) > 0;
+        const isCheckedIn = job.checkedIn;
+        let iconClass = "take";
+        let iconEmoji = "\u{1F4CB}";
+        let actLabel = "Trabajo asignado";
+        if (isDone) { iconClass = "completed"; iconEmoji = "\u2705"; actLabel = "Trabajo completado"; }
+        else if (hasPhotos) { iconClass = "photos"; iconEmoji = "\u{1F4F7}"; actLabel = "Fotos subidas"; }
+        else if (isCheckedIn) { iconClass = "checkin"; iconEmoji = "\u{1F4CD}"; actLabel = "Check-in registrado"; }
+        return `
+          <div class="timeline-item">
+            <span class="timeline-icon ${iconClass}">${iconEmoji}</span>
+            <div class="timeline-info">
+              <strong>${actLabel}</strong>
+              <span>${client.name} \u2022 ${job.date} \u2022 ${job.start || ""}</span>
+            </div>
+            <span class="timeline-time">${job.date || ""}</span>
+          </div>
+        `;
+      }).join("");
+    }
   }
   $("#cleanerAssignedJobs").innerHTML = activeAssignedJobs.length ? activeAssignedJobs.map(cleanerJobHtml).join("") : "<p class='muted'>No tienes trabajos activos. Los terminados estan en historial.</p>";
   $("#cleanerHistoryJobs").innerHTML = completedJobs.length ? completedJobs.map(cleanerHistoryHtml).join("") : "<p class='muted'>Todavia no hay trabajos terminados.</p>";
@@ -3938,10 +4487,9 @@ function renderClientLinks() {
           <div class="client-link-history">
             <strong>${activeCount} activo/proximo</strong>
             <span>${historyCount} en historial</span>
-          </div>
           <div class="client-link-key">
             <code>${escapeHtml(portalPassword)}</code>
-            <button type="button" title="Copiar link" data-copy-client-link="${client.id}">⧉</button>
+            <button type="button" title="Copiar clave" data-copy-client-key="${client.id}">⧉</button>
           </div>
           <div class="client-link-url">
             <strong>${escapeHtml(displayUrl)}</strong>
@@ -3960,6 +4508,9 @@ function renderClientLinks() {
   $("#clientLinkFilter")?.addEventListener("change", renderClientLinks, { once: true });
   $$("[data-copy-client-link]").forEach((button) => {
     button.addEventListener("click", () => copyClientLink(button.dataset.copyClientLink));
+  });
+  $$("[data-copy-client-key]").forEach((button) => {
+    button.addEventListener("click", () => copyClientKey(button.dataset.copyClientKey));
   });
   $$("[data-open-client-portal]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -4136,7 +4687,7 @@ function renderReports() {
   const total = billableJobs.reduce((sum, job) => sum + estimateJob(job), 0);
   const cleanerCosts = billableJobs.reduce((sum, job) => sum + cleanerCostForJob(job), 0);
   const grossProfit = Math.max(0, total - cleanerCosts);
-  const tax = total * 0.18;
+  const tax = total * (state.vatRate / 100);
   const completed = billableJobs.length;
   const activeClients = new Set(billableJobs.map((job) => job.clientId)).size;
   const totalHours = billableJobs.reduce((sum, job) => sum + jobHours(job), 0);
@@ -4147,9 +4698,9 @@ function renderReports() {
   const gpsJobs = reportJobs.filter((job) => job.checkedIn || job.checkedOut).length;
 
   $("#reportKpis").innerHTML = `
-    <article class="report-kpi"><i>$</i><div><span>Ganancia bruta real</span><strong>$${grossProfit.toFixed(0)}</strong><small>+18.6% vs mes anterior</small></div></article>
+    <article class="report-kpi"><i>${state.currencySymbol}</i><div><span>Ganancia bruta real</span><strong>${state.currencySymbol}${grossProfit.toFixed(0)}</strong><small>+18.6% vs mes anterior</small></div></article>
     <article class="report-kpi"><i>☷</i><div><span>Clientes atendidos</span><strong>${activeClients}</strong><small>+12% vs mes anterior</small></div></article>
-    <article class="report-kpi"><i>♙</i><div><span>Invertido en cleaners</span><strong>$${cleanerCosts.toFixed(0)}</strong><small>+9.4% vs mes anterior</small></div></article>
+    <article class="report-kpi"><i>♙</i><div><span>Invertido en cleaners</span><strong>${state.currencySymbol}${cleanerCosts.toFixed(0)}</strong><small>+9.4% vs mes anterior</small></div></article>
     <article class="report-kpi"><i>%</i><div><span>Margen referencial</span><strong>${marginPct}%</strong><small>+5.2% vs mes anterior</small></div></article>
   `;
 
@@ -4158,9 +4709,9 @@ function renderReports() {
   const taxPct = total ? Math.round((tax / (total + tax)) * 100) : 0;
   $("#incomeDonut").style.background = `conic-gradient(var(--green) 0 ${incomePct}%, var(--gold) ${incomePct}% ${incomePct + cleanerPct}%, var(--teal) ${incomePct + cleanerPct}% 100%)`;
   $("#incomeLegend").innerHTML = `
-    <div class="legend-item"><span><i style="background: var(--green)"></i>Ganancia bruta</span><strong>$${grossProfit.toFixed(0)}</strong></div>
-    <div class="legend-item"><span><i style="background: var(--gold)"></i>Pago cleaners</span><strong>$${cleanerCosts.toFixed(0)}</strong></div>
-    <div class="legend-item"><span><i style="background: var(--teal)"></i>IVA estimado</span><strong>$${tax.toFixed(0)}</strong></div>
+    <div class="legend-item"><span><i style="background: var(--green)"></i>Ganancia bruta</span><strong>${state.currencySymbol}${grossProfit.toFixed(0)}</strong></div>
+    <div class="legend-item"><span><i style="background: var(--gold)"></i>Pago cleaners</span><strong>${state.currencySymbol}${cleanerCosts.toFixed(0)}</strong></div>
+    <div class="legend-item"><span><i style="background: var(--teal)"></i>IVA estimado</span><strong>${state.currencySymbol}${tax.toFixed(0)}</strong></div>
   `;
 
   const clientTotals = state.clients.map((client) => {
@@ -4170,7 +4721,7 @@ function renderReports() {
   const maxClientTotal = Math.max(1, ...clientTotals.map((item) => item.total));
   $("#clientBars").innerHTML = clientTotals.map((item) => `
     <div class="bar-row">
-      <div class="bar-top"><span>${item.name}<small>${item.jobs} servicio${item.jobs === 1 ? "" : "s"}</small></span><strong>$${item.total.toFixed(0)}</strong></div>
+      <div class="bar-top"><span>${item.name}<small>${item.jobs} servicio${item.jobs === 1 ? "" : "s"}</small></span><strong>${state.currencySymbol}${item.total.toFixed(0)}</strong></div>
       <div class="bar-track"><div class="bar-fill" style="width:${Math.max(8, (item.total / maxClientTotal) * 100)}%"></div></div>
     </div>
   `).join("") || "<p class='muted'>Aún no hay clientes con trabajos completados este mes.</p>";
@@ -4190,9 +4741,9 @@ function renderReports() {
   `;
 
   $("#costRules").innerHTML = `
-    <div class="report-line"><span>Regla general cleaner</span><strong>$${state.costRules.generalCleanerRate}/h</strong></div>
+    <div class="report-line"><span>Regla general cleaner</span><strong>${state.currencySymbol}${state.costRules.generalCleanerRate}/h</strong></div>
     ${Object.entries(state.costRules.generalServiceRates || {}).map(([service, rate]) => `
-      <div class="report-line"><span>${service}</span><strong>$${rate}/h costo cleaner</strong></div>
+      <div class="report-line"><span>${service}</span><strong>${state.currencySymbol}${rate}/h costo cleaner</strong></div>
     `).join("")}
     ${state.costRules.specialRules.length ? state.costRules.specialRules.map((rule) => `
       <div class="report-line">
@@ -4203,11 +4754,11 @@ function renderReports() {
   `;
 
   $("#reportLines").innerHTML = `
-    <div class="report-line"><span>Subtotal real</span><strong>$${total.toFixed(0)}</strong></div>
-    <div class="report-line"><span>Pago real/estimado a cleaners</span><strong>$${cleanerCosts.toFixed(0)}</strong></div>
-    <div class="report-line"><span>Ganancia bruta real</span><strong>$${grossProfit.toFixed(0)}</strong></div>
-    <div class="report-line"><span>IVA estimado 18%</span><strong>$${tax.toFixed(0)}</strong></div>
-    <div class="report-line"><span>Total referencial</span><strong>$${(total + tax).toFixed(0)}</strong></div>
+    <div class="report-line"><span>Subtotal real</span><strong>${state.currencySymbol}${total.toFixed(0)}</strong></div>
+    <div class="report-line"><span>Pago real/estimado a cleaners</span><strong>${state.currencySymbol}${cleanerCosts.toFixed(0)}</strong></div>
+    <div class="report-line"><span>Ganancia bruta real</span><strong>${state.currencySymbol}${grossProfit.toFixed(0)}</strong></div>
+    <div class="report-line"><span>IVA estimado ${state.vatRate}%</span><strong>${state.currencySymbol}${tax.toFixed(0)}</strong></div>
+    <div class="report-line"><span>Total referencial</span><strong>${state.currencySymbol}${(total + tax).toFixed(0)}</strong></div>
     <div class="report-line"><span>Trabajos completados</span><strong>${completed}</strong></div>
     <div class="report-line"><span>Trabajos registrados sin contabilizar</span><strong>${registeredJobs.length}</strong></div>
     <div class="report-line"><span>Horas realizadas</span><strong>${totalHours.toFixed(1)}h</strong></div>
@@ -4224,6 +4775,8 @@ function renderSettings() {
     profileForm.elements.phone.value = profile.phone || "";
     profileForm.elements.email.value = profile.email || "";
     profileForm.elements.address.value = profile.address || "";
+    if (profileForm.elements.vatRate) profileForm.elements.vatRate.value = state.vatRate;
+    if (profileForm.elements.currencySymbol) profileForm.elements.currencySymbol.value = state.currencySymbol;
   }
   const photoPreview = $("#profilePhotoPreview");
   if (photoPreview) {
@@ -4524,6 +5077,20 @@ function syncPaymentAmountFromJobs() {
     return sum + (job ? cleanerCostForJob(job) : 0);
   }, 0);
   if (selectedIds.length) $("#paymentAmount").value = total.toFixed(2);
+  if ($("#paymentAmountReceived")) $("#paymentAmountReceived").value = total.toFixed(2);
+  syncPaymentSummaryCard();
+}
+
+function syncPaymentSummaryCard() {
+  const selectedIds = selectedPaymentJobIds();
+  const amountVal = parseFloat($("#paymentAmount")?.value || 0) || 0;
+  const subtotalEl = $("#pscSubtotal");
+  const totalEl = $("#pscTotal");
+  if (subtotalEl) subtotalEl.textContent = money(amountVal);
+  if (totalEl) totalEl.textContent = money(amountVal);
+  // Update job count row
+  const firstRow = document.querySelector(".psc-row");
+  if (firstRow) firstRow.querySelector("strong").textContent = selectedIds.length;
 }
 
 function renderPaymentJobPicker(selectedJobIds = []) {
@@ -5230,12 +5797,14 @@ function setupEvents() {
     state.companyProfile = {
       ...state.companyProfile,
       businessName: data.businessName?.trim() || "JobVisto Cleaning",
-      ownerName: data.ownerName?.trim() || "Meir Abravanel",
+      ownerName: data.ownerName?.trim() || "Usuario Demo",
       greetingName: data.greetingName?.trim() || firstName(data.ownerName) || "Miguel",
       phone: data.phone?.trim() || "",
       email: data.email?.trim() || "",
       address: data.address?.trim() || "",
     };
+    if (data.vatRate !== undefined) state.vatRate = Number(data.vatRate || 0);
+    if (data.currencySymbol) state.currencySymbol = data.currencySymbol;
     save();
     renderAll();
     toast("Perfil guardado.");
@@ -5419,7 +5988,15 @@ function setupEvents() {
 
 populateCountrySelect();
 setupEvents();
-enterClientPortalFromUrl();
+
+const _pathname = window.location.pathname.toLowerCase();
+if (_pathname.includes("portal-clientes")) {
+  enterClientPortalFromUrl();
+} else if (_pathname.includes("portal-cleaners")) {
+  enterCleanerPortalFromUrl();
+} else {
+  enterClientPortalFromUrl(); // For backwards compatibility with old /app links
+}
 
 if (supabaseClient) {
   supabaseClient.auth.onAuthStateChange(async (event, session) => {
@@ -5487,7 +6064,24 @@ if (supabaseClient) {
         enterApp(state.mode);
       } catch (err) {
         console.error("Error during session load or profile setup:", err);
-        toast("Error de sesión: " + err.message);
+        toast("Error de sesión. Restableciendo... / Session error. Resetting...");
+        try {
+          if (supabaseClient) await supabaseClient.auth.signOut();
+        } catch (_) {}
+        state.user = null;
+        state.orgId = null;
+        state.clients = [];
+        state.cleaners = [];
+        state.jobs = [];
+        state.receipts = [];
+        localStorage.clear();
+        const __urlParams = new URLSearchParams(location.search);
+        const __portalType = __urlParams.get("portal");
+        const __path = window.location.pathname.toLowerCase();
+        if (__portalType === "client" || __portalType === "cleaner" || __path.includes("portal-clientes") || __path.includes("portal-cleaners")) return;
+
+        $("#appShell").classList.add("hidden");
+        $("#authScreen").classList.remove("hidden");
         if (loginBtn) {
           loginBtn.disabled = false;
           loginBtn.textContent = selectedAuthAction === "login" ? "Log in" : "Register";
@@ -5500,6 +6094,13 @@ if (supabaseClient) {
         loginBtn.disabled = false;
         loginBtn.textContent = selectedAuthAction === "login" ? "Log in" : "Register";
       }
+
+      // ✅ Portal pages (cleaner/client) authenticate via URL params, NOT via Supabase session.
+      // Use synchronous URL check — DOM state can't be relied on due to async Supabase loading.
+      const _urlParams = new URLSearchParams(location.search);
+      const _portalType = _urlParams.get("portal");
+      const _path = window.location.pathname.toLowerCase();
+      if (_portalType === "client" || _portalType === "cleaner" || _path.includes("portal-clientes") || _path.includes("portal-cleaners")) return;
 
       // Clear current state to prevent stale data display
       state.user = null;
