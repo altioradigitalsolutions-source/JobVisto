@@ -1542,17 +1542,17 @@
 
     <div class="toast" id="toast"></div>
 
-    <dialog class="modal" id="idleTimeoutModal">
-      <div class="modal-content">
+    <div class="modal hidden" id="idleTimeoutModal">
+      <div class="modal-card form-layout">
         <h3>¿Sigues ahí? / Are you still there?</h3>
         <p>Por seguridad, tu sesión se cerrará en <strong id="idleCountdown">60</strong> segundos por inactividad.</p>
         <p class="muted">For security, your session will close in <strong id="idleCountdownEn">60</strong> seconds due to inactivity.</p>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-primary" id="stayLoggedInButton">Seguir conectado / Stay logged in</button>
-          <button type="button" class="btn btn-outline" id="logOutNowButton">Cerrar sesión / Log out</button>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button type="button" class="btn" id="stayLoggedInButton" style="flex: 1;">Seguir conectado / Stay logged in</button>
+          <button type="button" class="btn" id="logOutNowButton" style="flex: 1; background: transparent; color: var(--danger); border: 1px solid var(--danger);">Cerrar sesión / Log out</button>
         </div>
       </div>
-    </dialog>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./supabase-config.js"></script>

@@ -6447,8 +6447,8 @@ const MAX_IDLE_MINUTES = 30; // 30 minutes of inactivity allowed
 
 function resetIdleTime() {
   idleTime = 0;
-  if ($("#idleTimeoutModal") && $("#idleTimeoutModal").open) {
-    $("#idleTimeoutModal").close();
+  if ($("#idleTimeoutModal") && !$("#idleTimeoutModal").classList.contains("hidden")) {
+    $("#idleTimeoutModal").classList.add("hidden");
     clearInterval(countdownInterval);
   }
 }
@@ -6464,9 +6464,9 @@ function checkIdleTime() {
 
 function showIdleModal() {
   const modal = $("#idleTimeoutModal");
-  if (!modal || modal.open) return;
+  if (!modal || !modal.classList.contains("hidden")) return;
   
-  modal.showModal();
+  modal.classList.remove("hidden");
   countdownValue = 60;
   $("#idleCountdown").textContent = countdownValue;
   $("#idleCountdownEn").textContent = countdownValue;
