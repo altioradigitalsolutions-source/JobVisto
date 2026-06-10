@@ -3515,7 +3515,7 @@ function renderDashboardReminders() {
         <p>El cliente tiene un saldo pendiente de <strong>${money(d.debt)}</strong> por ${d.jobsCount} trabajo(s) terminado(s) y no pagado(s).</p>
       </div>
       <div class="reminder-alert-actions">
-        <button type="button" onclick="setView('jobs')" style="color: var(--danger); border-color: var(--danger);">Ver trabajos</button>
+        <button type="button" onclick="setView('pagos'); document.querySelector('[data-finance-tab=\'clients\']')?.click();" style="color: var(--danger); border-color: var(--danger);">Ver deuda en Pagos</button>
       </div>
     </div>
   `).join("");
@@ -5556,7 +5556,7 @@ function renderClientBalances() {
       <strong>${escapeHtml(d.client.name)} - Deuda: ${money(d.debt)}</strong>
       <span class="client-meta">${d.count} trabajo(s) terminado(s) sin pagar</span>
       <div class="receipt-actions" style="margin-top: 10px;">
-        <button class="mini-action" type="button" onclick="setView('jobs')">Ver trabajos</button>
+        <button class="mini-action" type="button" onclick="document.querySelector('[data-finance-tab=\'clients\']')?.click();">Registrar cobro</button>
       </div>
     </article>
   `).join("");
@@ -6120,7 +6120,11 @@ function setupEvents() {
   $("#confirmDeleteReceiptButton").addEventListener("click", deletePendingReceipt);
   $("#deleteReceiptModal").addEventListener("click", (event) => {
     if (event.target.id === "deleteReceiptModal") closeDeleteReceiptModal();
-  });  $("#clientPortalConfirmButton").addEventListener("click", async () => {
+  });
+  
+  document.addEventListener("click", async (event) => {
+    const confirmBtn = event.target.closest("#clientPortalConfirmButton");
+    if (!confirmBtn) return;
     const client = state.clients.find((item) => item.id === portalClientId);
     const job = currentClientJob(client?.id);
     if (!job) return;
