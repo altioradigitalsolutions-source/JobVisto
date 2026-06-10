@@ -4492,7 +4492,7 @@ function renderClientLinks() {
           <button type="button" title="Copiar link" data-copy-client-link="${client.id}">⧉</button>
         </div>
         <div class="client-link-url">
-          <strong>${escapeHtml(portalUrl.replace(location.origin, "http://127.0.0.1:4177"))}</strong>
+          <strong>${escapeHtml(portalUrl)}</strong>
           <span>Copiado el ${new Date().toLocaleDateString("es")} ${new Date().toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}</span>
         </div>
         <div class="client-link-actions">
@@ -4570,7 +4570,7 @@ function renderClientLinks() {
     </div>
     ${filtered.length ? filtered.map(({ client, activeCount, historyCount, portalUrl, portalPassword, loc }) => {
       const initials = String(client.name || "JV").split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
-      const displayUrl = portalUrl.replace(location.origin, "http://127.0.0.1:4177");
+      const displayUrl = portalUrl;
       return `
         <article class="client-link-card">
           <div class="client-link-client">
