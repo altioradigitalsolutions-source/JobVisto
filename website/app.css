@@ -6607,3 +6607,53 @@ button:disabled {
   color: #fff;
   border: 1px solid var(--border);
 }
+
+/* Reminder Alerts */
+#dashboardReminders {
+  margin: 0 24px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.reminder-alert {
+  background: #fff8e1;
+  border: 1px solid #ffe082;
+  border-left: 4px solid #ffb300;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.reminder-alert-content h4 {
+  margin: 0 0 4px 0;
+  color: #b07d00;
+  font-size: 1rem;
+}
+.reminder-alert-content p {
+  margin: 0;
+  color: #8c6300;
+  font-size: 0.9rem;
+}
+.reminder-alert-actions button {
+  background: #ffb300;
+  color: #fff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.reminder-alert-actions button:hover {
+  background: #e6a100;
+}
+@media (max-width: 768px) {
+  #dashboardReminders {
+    margin: 0 16px 20px 16px;
+  }
+  .reminder-alert {
+    flex-direction: column;
+  }
+}

@@ -3455,7 +3455,33 @@ function renderMode() {
   $$("[data-company-nav]").forEach((node) => node.classList.toggle("hidden", state.mode !== "company"));
 }
 
+function renderDashboardReminders() {
+  const container = $("#dashboardReminders");
+  if (!container) return;
+  
+  const todayStr = new Date().toISOString().split('T')[0];
+  const reminders = state.clients.filter(c => c.followUpDate && c.followUpDate <= todayStr);
+  
+  if (reminders.length === 0) {
+    container.innerHTML = "";
+    return;
+  }
+  
+  container.innerHTML = reminders.map(c => `
+    <div class="reminder-alert">
+      <div class="reminder-alert-content">
+        <h4>🔔 Recordatorio: Contactar a ${escapeHtml(c.name)}</h4>
+        <p>${escapeHtml(c.followUpNote || 'El cliente pausó el servicio y requiere seguimiento hoy.')}</p>
+      </div>
+      <div class="reminder-alert-actions">
+        <button type="button" data-clear-reminder="${c.id}">Marcar como contactado</button>
+      </div>
+    </div>
+  `).join("");
+}
+
 function renderMetrics() {
+  renderDashboardReminders();
   const monthJobs = state.jobs.filter(isCurrentMonth);
   const billableJobs = monthJobs.filter(isBillableDone);
   const monthTotal = billableJobs.reduce((sum, job) => sum + estimateJob(job), 0);
@@ -4295,6 +4321,10 @@ function startClientEdit(clientId) {
   form.elements.address.value = client.address || "";
   form.elements.paymentMethod.value = client.paymentMethod || "Efectivo";
   form.elements.notes.value = client.notes || "";
+  
+  if (form.elements.followUpDate) form.elements.followUpDate.value = client.followUpDate || "";
+  if (form.elements.followUpNote) form.elements.followUpNote.value = client.followUpNote || "";
+  
   $("#saveClientButton").textContent = "Actualizar cliente";
   $("#cancelClientEdit").classList.remove("hidden");
   toast("Editando cliente. Corrige y guarda.");
@@ -5663,7 +5693,9 @@ function setupEvents() {
       address: data.address,
       country: state.country,
       paymentMethod: data.paymentMethod,
-      notes: data.notes
+      notes: data.notes,
+      followUpDate: data.followUpDate || null,
+      followUpNote: data.followUpNote || ""
     };
     const index = state.clients.findIndex((client) => client.id === data.id);
     if (index >= 0) state.clients[index] = payload;
@@ -6009,6 +6041,21 @@ function setupEvents() {
       $("#dashboardSearch")?.focus();
     }
   });
+  document.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-clear-reminder]");
+    if (btn) {
+      const clientId = btn.dataset.clearReminder;
+      const client = state.clients.find(c => c.id === clientId);
+      if (client) {
+        client.followUpDate = null;
+        client.followUpNote = "";
+        save();
+        renderAll();
+        toast("Recordatorio completado.");
+      }
+    }
+  });
+
   $("#profileSettingsForm")?.addEventListener("submit", (event) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));

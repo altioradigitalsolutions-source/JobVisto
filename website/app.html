@@ -275,6 +275,8 @@
             <button class="primary dashboard-new-job" data-open-job><span aria-hidden="true">+</span><span data-i18n="newJob">New job</span></button>
             <div class="summary-chips hidden" id="summaryChips"></div>
           </div>
+          
+          <div id="dashboardReminders"></div>
           <div class="metric-grid">
             <article>
               <div class="metric-header">
@@ -445,6 +447,19 @@
                 </select>
               </label>
               <label>Notas <textarea name="notes" placeholder="Codigo de entrada, mascotas, instrucciones..."></textarea></label>
+              
+              <div class="pf-form-divider" style="margin: 16px 0; border-top: 1px solid var(--border);"></div>
+              <h4 style="margin-bottom: 8px; color: var(--ink);">Seguimiento / Recordatorio</h4>
+              <p class="muted" style="margin-bottom: 12px; font-size: 0.85rem;">Si el cliente pausó el servicio, elige una fecha para recordarte contactarlo.</p>
+              
+              <div class="pf-row-2">
+                <label>Fecha a contactar
+                  <input type="date" name="followUpDate">
+                </label>
+              </div>
+              <label>Nota de seguimiento
+                <textarea name="followUpNote" rows="2" placeholder="Ej: Regresan de vacaciones, preguntar qué día empezamos..."></textarea>
+              </label>
               <div class="form-actions">
                 <button class="primary" type="submit" id="saveClientButton">Guardar cliente</button>
                 <button class="ghost hidden" type="button" id="cancelClientEdit">Cancelar edicion</button>
