@@ -1651,6 +1651,7 @@ function localText(key) {
     amountToPay: { en: "Amount to pay", es: "Monto a pagar", ru: "Сумма к оплате" },
     amountPending: { en: "Pending", es: "Pendiente", ru: "Ожидает" },
     amountPendingLower: { en: "amount pending", es: "monto pendiente", ru: "сумма ожидает" },
+    noPendingBalance: { en: "No pending balance", es: "Sin saldo pendiente", ru: "Нет ожидающего баланса" },
     billingPendingCopy: {
       en: "It is calculated only when real cleaner or administrator arrival and departure times exist.",
       es: "Se calcula solo cuando exista entrada y salida real del cleaner o del administrador.",
@@ -2463,6 +2464,16 @@ function renderStandaloneClientPortal(unlocked = true) {
   $("#clientPortalContent").classList.toggle("hidden", !unlocked);
   document.querySelector(".portal-header")?.classList.toggle("hidden", !unlocked);
 
+  const unpaidJobs = historyJobs.filter(j => j.status.includes("Terminado") && j.clientPaymentStatus !== "paid");
+  let pendingBalance = unpaidJobs.reduce((sum, j) => sum + ((parseFloat(j.amount) || 0) - (parseFloat(j.clientPaidAmount) || 0)), 0);
+  
+  // Si hay un trabajo actual con monto pero que no está terminado y no ha sido pagado, lo sumamos.
+  if (hasPayableAmount && job && !job.status.includes("Terminado") && job.clientPaymentStatus !== "paid") {
+    pendingBalance += estimateJob(job);
+  }
+  
+  const hasPending = pendingBalance > 0;
+
   // Build the left summary card
   const statusMap = {
     "Asignado": { label: "Asignado", cls: "cp-status-assigned" },
@@ -2507,14 +2518,14 @@ function renderStandaloneClientPortal(unlocked = true) {
       </div>
     </div>
 
-    <div class="cp-payment-card-redesign ${hasPayableAmount ? '' : 'cp-payment-locked'}">
+    <div class="cp-payment-card-redesign ${hasPending ? '' : 'cp-payment-locked'}">
       <div class="cp-payment-icon-circle">
         <i data-lucide="dollar-sign"></i>
       </div>
       <div class="cp-payment-text-wrap">
         <span class="cp-payment-label-redesign">${localText("amountToPay")}</span>
-        <strong class="cp-payment-amount-redesign">${hasPayableAmount ? money(estimateJob(job)) : localText("amountPending")}</strong>
-        <p class="cp-payment-desc-redesign">${hasPayableAmount ? `${localText("paymentMethodExpected")}: ${client.paymentMethod || '—'}` : localText("billingPendingCopy")}</p>
+        <strong class="cp-payment-amount-redesign">${hasPending ? money(pendingBalance) : money(0)}</strong>
+        <p class="cp-payment-desc-redesign">${hasPending ? `${localText("paymentMethodExpected")}: ${client.paymentMethod || '—'}` : localText("noPendingBalance")}</p>
       </div>
     </div>
 
@@ -2552,14 +2563,14 @@ function renderStandaloneClientPortal(unlocked = true) {
       <div class="cp-client-avatar">${initials}</div>
       <strong style="color: #fff;">${client.name}</strong>
     </div>
-    <div class="cp-payment-card-redesign cp-payment-locked" style="margin-top: 20px;">
+    <div class="cp-payment-card-redesign ${hasPending ? '' : 'cp-payment-locked'}" style="margin-top: 20px;">
       <div class="cp-payment-icon-circle">
         <i data-lucide="dollar-sign"></i>
       </div>
       <div class="cp-payment-text-wrap">
         <span class="cp-payment-label-redesign">${localText("amountToPay")}</span>
-        <strong class="cp-payment-amount-redesign">${money(0)}</strong>
-        <p class="cp-payment-desc-redesign">${localText("noActivePaymentCopy")}</p>
+        <strong class="cp-payment-amount-redesign">${hasPending ? money(pendingBalance) : money(0)}</strong>
+        <p class="cp-payment-desc-redesign">${hasPending ? `${localText("paymentMethodExpected")}: ${client.paymentMethod || '—'}` : localText("noPendingBalance")}</p>
       </div>
     </div>
     <p class="muted" style="margin-top:16px;">${t("portalHistoryAvailable")}</p>
@@ -5105,9 +5116,16 @@ function readServiceRates(form, namePrefix, fallback = 0) {
 }
 
 function renderPayments() {
+  // Cleaners Tab
   syncPaymentCleanerSelect();
   $("#paymentPeriod").value = $("#paymentPeriod").value || currentPeriodLabel();
   renderPaymentJobPicker();
+  
+  // Clients Tab
+  syncClientPaymentSelect();
+  renderClientPaymentJobPicker();
+  renderClientBalances();
+  
   $("#paymentReceipts").innerHTML = state.receipts.length
     ? state.receipts.map((receipt) => `
       <article class="receipt-item ${receipt.status === "pending_signature" ? "pending" : ""}">
@@ -5904,6 +5922,78 @@ function setupEvents() {
     $("#paymentAmount").value = 0;
     renderPaymentJobPicker();
   });
+  
+  // CLIENT PAYMENTS EVENTS
+  $("#clientPaymentSelect")?.addEventListener("change", () => {
+    renderClientPaymentJobPicker();
+  });
+  
+  document.addEventListener("change", (e) => {
+    if (e.target.matches(".client-payment-job-checkbox")) {
+      updateClientPaymentTotal();
+    }
+  });
+  
+  document.addEventListener("click", (e) => {
+    if (e.target.matches("[data-finance-tab]")) {
+      const tabName = e.target.dataset.financeTab;
+      document.querySelectorAll("[data-finance-tab]").forEach(btn => btn.classList.remove("active"));
+      e.target.classList.add("active");
+      document.querySelectorAll(".finance-tab-content").forEach(tab => tab.classList.add("hidden"));
+      const tabContent = document.getElementById(tabName === "clients" ? "financeClientsTab" : "financeCleanersTab");
+      if (tabContent) tabContent.classList.remove("hidden");
+    }
+  });
+
+  $("#clientPaymentForm")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(event.currentTarget));
+    const formEl = event.currentTarget;
+    const jobIds = Array.from(formEl.querySelectorAll("input[name='jobIds']:checked")).map(el => el.value);
+    
+    if (!jobIds.length) {
+      toast("Selecciona al menos un trabajo para cobrar.");
+      return;
+    }
+    
+    const amountReceived = parseFloat(data.amountReceived) || 0;
+    const discount = parseFloat(data.discount) || 0;
+    let remainingToCover = amountReceived + discount;
+    
+    if (remainingToCover <= 0) {
+      toast("El monto cobrado debe ser mayor a cero.");
+      return;
+    }
+    
+    jobIds.forEach(id => {
+      const job = state.jobs.find(j => j.id === id);
+      if (job) {
+        const jobCost = parseFloat(job.amount) || 0;
+        const alreadyPaid = parseFloat(job.clientPaidAmount) || 0;
+        const owe = jobCost - alreadyPaid;
+        
+        if (remainingToCover >= owe) {
+          job.clientPaidAmount = jobCost;
+          job.clientPaymentStatus = "paid";
+          job.clientPaidDate = new Date().toISOString().split('T')[0];
+          job.clientPaymentMethod = data.method;
+          remainingToCover -= owe;
+        } else if (remainingToCover > 0) {
+          job.clientPaidAmount = alreadyPaid + remainingToCover;
+          job.clientPaymentStatus = "partial";
+          job.clientPaidDate = new Date().toISOString().split('T')[0];
+          job.clientPaymentMethod = data.method;
+          remainingToCover = 0;
+        }
+      }
+    });
+
+    save();
+    renderAll();
+    toast("Cobro registrado exitosamente.");
+    formEl.reset();
+  });
+
   $("#cancelPaymentEdit").addEventListener("click", resetPaymentForm);
   $("#dashboardSearch")?.addEventListener("input", renderDashboardSearch);
   $("#dashboardSearch")?.addEventListener("focus", renderDashboardSearch);

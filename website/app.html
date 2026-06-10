@@ -745,17 +745,24 @@
           <!-- Page Hero -->
           <div class="payments-hero">
             <div>
-              <p class="eyebrow">Empresa</p>
-              <h3>Payments</h3>
-              <p class="muted">Gestiona y registra pagos externos de trabajos realizados.</p>
+              <p class="eyebrow" data-i18n="finances">Finances</p>
+              <h3 data-i18n="payments">Payments</h3>
+              <p class="muted" data-i18n="paymentsSubtitle">Gestiona y registra cobros y pagos de trabajos realizados.</p>
             </div>
             <div class="payments-hero-kpis" id="paymentsKpis">
               <!-- Populated by JS -->
             </div>
           </div>
 
-          <!-- Two-column layout -->
-          <div class="payments-layout">
+          <div class="tab-buttons" style="margin-bottom: 24px;">
+            <button class="tab-button active" type="button" data-finance-tab="cleaners" data-i18n="cleanerPayments">Pagos a Cleaners</button>
+            <button class="tab-button" type="button" data-finance-tab="clients" data-i18n="clientPayments">Cobros a Clientes</button>
+          </div>
+
+          <!-- Tab 1: Cleaners -->
+          <div class="finance-tab-content active" id="financeCleanersTab">
+            <!-- Two-column layout -->
+            <div class="payments-layout">
             <!-- LEFT: Register form -->
             <form class="panel payments-form-panel" id="paymentForm">
               <div class="payments-form-header">
@@ -855,6 +862,95 @@
                   <button class="text-link" type="button">Ver todos</button>
                 </div>
                 <div id="paymentReceipts" class="receipt-list"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 2: Clients -->
+          <div class="finance-tab-content hidden" id="financeClientsTab">
+            <div class="payments-layout">
+              <!-- LEFT: Register Client Payment form -->
+              <form class="panel payments-form-panel" id="clientPaymentForm">
+                <div class="payments-form-header">
+                  <span class="payments-form-icon">💰</span>
+                  <div>
+                    <h3 data-i18n="registerClientPayment">Registrar cobro a cliente</h3>
+                    <p class="muted" data-i18n="clientPaymentSubtitle">Selecciona los trabajos terminados y registra el cobro al cliente.</p>
+                  </div>
+                </div>
+                
+                <label class="pf-label">
+                  <span class="pf-label-text" data-i18n="clientLabel">Cliente</span>
+                  <div class="pf-cleaner-select-wrap">
+                    <span class="pf-cleaner-avatar" id="clientPaymentAvatar">C</span>
+                    <select name="client" id="clientPaymentSelect"></select>
+                  </div>
+                </label>
+
+                <section class="payment-job-picker" id="clientPaymentJobPicker"></section>
+
+                <div class="pf-amounts-row">
+                  <label class="pf-label pf-label-grow">
+                    <span class="pf-label-text" data-i18n="totalAmount">Monto total a cobrar</span>
+                    <div class="pf-input-currency">
+                      <input name="amount" id="clientPaymentAmount" type="number" value="0" readonly>
+                      <span class="pf-currency-badge">USD</span>
+                    </div>
+                  </label>
+                </div>
+
+                <div class="pf-row-2">
+                  <label class="pf-label">
+                    <span class="pf-label-text" data-i18n="amountReceived">Monto cobrado</span>
+                    <div class="pf-input-currency">
+                      <input name="amountReceived" id="clientPaymentAmountReceived" type="number" value="0">
+                      <span class="pf-currency-badge">USD</span>
+                    </div>
+                  </label>
+                  <label class="pf-label">
+                    <span class="pf-label-text" data-i18n="discount">Descuento aplicado</span>
+                    <div class="pf-input-currency">
+                      <input name="discount" id="clientPaymentDiscount" type="number" value="0">
+                      <span class="pf-currency-badge">USD</span>
+                    </div>
+                  </label>
+                </div>
+
+                <label class="pf-label">
+                  <span class="pf-label-text">Método de pago</span>
+                  <select name="method">
+                    <option>Efectivo</option>
+                    <option>Transferencia</option>
+                    <option>Tarjeta</option>
+                    <option>PayPal</option>
+                    <option>Zelle</option>
+                    <option>Venmo</option>
+                    <option>Cheque</option>
+                  </select>
+                </label>
+
+                <label class="pf-label">
+                  <span class="pf-label-text">Notas <em>(opcional)</em></span>
+                  <textarea name="notes" placeholder="Agrega una nota o referencia del pago..." rows="2"></textarea>
+                </label>
+
+                <div class="form-actions">
+                  <button class="primary pf-submit" type="submit" disabled id="clientPaymentSubmitBtn">Registrar cobro</button>
+                </div>
+              </form>
+
+              <!-- RIGHT: Client Balances list -->
+              <div class="payments-list-panel">
+                <div class="pl-header">
+                  <h3 data-i18n="clientBalances">Saldos de Clientes</h3>
+                </div>
+                <div class="pl-list" id="clientBalancesList">
+                  <!-- Populated by JS -->
+                  <div class="pl-empty">
+                    <span>💵</span>
+                    <p data-i18n="noPendingBalances">No hay saldos pendientes.</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
