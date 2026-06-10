@@ -123,6 +123,9 @@ async function loadStateFromSupabase(currentUser = null) {
             serviceType: j.service_type || "Limpieza normal",
             rate: Number(j.client_hourly_rate || 65),
             extras: Number(j.extras_amount || 0),
+            requestReview: Boolean(j.request_review),
+            clientRating: j.client_rating ? Number(j.client_rating) : null,
+            clientReviewText: j.client_review_text || "",
             status: j.status === 'scheduled' ? 'Asignado' : 
                     j.status === 'open' ? 'Disponible para tomar' : 
                     j.status === 'in_site' ? 'En progreso' :
@@ -354,6 +357,9 @@ async function asyncSaveToSupabase() {
         actual_end: actualEnd,
         client_hourly_rate: job.rate,
         extras_amount: job.extras,
+        request_review: Boolean(job.requestReview),
+        client_rating: job.clientRating || null,
+        client_review_text: job.clientReviewText || null,
         status: dbStatus,
         checklist: job.tasks
       });
@@ -2294,6 +2300,9 @@ async function enterClientPortalFromUrl() {
             serviceType: j.service_type || "Limpieza normal",
             rate: Number(j.client_hourly_rate || 65),
             extras: Number(j.extras_amount || 0),
+            requestReview: Boolean(j.request_review),
+            clientRating: j.client_rating ? Number(j.client_rating) : null,
+            clientReviewText: j.client_review_text || "",
             status: j.status === 'scheduled' ? 'Asignado' : 
                     j.status === 'open' ? 'Disponible para tomar' : 
                     j.status === 'in_site' ? 'En progreso' :
@@ -2412,6 +2421,9 @@ async function enterCleanerPortalFromUrl(params = new URLSearchParams(location.s
             serviceType: j.service_type || "Limpieza normal",
             rate: Number(j.client_hourly_rate || 65),
             extras: Number(j.extras_amount || 0),
+            requestReview: Boolean(j.request_review),
+            clientRating: j.client_rating ? Number(j.client_rating) : null,
+            clientReviewText: j.client_review_text || "",
             status: j.status === 'scheduled' ? 'Asignado' : 
                     j.status === 'open' ? 'Disponible para tomar' : 
                     j.status === 'in_site' ? 'En progreso' :
@@ -4010,6 +4022,24 @@ function startJobEdit(jobId) {
   form.elements.rate.value = job.rate || 0;
   form.elements.extras.value = job.extras || 0;
   form.elements.tasks.value = (job.tasks || []).join(", ");
+  
+  if (form.elements.requestReview) {
+    form.elements.requestReview.checked = Boolean(job.requestReview);
+  }
+  
+  const reviewDisplay = $("#jobReviewDisplay");
+  const reviewStars = $("#jobReviewStars");
+  const reviewText = $("#jobReviewText");
+  if (reviewDisplay && reviewStars && reviewText) {
+    if (job.clientRating) {
+      reviewDisplay.classList.remove("hidden");
+      reviewStars.innerHTML = "⭐".repeat(job.clientRating) + "☆".repeat(5 - job.clientRating);
+      reviewText.textContent = job.clientReviewText ? `"${job.clientReviewText}"` : "Sin comentarios adicionales.";
+    } else {
+      reviewDisplay.classList.add("hidden");
+    }
+  }
+  
   updateJobClientAddressHint();
   $("#saveJobButton").textContent = "Actualizar trabajo";
   $("#cancelJobEdit").classList.remove("hidden");
@@ -4071,6 +4101,11 @@ function resetJobForm() {
   $("#jobId").value = "";
   $("#jobForm").elements.status.value = "Asignado";
   $("#jobForm").elements.repeatCount.value = 1;
+  if ($("#jobForm").elements.requestReview) {
+    $("#jobForm").elements.requestReview.checked = false;
+  }
+  const reviewDisplay = $("#jobReviewDisplay");
+  if (reviewDisplay) reviewDisplay.classList.add("hidden");
   applyServiceRuleToJobForm();
   updateJobClientAddressHint();
   $("#saveJobButton").textContent = "Crear trabajo";
@@ -4745,13 +4780,21 @@ function renderClientPortal(clientId, keepHidden = false) {
     <p>${t("currentService")}: <strong>${t("noActiveJobs")}</strong></p>
     <p>${t("completedJobsHistoryBelow")}</p>
   `;
+  const jobToReview = historyJobs.find(j => j.requestReview && !j.clientRating);
+  const reviewedJob = historyJobs.find(j => j.requestReview && j.clientRating);
+  const reviewJob = jobToReview || reviewedJob;
+  
+  const reviewHtml = reviewJob ? clientReviewHtml(reviewJob) : "";
+
   $("#photoBoard").innerHTML = job ? `
     ${photoSectionsHtml(job)}
+    ${reviewHtml}
     <section class="panel client-history-panel">
       <h2>${t("serviceHistory")}</h2>
       ${clientHistoryHtml(historyJobs)}
     </section>
   ` : `
+    ${reviewHtml}
     <section class="panel client-history-panel">
       <h2>${t("serviceHistory")}</h2>
       ${clientHistoryHtml(historyJobs)}
@@ -4759,6 +4802,101 @@ function renderClientPortal(clientId, keepHidden = false) {
   `;
   bindPhotoActions();
 }
+
+function clientReviewHtml(job) {
+  if (!job || !job.requestReview) return "";
+  
+  if (job.clientRating) {
+    return `
+      <section class="panel client-history-panel" style="border: 2px solid var(--gold); margin-bottom: 24px;">
+        <h2 style="color: var(--gold);">¡Gracias por tu review!</h2>
+        <div style="color: var(--gold); font-size: 1.5rem; margin-bottom: 8px;">${"⭐".repeat(job.clientRating)}${"☆".repeat(5 - job.clientRating)}</div>
+        <p style="margin:0;"><em>"${escapeHtml(job.clientReviewText || '')}"</em></p>
+      </section>
+    `;
+  }
+
+  return `
+    <section class="panel client-history-panel" style="border: 2px solid var(--gold); margin-bottom: 24px;" id="reviewSection_${job.id}">
+      <h2 style="color: var(--gold);">¿Cómo fue nuestro servicio el ${job.date}?</h2>
+      <p>Nos importa mucho tu opinión. Por favor califica este servicio:</p>
+      <form onsubmit="submitClientReview(event, '${job.id}')" style="display: flex; flex-direction: column; gap: 10px; margin-top: 12px;">
+        <div class="star-rating-input" style="font-size: 2.5rem; color: #ccc; cursor: pointer; display: flex; gap: 8px; justify-content: center;">
+          <span onclick="setReviewRating('${job.id}', 1)" id="star_${job.id}_1">★</span>
+          <span onclick="setReviewRating('${job.id}', 2)" id="star_${job.id}_2">★</span>
+          <span onclick="setReviewRating('${job.id}', 3)" id="star_${job.id}_3">★</span>
+          <span onclick="setReviewRating('${job.id}', 4)" id="star_${job.id}_4">★</span>
+          <span onclick="setReviewRating('${job.id}', 5)" id="star_${job.id}_5">★</span>
+        </div>
+        <input type="hidden" name="rating" id="reviewRating_${job.id}" value="0" required>
+        <textarea name="reviewText" placeholder="Escribe tu comentario aquí (opcional)..." rows="3" style="width: 100%; border-radius: 6px; border: 1px solid var(--border-color); padding: 8px; font-family: inherit; resize: vertical;"></textarea>
+        <button type="submit" class="primary" style="background: var(--gold); border: none; color: black; font-weight: bold; margin-top: 8px;">Enviar Review</button>
+      </form>
+    </section>
+  `;
+}
+
+window.setReviewRating = function(jobId, rating) {
+  const ratingInput = document.getElementById(`reviewRating_${jobId}`);
+  if (ratingInput) ratingInput.value = rating;
+  for (let i = 1; i <= 5; i++) {
+    const star = document.getElementById(`star_${jobId}_${i}`);
+    if (star) {
+      star.style.color = i <= rating ? "var(--gold)" : "#ccc";
+    }
+  }
+};
+
+window.submitClientReview = async function(event, jobId) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const formData = new FormData(form);
+  const rating = parseInt(formData.get("rating"), 10);
+  const text = formData.get("reviewText");
+  
+  if (!rating || rating < 1 || rating > 5) {
+    alert("Por favor selecciona una calificación de estrellas.");
+    return;
+  }
+  
+  const submitBtn = form.querySelector("button[type='submit']");
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Enviando...";
+  }
+  
+  if (supabaseClient) {
+    const { error } = await supabaseClient
+      .from('jobs')
+      .update({ client_rating: rating, client_review_text: text })
+      .eq('id', jobId);
+      
+    if (error) {
+      alert("Error al enviar el review: " + error.message);
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Enviar Review";
+      }
+      return;
+    }
+  }
+  
+  // Optimistically update local state if present
+  const job = state.jobs.find(j => j.id === jobId);
+  if (job) {
+    job.clientRating = rating;
+    job.clientReviewText = text;
+    save();
+  }
+  
+  // Re-render
+  const clientViewId = new URLSearchParams(location.search).get("id");
+  if (clientViewId) {
+    renderClientPortal(clientViewId, true);
+  } else {
+    renderAll();
+  }
+};
 
 function renderPhotoBoard(selector, job, options = {}) {
   document.querySelector(selector).innerHTML = photoSectionsHtml(job, options);
@@ -5843,7 +5981,8 @@ function setupEvents() {
       serviceType: data.serviceType,
       rate: Number(data.rate),
       extras: Number(data.extras || 0),
-      tasks: (data.tasks || "Cocina, Banos, Pisos").split(",").map((task) => task.trim()).filter(Boolean)
+      tasks: (data.tasks || "Cocina, Banos, Pisos").split(",").map((task) => task.trim()).filter(Boolean),
+      requestReview: event.currentTarget.elements.requestReview ? event.currentTarget.elements.requestReview.checked : false
     };
     const index = state.jobs.findIndex((job) => job.id === data.id);
     const previousJob = index >= 0 ? state.jobs[index] : {};

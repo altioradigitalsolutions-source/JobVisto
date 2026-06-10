@@ -595,6 +595,15 @@
               </label>
               <label>Create how many dates <input name="repeatCount" type="number" min="1" max="24" value="1"></label>
               <label>Checklist <textarea name="tasks" placeholder="e.g. Kitchen, bathrooms, floors, windows, etc."></textarea></label>
+              <label class="toggle-label" style="margin-top: 10px; margin-bottom: 10px;">
+                <input type="checkbox" name="requestReview" id="jobRequestReview">
+                <span>Solicitar Review al cliente en su portal</span>
+              </label>
+              <div id="jobReviewDisplay" class="hidden" style="background: var(--surface-2); padding: 12px; border-radius: 8px; margin-bottom: 12px; border-left: 4px solid var(--gold);">
+                <h4 style="margin: 0 0 4px 0; color: var(--gold);">Review del Cliente</h4>
+                <div style="color: var(--gold); font-size: 1.2rem; margin-bottom: 4px;" id="jobReviewStars"></div>
+                <p id="jobReviewText" style="margin: 0; font-size: 0.9rem; font-style: italic;"></p>
+              </div>
               <div class="form-actions">
                 <button class="primary" type="submit" id="saveJobButton">Crear trabajo</button>
                 <button class="ghost hidden" type="button" id="cancelJobEdit">Cancelar edicion</button>
