@@ -5528,12 +5528,73 @@ function deletePendingReceipt() {
   toast("Comprobante eliminado. Los trabajos asociados vuelven a estar disponibles.");
 }
 
-function syncClientPaymentSelect() {}
-function renderClientPaymentJobPicker() {}
+function syncClientPaymentSelect() {
+  const select = $("#clientPaymentSelect");
+  if (!select) return;
+  const clients = state.clients;
+  select.innerHTML = clients.length
+    ? clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("")
+    : `<option value="">Sin clientes registrados</option>`;
+  // Update avatar initial
+  const avatar = $("#clientPaymentAvatar");
+  if (avatar && clients.length) avatar.textContent = clients[0].name.charAt(0).toUpperCase();
+}
+
+function renderClientPaymentJobPicker() {
+  const picker = $("#clientPaymentJobPicker");
+  if (!picker) return;
+  const clientId = $("#clientPaymentSelect")?.value;
+  if (!clientId) { picker.innerHTML = ""; return; }
+
+  // Jobs that are finished and not fully paid for this client
+  const unpaidJobs = state.jobs.filter(j =>
+    j.clientId === clientId &&
+    j.status.includes("Terminado") &&
+    j.clientPaymentStatus !== "paid"
+  );
+
+  if (!unpaidJobs.length) {
+    picker.innerHTML = `<p class="muted" style="padding: 8px 0;">No hay trabajos pendientes de cobro para este cliente.</p>`;
+    $("#clientPaymentAmount").value = 0;
+    const submitBtn = $("#clientPaymentSubmitBtn");
+    if (submitBtn) submitBtn.disabled = true;
+    return;
+  }
+
+  picker.innerHTML = `
+    <p class="pf-label-text" style="margin-bottom: 8px; font-weight: 600;">Trabajos pendientes de cobro</p>
+    ${unpaidJobs.map(j => {
+      const amount = estimateJob(j);
+      const paid = parseFloat(j.clientPaidAmount) || 0;
+      const pending = amount - paid;
+      return `
+        <label class="payment-job-item" style="display:flex; align-items:center; gap:10px; padding:8px; border:1px solid var(--border); border-radius:8px; margin-bottom:6px; cursor:pointer;">
+          <input type="checkbox" class="client-payment-job-checkbox" value="${j.id}" data-amount="${pending}" checked>
+          <span style="flex:1">
+            <strong>${escapeHtml(j.date)}</strong> – ${escapeHtml(j.serviceType || "Limpieza")}
+            <br><small class="muted">${money(pending)} pendiente</small>
+          </span>
+        </label>`;
+    }).join("")}
+  `;
+
+  updateClientPaymentTotal();
+}
+
+function updateClientPaymentTotal() {
+  const checkboxes = document.querySelectorAll(".client-payment-job-checkbox:checked");
+  let total = 0;
+  checkboxes.forEach(cb => { total += parseFloat(cb.dataset.amount) || 0; });
+  const amountInput = $("#clientPaymentAmount");
+  if (amountInput) amountInput.value = total.toFixed(2);
+  const submitBtn = $("#clientPaymentSubmitBtn");
+  if (submitBtn) submitBtn.disabled = checkboxes.length === 0;
+}
 
 function renderClientBalances() {
   const container = $("#clientBalancesList");
   if (!container) return;
+
   
   const debts = [];
   state.clients.forEach(c => {
@@ -6216,14 +6277,24 @@ function setupEvents() {
       document.querySelectorAll(".finance-tab-content").forEach(tab => tab.classList.add("hidden"));
       const tabContent = document.getElementById(tabName === "clients" ? "financeClientsTab" : "financeCleanersTab");
       if (tabContent) tabContent.classList.remove("hidden");
+      
+      // Refresh client tab data when switching to it
+      if (tabName === "clients") {
+        syncClientPaymentSelect();
+        renderClientPaymentJobPicker();
+        renderClientBalances();
+      }
     }
   });
+
 
   $("#clientPaymentForm")?.addEventListener("submit", (event) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
     const formEl = event.currentTarget;
-    const jobIds = Array.from(formEl.querySelectorAll("input[name='jobIds']:checked")).map(el => el.value);
+    // Collect checked job IDs from the dynamically rendered picker
+    const jobIds = Array.from(document.querySelectorAll(".client-payment-job-checkbox:checked")).map(el => el.value);
+
     
     if (!jobIds.length) {
       toast("Selecciona al menos un trabajo para cobrar.");
