@@ -6608,10 +6608,8 @@ if (supabaseClient) {
         enterApp(state.mode);
       } catch (err) {
         console.error("Error during session load or profile setup:", err);
-        toast("Error de sesión. Restableciendo... / Session error. Resetting...");
-        try {
-          if (supabaseClient) await supabaseClient.auth.signOut();
-        } catch (_) {}
+        toast("Error de sesión. Restableciendo...");
+
         state.user = null;
         state.orgId = null;
         state.clients = [];
@@ -6622,14 +6620,18 @@ if (supabaseClient) {
         const __urlParams = new URLSearchParams(location.search);
         const __portalType = __urlParams.get("portal");
         const __path = window.location.pathname.toLowerCase();
-        if (__portalType === "client" || __portalType === "cleaner" || __path.includes("portal-clientes") || __path.includes("portal-cleaners")) return;
-
-        $("#appShell").classList.add("hidden");
-        $("#authScreen").classList.remove("hidden");
-        if (loginBtn) {
-          loginBtn.disabled = false;
-          loginBtn.textContent = selectedAuthAction === "login" ? "Log in" : "Register";
+        if (!(__portalType === "client" || __portalType === "cleaner" || __path.includes("portal-clientes") || __path.includes("portal-cleaners"))) {
+          $("#appShell").classList.add("hidden");
+          $("#authScreen").classList.remove("hidden");
+          if (loginBtn) {
+            loginBtn.disabled = false;
+            loginBtn.textContent = selectedAuthAction === "login" ? "Ingresar" : "Registrarse";
+          }
         }
+
+        try {
+          if (supabaseClient) supabaseClient.auth.signOut();
+        } catch (_) {}
       }
     } else {
       // Re-enable form buttons if they are signed out
