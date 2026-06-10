@@ -4318,7 +4318,10 @@ function startClientEdit(clientId) {
   form.elements.name.value = client.name || "";
   form.elements.phoneLocal.value = client.phoneLocal || (client.phone || "").replace(/^\+\d+\s*/, "");
   form.elements.email.value = client.email || "";
-  form.elements.address.value = client.address || "";
+  
+  const addressInput = form.querySelector('[name="address"]');
+  if (addressInput) addressInput.value = client.address || "";
+  
   form.elements.paymentMethod.value = client.paymentMethod || "Efectivo";
   form.elements.notes.value = client.notes || "";
   
