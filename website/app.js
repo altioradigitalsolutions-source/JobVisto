@@ -163,6 +163,16 @@ async function loadStateFromSupabase(currentUser = null) {
       // Fetch organization settings
       const { data: settings } = await supabaseClient.from('organization_settings').select('*').eq('organization_id', orgId);
       if (settings) {
+        const greetingSetting = settings.find(s => s.key === 'greeting_name');
+        if (greetingSetting && greetingSetting.value?.name) {
+          state.companyProfile.greetingName = greetingSetting.value.name;
+        }
+
+        const addressSetting = settings.find(s => s.key === 'company_address');
+        if (addressSetting && addressSetting.value?.address) {
+          state.companyProfile.address = addressSetting.value.address;
+        }
+
         const vatSetting = settings.find(s => s.key === 'vat_rate');
         if (vatSetting) {
           state.vatRate = Number(vatSetting.value?.rate !== undefined ? vatSetting.value.rate : 18);
@@ -240,9 +250,7 @@ async function asyncSaveToSupabase() {
       email: state.companyProfile.email,
       phone: state.companyProfile.phone,
       preferred_language: state.language
-    });
-
-    // 2. Sync organization details
+    });    // 2. Sync organization details
     await supabaseClient.from('organizations').update({
       name: state.companyProfile.businessName,
       type: state.mode,
@@ -250,7 +258,13 @@ async function asyncSaveToSupabase() {
       default_language: state.language
     }).eq('id', state.orgId);
 
-    // 3. Clean up deleted clients
+    // 3. Sync extra settings
+    await supabaseClient.from('organization_settings').upsert([
+      { organization_id: state.orgId, key: 'greeting_name', value: { name: state.companyProfile.greetingName || firstName(state.companyProfile.ownerName) } },
+      { organization_id: state.orgId, key: 'company_address', value: { address: state.companyProfile.address || "" } }
+    ]);
+
+    // 4. Update memory rules and cleaners. Clean up deleted clients
     const currentClientIds = state.clients.map(c => c.id).filter(Boolean);
     if (currentClientIds.length > 0) {
       const formattedIds = currentClientIds.map(id => `'${id}'`).join(',');
