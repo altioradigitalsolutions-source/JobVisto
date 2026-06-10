@@ -5732,6 +5732,13 @@ function setupEvents() {
   $("#jobForm").addEventListener("submit", (event) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
+    
+    // Auto-save address to client if it's missing
+    const clientForJob = state.clients.find(c => c.id === data.clientId);
+    if (clientForJob && !clientForJob.address && data.jobAddress) {
+      clientForJob.address = data.jobAddress.trim();
+    }
+
     const payload = {
       id: data.id || crypto.randomUUID(),
       clientId: data.clientId,
