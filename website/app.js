@@ -2483,7 +2483,7 @@ function renderStandaloneClientPortal(unlocked = true) {
   document.querySelector(".portal-header")?.classList.toggle("hidden", !unlocked);
 
   const unpaidJobs = historyJobs.filter(j => j.status.includes("Terminado") && j.clientPaymentStatus !== "paid");
-  let pendingBalance = unpaidJobs.reduce((sum, j) => sum + ((parseFloat(j.amount) || 0) - (parseFloat(j.clientPaidAmount) || 0)), 0);
+  let pendingBalance = unpaidJobs.reduce((sum, j) => sum + (estimateJob(j) - (parseFloat(j.clientPaidAmount) || 0)), 0);
   
   // Si hay un trabajo actual con monto pero que no está terminado y no ha sido pagado, lo sumamos.
   if (hasPayableAmount && job && !job.status.includes("Terminado") && job.clientPaymentStatus !== "paid") {
