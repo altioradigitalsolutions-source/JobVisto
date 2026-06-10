@@ -7,10 +7,14 @@ const supabaseClient = window.supabase ? window.supabase.createClient(
 ) : null;
 
 // Supabase Data Integration Helpers
-async function loadStateFromSupabase() {
+async function loadStateFromSupabase(currentUser = null) {
   if (!supabaseClient) return;
   try {
-    const { data: { user } } = await supabaseClient.auth.getUser();
+    let user = currentUser;
+    if (!user) {
+      const { data } = await supabaseClient.auth.getUser();
+      user = data?.user;
+    }
     if (!user) return;
     state.user = user;
 
@@ -6336,7 +6340,7 @@ if (supabaseClient) {
       state.user = user;
 
       try {
-        await loadStateFromSupabase();
+        await loadStateFromSupabase(user);
 
         // If they don't have an organization, they signed up via OAuth (Google/Microsoft) or email verification completed but profile/org weren't created due to RLS
         if (!state.orgId) {
@@ -6432,4 +6436,75 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
   });
+}
+
+// Session Idle Timeout Logic
+let idleTime = 0;
+let idleInterval;
+let countdownInterval;
+let countdownValue = 60;
+const MAX_IDLE_MINUTES = 30; // 30 minutes of inactivity allowed
+
+function resetIdleTime() {
+  idleTime = 0;
+  if ($("#idleTimeoutModal") && $("#idleTimeoutModal").open) {
+    $("#idleTimeoutModal").close();
+    clearInterval(countdownInterval);
+  }
+}
+
+function checkIdleTime() {
+  if (!state.user) return; // Only track logged in users
+  idleTime++;
+  
+  if (idleTime >= MAX_IDLE_MINUTES) {
+    showIdleModal();
+  }
+}
+
+function showIdleModal() {
+  const modal = $("#idleTimeoutModal");
+  if (!modal || modal.open) return;
+  
+  modal.showModal();
+  countdownValue = 60;
+  $("#idleCountdown").textContent = countdownValue;
+  $("#idleCountdownEn").textContent = countdownValue;
+  
+  clearInterval(countdownInterval);
+  countdownInterval = setInterval(() => {
+    countdownValue--;
+    $("#idleCountdown").textContent = countdownValue;
+    $("#idleCountdownEn").textContent = countdownValue;
+    
+    if (countdownValue <= 0) {
+      clearInterval(countdownInterval);
+      forceLogOut();
+    }
+  }, 1000);
+}
+
+async function forceLogOut() {
+  if (supabaseClient) {
+    try {
+      await supabaseClient.auth.signOut();
+    } catch (e) {}
+  }
+  localStorage.clear();
+  window.location.reload();
+}
+
+// Attach idle listeners
+["mousemove", "keydown", "touchstart", "scroll"].forEach(event => {
+  window.addEventListener(event, resetIdleTime, { passive: true });
+});
+
+// Check every minute
+idleInterval = setInterval(checkIdleTime, 60000);
+
+if ($("#stayLoggedInButton")) {
+  $("#stayLoggedInButton").addEventListener("click", resetIdleTime);
+}
+if ($("#logOutNowButton")) {
+  $("#logOutNowButton").addEventListener("click", forceLogOut);
 }

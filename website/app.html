@@ -1541,6 +1541,19 @@
     </div>
 
     <div class="toast" id="toast"></div>
+
+    <dialog class="modal" id="idleTimeoutModal">
+      <div class="modal-content">
+        <h3>¿Sigues ahí? / Are you still there?</h3>
+        <p>Por seguridad, tu sesión se cerrará en <strong id="idleCountdown">60</strong> segundos por inactividad.</p>
+        <p class="muted">For security, your session will close in <strong id="idleCountdownEn">60</strong> seconds due to inactivity.</p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-primary" id="stayLoggedInButton">Seguir conectado / Stay logged in</button>
+          <button type="button" class="btn btn-outline" id="logOutNowButton">Cerrar sesión / Log out</button>
+        </div>
+      </div>
+    </dialog>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./supabase-config.js"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
