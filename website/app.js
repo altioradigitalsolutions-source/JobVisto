@@ -3480,12 +3480,36 @@ function renderDashboardReminders() {
   const todayStr = new Date().toISOString().split('T')[0];
   const reminders = state.clients.filter(c => c.followUpDate && c.followUpDate <= todayStr);
   
-  if (reminders.length === 0) {
+  // Calculate debts
+  const debts = [];
+  state.clients.forEach(c => {
+    const jobs = state.jobs.filter(j => j.clientId === c.id && j.status.includes("Terminado") && j.clientPaymentStatus !== "paid");
+    const debt = jobs.reduce((sum, j) => sum + (estimateJob(j) - (parseFloat(j.clientPaidAmount) || 0)), 0);
+    if (debt > 0) debts.push({ client: c, debt, jobsCount: jobs.length });
+  });
+  
+  if (reminders.length === 0 && debts.length === 0) {
     container.innerHTML = "";
     return;
   }
   
-  container.innerHTML = reminders.map(c => `
+  let html = "";
+  
+  // Render Debts
+  html += debts.map(d => `
+    <div class="reminder-alert" style="border-left-color: var(--danger);">
+      <div class="reminder-alert-content">
+        <h4 style="color: var(--danger);">⚠️ Deuda pendiente: ${escapeHtml(d.client.name)}</h4>
+        <p>El cliente tiene un saldo pendiente de <strong>${money(d.debt)}</strong> por ${d.jobsCount} trabajo(s) terminado(s) y no pagado(s).</p>
+      </div>
+      <div class="reminder-alert-actions">
+        <button type="button" onclick="setView('trabajos')" style="color: var(--danger); border-color: var(--danger);">Ver trabajos</button>
+      </div>
+    </div>
+  `).join("");
+  
+  // Render Follow-ups
+  html += reminders.map(c => `
     <div class="reminder-alert">
       <div class="reminder-alert-content">
         <h4>🔔 Recordatorio: Contactar a ${escapeHtml(c.name)}</h4>
@@ -3496,6 +3520,8 @@ function renderDashboardReminders() {
       </div>
     </div>
   `).join("");
+  
+  container.innerHTML = html;
 }
 
 function renderMetrics() {
@@ -5362,6 +5388,51 @@ function deletePendingReceipt() {
   renderAll();
   closeDeleteReceiptModal();
   toast("Comprobante eliminado. Los trabajos asociados vuelven a estar disponibles.");
+}
+
+function syncClientPaymentSelect() {}
+function renderClientPaymentJobPicker() {}
+
+function renderClientBalances() {
+  const container = $("#clientBalancesList");
+  if (!container) return;
+  
+  const debts = [];
+  state.clients.forEach(c => {
+    const jobs = state.jobs.filter(j => j.clientId === c.id && j.status.includes("Terminado") && j.clientPaymentStatus !== "paid");
+    const debt = jobs.reduce((sum, j) => sum + (estimateJob(j) - (parseFloat(j.clientPaidAmount) || 0)), 0);
+    if (debt > 0) debts.push({ client: c, debt, count: jobs.length });
+  });
+  
+  if (debts.length === 0) {
+    container.innerHTML = `
+      <div class="pl-empty">
+        <span>✅</span>
+        <p data-i18n="noPendingBalances">No hay saldos pendientes.</p>
+      </div>`;
+    return;
+  }
+  
+  container.innerHTML = debts.map(d => `
+    <article class="receipt-item pending">
+      <strong>${escapeHtml(d.client.name)} - Deuda: ${money(d.debt)}</strong>
+      <span class="client-meta">${d.count} trabajo(s) terminado(s) sin pagar</span>
+      <div class="receipt-actions" style="margin-top: 10px;">
+        <button class="mini-action" type="button" onclick="setView('trabajos')">Ver trabajos</button>
+      </div>
+    </article>
+  `).join("");
+}
+
+function processPaymentForm(event) {
+  $("#paymentForm").reset();
+  $("#paymentId").value = "";
+  syncPaymentCleanerSelect();
+  $("#paymentPeriod").value = currentPeriodLabel();
+  $("#paymentAmount").value = 0;
+  renderPaymentJobPicker();
+  $("#savePaymentButton").textContent = "Registrar pago externo";
+  $("#cancelPaymentEdit").classList.add("hidden");
 }
 
 function resetPaymentForm() {
