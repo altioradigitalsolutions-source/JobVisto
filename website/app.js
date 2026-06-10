@@ -3503,7 +3503,7 @@ function renderDashboardReminders() {
         <p>El cliente tiene un saldo pendiente de <strong>${money(d.debt)}</strong> por ${d.jobsCount} trabajo(s) terminado(s) y no pagado(s).</p>
       </div>
       <div class="reminder-alert-actions">
-        <button type="button" onclick="setView('trabajos')" style="color: var(--danger); border-color: var(--danger);">Ver trabajos</button>
+        <button type="button" onclick="setView('jobs')" style="color: var(--danger); border-color: var(--danger);">Ver trabajos</button>
       </div>
     </div>
   `).join("");
@@ -5418,7 +5418,7 @@ function renderClientBalances() {
       <strong>${escapeHtml(d.client.name)} - Deuda: ${money(d.debt)}</strong>
       <span class="client-meta">${d.count} trabajo(s) terminado(s) sin pagar</span>
       <div class="receipt-actions" style="margin-top: 10px;">
-        <button class="mini-action" type="button" onclick="setView('trabajos')">Ver trabajos</button>
+        <button class="mini-action" type="button" onclick="setView('jobs')">Ver trabajos</button>
       </div>
     </article>
   `).join("");
