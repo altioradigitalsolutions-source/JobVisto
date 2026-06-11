@@ -177,7 +177,7 @@ textarea { min-height: 92px; resize: vertical; }
   gap: 8px;
 }
 .language-switch {
-  display: none !important;
+  display: flex;
   align-items: center;
   width: fit-content;
   gap: 4px;

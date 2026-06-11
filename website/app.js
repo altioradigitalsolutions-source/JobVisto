@@ -1204,7 +1204,7 @@ function applyStaticLanguage() {
 }
 
 function setLanguage(language) {
-  state.language = "es";
+  state.language = language || "es";
   save();
   populateCountrySelect();
   applyStaticLanguage();
