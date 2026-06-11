@@ -177,7 +177,7 @@ textarea { min-height: 92px; resize: vertical; }
   gap: 8px;
 }
 .language-switch {
-  display: inline-flex;
+  display: none !important;
   align-items: center;
   width: fit-content;
   gap: 4px;
@@ -4520,11 +4520,20 @@ button:disabled {
   font-weight: 900;
 }
 
+#clientLinksView .client-link-status.status-inactive {
+  color: #c53030;
+  background: #fff5f5;
+}
+
 #clientLinksView .client-link-status i {
   width: 10px;
   height: 10px;
   border-radius: 50%;
   background: #0ca76d;
+}
+
+#clientLinksView .client-link-status.status-inactive i {
+  background: #e53e3e;
 }
 
 #clientLinksView .client-link-key {

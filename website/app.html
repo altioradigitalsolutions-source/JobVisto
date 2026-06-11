@@ -199,7 +199,7 @@
           <button data-view="jobs"><i data-icon="briefcase"></i> <span data-i18n="jobs">Jobs</span></button>
           <button data-view="clientLinks"><i data-icon="link"></i> <span data-i18n="clientLinks">Client links</span></button>
           <button data-view="reports"><i data-icon="chart"></i> <span data-i18n="reports">Reports</span></button>
-          <button data-view="payments" data-company-nav><i data-icon="receipt"></i> <span data-i18n="payments">Payments</span></button>
+          <button data-view="payments"><i data-icon="receipt"></i> <span data-i18n="payments">Payments</span></button>
           <button data-view="settings"><i data-icon="settings"></i> <span data-i18n="settings">Settings</span></button>
         </nav>
         <button class="logout" id="logoutButton" data-i18n="logout">Log out</button>
@@ -887,8 +887,9 @@
                 </div>
                 <div id="paymentReceipts" class="receipt-list"></div>
               </div>
-            </div>
-          </div>
+            </div><!-- end payments-right-col -->
+          </div><!-- end payments-layout -->
+          </div><!-- end financeCleanersTab -->
 
           <!-- Tab 2: Clients -->
           <div class="finance-tab-content hidden" id="financeClientsTab">
@@ -958,21 +959,51 @@
                   <textarea name="notes" placeholder="Agrega una nota o referencia del pago..." rows="2"></textarea>
                 </label>
 
-                <div class="form-actions">
-                  <button class="primary pf-submit" type="submit" disabled id="clientPaymentSubmitBtn">Registrar cobro</button>
+                <div class="pf-actions">
+                  <button class="primary pf-submit-btn" type="submit" disabled id="clientPaymentSubmitBtn">
+                    <span>💰</span> Registrar cobro
+                  </button>
                 </div>
               </form>
 
-              <!-- RIGHT: Client Balances list -->
-              <div class="payments-list-panel">
-                <div class="pl-header">
-                  <h3 data-i18n="clientBalances">Saldos de Clientes</h3>
+              <!-- RIGHT: Summary + Client Balances + Recent Collections -->
+              <div class="payments-right-col">
+                <!-- Client Payment Summary Card -->
+                <div class="payment-summary-card" id="clientPaymentSummaryCard">
+                  <div class="psc-header">
+                    <span class="psc-icon">📄</span>
+                    <h4>Resumen del cobro</h4>
+                  </div>
+                  <div class="psc-rows" id="clientPaymentSummaryRows">
+                    <div class="psc-row"><span>Trabajos seleccionados</span><strong id="cpscSelectedJobs">0</strong></div>
+                    <div class="psc-row"><span>Subtotal</span><strong id="cpscSubtotal">$0.00</strong></div>
+                    <div class="psc-row psc-row-discount"><span>Descuento</span><strong id="cpscDiscount">$0.00</strong></div>
+                    <div class="psc-row psc-row-total"><span>Total a cobrar</span><strong id="cpscTotal">$0.00</strong></div>
+                  </div>
+                  <div class="psc-note">
+                    <span>ℹ</span>
+                    <p>Este cobro quedará registrado en el historial del cliente y en tus reportes.</p>
+                  </div>
                 </div>
-                <div class="pl-list" id="clientBalancesList">
-                  <!-- Populated by JS -->
-                  <div class="pl-empty">
-                    <span>💵</span>
-                    <p data-i18n="noPendingBalances">No hay saldos pendientes.</p>
+
+                <!-- Client Balances -->
+                <div class="panel payments-recent-panel">
+                  <div class="panel-head">
+                    <h3 data-i18n="clientBalances">Saldos de Clientes</h3>
+                  </div>
+                  <div id="clientBalancesList" class="receipt-list">
+                    <!-- Populated by JS -->
+                  </div>
+                </div>
+
+                <!-- Recent Collections -->
+                <div class="panel payments-recent-panel">
+                  <div class="panel-head">
+                    <h3>Cobros recientes</h3>
+                    <button class="text-link" type="button">Ver todos</button>
+                  </div>
+                  <div id="clientPaymentReceipts" class="receipt-list">
+                    <!-- Populated by JS -->
                   </div>
                 </div>
               </div>
@@ -997,6 +1028,7 @@
               <label>Telefono <input name="phone" placeholder="+972 50 000 0000"></label>
               <label>Email <input name="email" type="email" placeholder="admin@jobvisto.demo"></label>
               <label>Direccion base <input name="address" placeholder="Tel Aviv, Israel"></label>
+              <label>URL de producción / Dominio del portal <input name="portalUrl" placeholder="https://tu-sitio.netlify.app"></label>
               <div class="form-row" style="display: flex; gap: 10px;">
                 <label style="flex: 1;">Moneda
                   <select name="currencySymbol">
@@ -1122,7 +1154,7 @@
               <span class="more-grid-icon">📊</span>
               <strong>Reportes</strong>
             </button>
-              <button class="more-grid-item" data-more-view="payments" type="button" data-company-nav>
+              <button class="more-grid-item" data-more-view="payments" type="button">
               <span class="more-grid-icon">🧾</span>
               <strong>Pagos</strong>
             </button>
@@ -1551,6 +1583,45 @@
 
     <div class="toast" id="toast"></div>
 
+    <div class="modal hidden" id="clientPortalSettingsModal" role="dialog" aria-modal="true" aria-labelledby="clientPortalSettingsTitle" style="z-index: 1000;">
+      <div class="modal-card confirm-modal-card brand-confirm-card" style="border: 2px solid #35d17f;">
+        <div class="panel-head">
+          <div>
+            <span class="status-chip">JV</span>
+            <h3 id="clientPortalSettingsTitle">Ajustes del Portal de Cliente</h3>
+            <p class="muted">Configura el acceso al portal para este cliente.</p>
+          </div>
+          <button class="ghost" type="button" id="closeClientPortalSettingsModal">Cerrar</button>
+        </div>
+        
+        <form id="clientPortalSettingsForm" style="display: flex; flex-direction: column; gap: 16px; margin: 16px 0;">
+          <input type="hidden" id="cpsClientId">
+          
+          <label class="pf-label">
+            <span class="pf-label-text">Estado del Portal</span>
+            <select id="cpsPortalActive">
+              <option value="true">Activo (El cliente puede acceder)</option>
+              <option value="false">Desactivado (Acceso bloqueado)</option>
+            </select>
+          </label>
+
+          <label class="pf-label">
+            <span class="pf-label-text">Clave de acceso personalizada</span>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="cpsPortalPasscode" style="flex: 1;" placeholder="Ej: JV-ABC-12">
+              <button class="ghost" type="button" id="cpsGenerateCodeBtn" style="white-space: nowrap;">Generar clave</button>
+            </div>
+            <small class="muted">Deja vacío para usar la clave por defecto del sistema.</small>
+          </label>
+
+          <div class="form-actions" style="margin-top: 16px;">
+            <button class="ghost" type="button" id="cancelClientPortalSettings">Cancelar</button>
+            <button class="primary" type="submit">Guardar cambios</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div class="modal hidden" id="idleTimeoutModal">
       <div class="modal-card form-layout">
         <h3>¿Sigues ahí? / Are you still there?</h3>
@@ -1566,6 +1637,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./supabase-config.js"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-    <script src="./app.js?v=4"></script>
+    <script src="./app.js?v=5"></script>
   </body>
 </html>

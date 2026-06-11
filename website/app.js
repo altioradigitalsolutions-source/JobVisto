@@ -52,7 +52,9 @@ async function loadStateFromSupabase(currentUser = null) {
           address: "",
           country: state.country || "IL",
           paymentMethod: c.default_payment_method === 'cash' ? 'Efectivo' : 'Transferencia',
-          notes: c.notes || ""
+          notes: c.notes || "",
+          portalPasscode: c.portal_passcode || null,
+          portalActive: c.portal_active !== false
         }));
       }
 
@@ -286,7 +288,9 @@ async function asyncSaveToSupabase() {
         email: client.email,
         preferred_language: state.language || 'es',
         default_payment_method: client.paymentMethod === 'Efectivo' ? 'cash' : 'transfer',
-        notes: client.notes
+        notes: client.notes,
+        portal_passcode: client.portalPasscode || null,
+        portal_active: client.portalActive !== false
       });
 
       if (client.address) {
@@ -468,7 +472,7 @@ function normalizePlanKey(plan) {
 const state = {
   mode: pageParams.get("mode") || localStorage.getItem("jobvisto-mode") || "independent",
   country: localStorage.getItem("jobvisto-country") || "IL",
-  language: localStorage.getItem("jobvisto-language") || "es",
+  language: "es",
   companyProfile: JSON.parse(localStorage.getItem("jobvisto-company-profile") || "null") || {
     businessName: "JobVisto Cleaning",
     ownerName: "Miguel",
@@ -1200,7 +1204,7 @@ function applyStaticLanguage() {
 }
 
 function setLanguage(language) {
-  state.language = i18n[language] ? language : "en";
+  state.language = "es";
   save();
   populateCountrySelect();
   applyStaticLanguage();
@@ -1637,7 +1641,7 @@ function cleanerCostForJob(job) {
 }
 
 function clientPortalPassword(client) {
-  return `JV-${client.name.slice(0, 3).toUpperCase()}-${client.id.slice(-2)}`;
+  return client.portalPasscode || `JV-${client.name.slice(0, 3).toUpperCase()}-${client.id.slice(-2)}`;
 }
 
 function clientPortalKeyPrefix(key) {
@@ -1657,11 +1661,29 @@ function cleanerPortalPassword(cleaner) {
 }
 
 function localClientPortalUrl(client) {
+  if (state.companyProfile && state.companyProfile.portalUrl) {
+    let customUrl = state.companyProfile.portalUrl.trim();
+    if (customUrl) {
+      if (!/^https?:\/\//i.test(customUrl)) {
+        customUrl = 'https://' + customUrl;
+      }
+      return `${customUrl.replace(/\/$/, "").replace(/\/portal-clientes\.html$/i, "")}/portal-clientes.html?id=${encodeURIComponent(client.id)}&clave=${encodeURIComponent(clientPortalPassword(client))}`;
+    }
+  }
   const basePath = location.pathname.replace(/\/[^/]*$/, "");
   return `${location.origin}${basePath}/portal-clientes.html?id=${encodeURIComponent(client.id)}&clave=${encodeURIComponent(clientPortalPassword(client))}`;
 }
 
 function localCleanerPortalUrl(cleaner) {
+  if (state.companyProfile && state.companyProfile.portalUrl) {
+    let customUrl = state.companyProfile.portalUrl.trim();
+    if (customUrl) {
+      if (!/^https?:\/\//i.test(customUrl)) {
+        customUrl = 'https://' + customUrl;
+      }
+      return `${customUrl.replace(/\/$/, "").replace(/\/portal-cleaners\.html$/i, "")}/portal-cleaners.html?id=${encodeURIComponent(cleaner.id)}&clave=${encodeURIComponent(cleanerPortalPassword(cleaner))}`;
+    }
+  }
   const basePath = location.pathname.replace(/\/[^/]*$/, "");
   return `${location.origin}${basePath}/portal-cleaners.html?id=${encodeURIComponent(cleaner.id)}&clave=${encodeURIComponent(cleanerPortalPassword(cleaner))}`;
 }
@@ -1857,12 +1879,15 @@ function currentClientJob(clientId) {
 
 function clientFromPortalAccess(id, key) {
   const accessKey = normalizeKey(key);
-  const accessPrefix = clientPortalKeyPrefix(accessKey);
   const byId = state.clients.find((item) => item.id === id);
-  if (byId && (!accessKey || normalizeKey(clientPortalPassword(byId)) === accessKey)) return byId;
-  return state.clients.find((item) => normalizeKey(clientPortalPassword(item)) === accessKey)
-    || state.clients.find((item) => accessPrefix && clientPortalKeyPrefix(clientPortalPassword(item)) === accessPrefix)
-    || byId;
+  if (byId) {
+    if (byId.portalActive === false) return null;
+    if (!accessKey || normalizeKey(clientPortalPassword(byId)) === accessKey) return byId;
+  }
+  const byKey = state.clients.find((item) => normalizeKey(clientPortalPassword(item)) === accessKey);
+  if (byKey && byKey.portalActive !== false) return byKey;
+  if (byId && byId.portalActive !== false) return byId;
+  return null;
 }
 
 function cleanerFromPortalAccess(id, key) {
@@ -1943,7 +1968,35 @@ function clientHistoryTimelineHtml(historyJobs, currentJob) {
               Ver detalles &gt;
             </button>
             <div class="cp-history-job-expanded hidden" id="history-details-${job.id}">
-              ${evidenceCount(job) ? photoBoardHtml(job, true) : `<p class="muted" style="margin: 8px 0 0; font-size: 0.8rem;">Sin evidencias cargadas.</p>`}
+              ${evidenceCount(job) ? photoBoardHtml(job, true) : `<p class="muted" style="margin: 8px 0 0 16px; font-size: 0.8rem;">Sin evidencias cargadas.</p>`}
+              ${!isCurrent ? `
+                <div class="cp-history-review-section" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2ebe4; text-align: left;">
+                  ${job.clientRating ? `
+                    <div style="background: #fffcf5; border: 1px solid #f4e3c1; border-radius: 8px; padding: 12px; margin-top: 8px;">
+                      <div style="color: var(--gold); font-size: 1.1rem; margin-bottom: 4px;">
+                        ${"★".repeat(job.clientRating)}${"☆".repeat(5 - job.clientRating)}
+                      </div>
+                      <p style="margin: 0; font-size: 0.85rem; color: #557067; font-style: italic;">"${escapeHtml(job.clientReviewText || 'Sin comentario')}"</p>
+                    </div>
+                  ` : `
+                    <div style="background: #f8faf9; border: 1px solid #dce6e2; border-radius: 8px; padding: 12px; margin-top: 8px;" id="historyReviewForm_${job.id}">
+                      <strong style="font-size: 0.85rem; color: #07302d; display: block; margin-bottom: 6px;">Calificar este servicio:</strong>
+                      <form onsubmit="submitClientReview(event, '${job.id}')" style="display: flex; flex-direction: column; gap: 8px;">
+                        <div class="star-rating-input" style="font-size: 1.8rem; color: #ccc; cursor: pointer; display: flex; gap: 6px; justify-content: flex-start;">
+                          <span onclick="setReviewRating('${job.id}', 1)" id="star_${job.id}_1" style="transition: color 0.2s;">★</span>
+                          <span onclick="setReviewRating('${job.id}', 2)" id="star_${job.id}_2" style="transition: color 0.2s;">★</span>
+                          <span onclick="setReviewRating('${job.id}', 3)" id="star_${job.id}_3" style="transition: color 0.2s;">★</span>
+                          <span onclick="setReviewRating('${job.id}', 4)" id="star_${job.id}_4" style="transition: color 0.2s;">★</span>
+                          <span onclick="setReviewRating('${job.id}', 5)" id="star_${job.id}_5" style="transition: color 0.2s;">★</span>
+                        </div>
+                        <input type="hidden" name="rating" id="reviewRating_${job.id}" value="0" required>
+                        <textarea name="reviewText" placeholder="Escribe un comentario aquí (opcional)..." rows="2" style="width: 100%; border-radius: 6px; border: 1px solid var(--border-color); padding: 8px; font-size: 0.8rem; font-family: inherit; resize: vertical;"></textarea>
+                        <button type="submit" class="primary" style="background: #35d17f; border: none; color: #07302d; font-size: 0.8rem; font-weight: bold; padding: 6px 12px; border-radius: 6px; align-self: flex-start; margin-top: 4px; cursor: pointer;">Enviar Calificación</button>
+                      </form>
+                    </div>
+                  `}
+                </div>
+              ` : ''}
             </div>
           </div>
         `;
@@ -2251,7 +2304,9 @@ async function enterClientPortalFromUrl() {
           address: "",
           country: state.country || "IL",
           paymentMethod: cl.default_payment_method === 'cash' ? 'Efectivo' : 'Transferencia',
-          notes: cl.notes || ""
+          notes: cl.notes || "",
+          portalPasscode: cl.portal_passcode || null,
+          portalActive: cl.portal_active !== false
         }];
 
         const { data: addresses } = await supabaseClient.from('client_addresses').select('*').eq('client_id', cl.id);
@@ -3176,10 +3231,10 @@ function closeJobByAdmin(job, start, end) {
   job.status = "Terminado por administrador";
 }
 
-function completeJobByAdmin(jobId) {
+async function completeJobByAdmin(jobId) {
   const job = state.jobs.find((item) => item.id === jobId);
   if (!job) return;
-  if (!window.confirm("Seguro que quieres cerrar este trabajo como terminado por administrador?")) return;
+  if (!await brandConfirm("¿Seguro que quieres cerrar este trabajo como terminado por administrador?")) return;
   closeJobByAdmin(job);
   save();
   renderAll();
@@ -4531,6 +4586,13 @@ function activeJob() {
 
 function renderMobile() {
   const job = activeJob();
+  if (!job) {
+    const mobileJobEl = $("#mobileJob");
+    if (mobileJobEl) {
+      mobileJobEl.innerHTML = `<p class="muted" style="padding: 16px; text-align: center;">No hay trabajos activos hoy.</p>`;
+    }
+    return;
+  }
   const client = clientFor(job);
   $("#mobileJob").innerHTML = `
     <span class="status-chip">${job.status}</span>
@@ -4753,6 +4815,30 @@ async function copyClientLink(clientId) {
   } catch {
     window.prompt("Copia este link:", text);
   }
+}
+
+function openClientPortalSettings(clientId) {
+  const client = state.clients.find(c => c.id === clientId);
+  if (!client) return;
+  
+  $("#cpsClientId").value = client.id;
+  $("#cpsPortalActive").value = (client.portalActive !== false) ? "true" : "false";
+  $("#cpsPortalPasscode").value = client.portalPasscode || "";
+  
+  $("#clientPortalSettingsModal").classList.remove("hidden");
+}
+
+function generateBrandPasscode(clientName) {
+  const cleanName = String(clientName || "CL")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z]/g, "")
+    .slice(0, 3)
+    .toUpperCase();
+  const prefix = cleanName.length >= 2 ? cleanName : "CL";
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const randomChars = Array.from({ length: 3 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  const randomDigits = Math.floor(10 + Math.random() * 90);
+  return `JV-${prefix}-${randomChars}-${randomDigits}`;
 }
 
 function renderClientPortal(clientId, keepHidden = false) {
@@ -4990,7 +5076,7 @@ function bindPhotoActions(canDelete = false) {
     button.addEventListener("click", async () => {
       const found = findEvidence(button.dataset.deletePhoto);
       if (!found) return;
-      if (!window.confirm(t("confirmDeletePhoto"))) return;
+      if (!await brandConfirm(t("confirmDeletePhoto"))) return;
       found.job.evidence = evidenceFor(found.job).filter((item) => item.id !== button.dataset.deletePhoto);
       found.job.photos = evidenceCount(found.job);
       save();
@@ -5108,6 +5194,7 @@ function renderSettings() {
     profileForm.elements.phone.value = profile.phone || "";
     profileForm.elements.email.value = profile.email || "";
     profileForm.elements.address.value = profile.address || "";
+    if (profileForm.elements.portalUrl) profileForm.elements.portalUrl.value = profile.portalUrl || "";
     if (profileForm.elements.vatRate) profileForm.elements.vatRate.value = state.vatRate;
     if (profileForm.elements.currencySymbol) profileForm.elements.currencySymbol.value = state.currencySymbol;
   }
@@ -5158,7 +5245,7 @@ function renderSettings() {
     button.addEventListener("click", () => startCostRuleEdit(button.dataset.editCostRule));
   });
   $$("[data-delete-cost-rule]").forEach((button) => {
-    button.addEventListener("click", () => deleteCostRule(button.dataset.deleteCostRule));
+    button.addEventListener("click", async () => await deleteCostRule(button.dataset.deleteCostRule));
   });
 
   // Render Super Admin Stripe Payments Panel
@@ -5236,8 +5323,8 @@ function startCostRuleEdit(ruleId) {
   toast("Editando regla especial.");
 }
 
-function deleteCostRule(ruleId) {
-  if (!window.confirm(t("confirmDeleteCostRule"))) return;
+async function deleteCostRule(ruleId) {
+  if (!await brandConfirm(t("confirmDeleteCostRule"))) return;
   state.costRules.specialRules = state.costRules.specialRules.filter((rule) => rule.id !== ruleId);
   save();
   renderAll();
@@ -5283,7 +5370,7 @@ function renderClientPriceRulesSettings() {
     button.addEventListener("click", () => startClientPriceRuleEdit(button.dataset.editClientPriceRule));
   });
   $$("[data-delete-client-price-rule]").forEach((button) => {
-    button.addEventListener("click", () => deleteClientPriceRule(button.dataset.deleteClientPriceRule));
+    button.addEventListener("click", async () => await deleteClientPriceRule(button.dataset.deleteClientPriceRule));
   });
 }
 
@@ -5308,8 +5395,8 @@ function startClientPriceRuleEdit(ruleId) {
   toast("Editando precio especial del cliente.");
 }
 
-function deleteClientPriceRule(ruleId) {
-  if (!window.confirm("Eliminar esta regla especial del cliente?")) return;
+async function deleteClientPriceRule(ruleId) {
+  if (!await brandConfirm("¿Eliminar esta regla especial del cliente?")) return;
   state.clientPriceRules = (state.clientPriceRules || []).filter((rule) => rule.id !== ruleId);
   save();
   resetClientPriceRuleForm();
@@ -5331,6 +5418,27 @@ function readServiceRates(form, namePrefix, fallback = 0) {
 }
 
 function renderPayments() {
+  // Toggle visibility of cleaners tab button based on mode
+  const cleanersTabBtn = document.querySelector('[data-finance-tab="cleaners"]');
+  const clientsTabBtn = document.querySelector('[data-finance-tab="clients"]');
+  
+  if (state.mode === "independent") {
+    if (cleanersTabBtn) cleanersTabBtn.classList.add("hidden");
+    // Force active tab to clients if cleaners tab was active
+    if (cleanersTabBtn && cleanersTabBtn.classList.contains("active")) {
+      cleanersTabBtn.classList.remove("active");
+      if (clientsTabBtn) {
+        clientsTabBtn.classList.add("active");
+        const cleanersContent = document.getElementById("financeCleanersTab");
+        const clientsContent = document.getElementById("financeClientsTab");
+        if (cleanersContent) cleanersContent.classList.add("hidden");
+        if (clientsContent) clientsContent.classList.remove("hidden");
+      }
+    }
+  } else {
+    if (cleanersTabBtn) cleanersTabBtn.classList.remove("hidden");
+  }
+
   // Cleaners Tab
   syncPaymentCleanerSelect();
   $("#paymentPeriod").value = $("#paymentPeriod").value || currentPeriodLabel();
@@ -5555,38 +5663,96 @@ function renderClientPaymentJobPicker() {
 
   if (!unpaidJobs.length) {
     picker.innerHTML = `<p class="muted" style="padding: 8px 0;">No hay trabajos pendientes de cobro para este cliente.</p>`;
-    $("#clientPaymentAmount").value = 0;
+    const amountInput = $("#clientPaymentAmount");
+    if (amountInput) amountInput.value = 0;
+    
+    // Explicitly reset client payment form inputs
+    const amountReceivedInput = $("#clientPaymentAmountReceived");
+    if (amountReceivedInput) amountReceivedInput.value = 0;
+    const discountInput = $("#clientPaymentDiscount");
+    if (discountInput) discountInput.value = 0;
+
+    const cpscSelectedJobs = $("#cpscSelectedJobs");
+    if (cpscSelectedJobs) cpscSelectedJobs.textContent = "0";
+    const cpscSubtotal = $("#cpscSubtotal");
+    if (cpscSubtotal) cpscSubtotal.textContent = money(0);
+    const cpscDiscount = $("#cpscDiscount");
+    if (cpscDiscount) cpscDiscount.textContent = money(0);
+    const cpscTotal = $("#cpscTotal");
+    if (cpscTotal) cpscTotal.textContent = money(0);
+
     const submitBtn = $("#clientPaymentSubmitBtn");
     if (submitBtn) submitBtn.disabled = true;
     return;
   }
 
   picker.innerHTML = `
-    <p class="pf-label-text" style="margin-bottom: 8px; font-weight: 600;">Trabajos pendientes de cobro</p>
-    ${unpaidJobs.map(j => {
-      const amount = estimateJob(j);
-      const paid = parseFloat(j.clientPaidAmount) || 0;
-      const pending = amount - paid;
-      return `
-        <label class="payment-job-item" style="display:flex; align-items:center; gap:10px; padding:8px; border:1px solid var(--border); border-radius:8px; margin-bottom:6px; cursor:pointer;">
-          <input type="checkbox" class="client-payment-job-checkbox" value="${j.id}" data-amount="${pending}" checked>
-          <span style="flex:1">
-            <strong>${escapeHtml(j.date)}</strong> – ${escapeHtml(j.serviceType || "Limpieza")}
-            <br><small class="muted">${money(pending)} pendiente</small>
-          </span>
-        </label>`;
-    }).join("")}
+    <div class="payment-job-picker-head" style="border-bottom: 1px solid #eaeaea; padding-bottom: 10px; margin-bottom: 10px;">
+      <h4 style="font-weight: 500; font-size: 1.05rem; margin: 0; color: #444; letter-spacing: 0.3px;">Trabajos pendientes de cobro</h4>
+      <button class="mini-action" type="button" id="selectAllClientPaymentJobs" style="border-radius: 999px; background: transparent; border: 1px solid #d1d1d1;">Seleccionar todos</button>
+    </div>
+    <div class="payment-job-list">
+      ${unpaidJobs.map(j => {
+        const amount = estimateJob(j);
+        const paid = parseFloat(j.clientPaidAmount) || 0;
+        const pending = amount - paid;
+        const cleaner = state.cleaners.find(c => c.id === j.cleanerId);
+        const cleanerName = cleaner ? cleaner.name : "Sin asignar";
+        const duration = minutesLabel(billableMinutes(j));
+        return `
+          <label class="payment-job-option">
+            <input type="checkbox" class="client-payment-job-checkbox" value="${j.id}" data-amount="${pending}" checked>
+            <span>
+              <strong>${escapeHtml(j.serviceType || "Limpieza")} - ${escapeHtml(j.date)}</strong>
+              <small>${j.start || ""}-${j.actualEnd || j.end || "por definir"} &bull; Cleaner: ${escapeHtml(cleanerName)} &bull; ${duration}</small>
+            </span>
+            <b>${money(pending)}</b>
+          </label>`;
+      }).join("")}
+    </div>
   `;
+
+  // Bind the select all button
+  $("#selectAllClientPaymentJobs")?.addEventListener("click", () => {
+    document.querySelectorAll(".client-payment-job-checkbox").forEach(cb => {
+      cb.checked = true;
+    });
+    updateClientPaymentTotal();
+  });
 
   updateClientPaymentTotal();
 }
 
 function updateClientPaymentTotal() {
   const checkboxes = document.querySelectorAll(".client-payment-job-checkbox:checked");
-  let total = 0;
-  checkboxes.forEach(cb => { total += parseFloat(cb.dataset.amount) || 0; });
+  let subtotal = 0;
+  checkboxes.forEach(cb => { subtotal += parseFloat(cb.dataset.amount) || 0; });
+  
   const amountInput = $("#clientPaymentAmount");
-  if (amountInput) amountInput.value = total.toFixed(2);
+  if (amountInput) amountInput.value = subtotal.toFixed(2);
+
+  // Set Amount Received to match subtotal if it's currently 0 or empty (helps user auto-fill)
+  const amountReceivedInput = $("#clientPaymentAmountReceived");
+  if (amountReceivedInput && (parseFloat(amountReceivedInput.value) === 0 || amountReceivedInput.value === "")) {
+    amountReceivedInput.value = subtotal.toFixed(2);
+  }
+
+  const discountInput = $("#clientPaymentDiscount");
+  const discount = parseFloat(discountInput?.value || 0) || 0;
+
+  // Update summary card values
+  const cpscSelectedJobs = $("#cpscSelectedJobs");
+  if (cpscSelectedJobs) cpscSelectedJobs.textContent = checkboxes.length;
+
+  const cpscSubtotal = $("#cpscSubtotal");
+  if (cpscSubtotal) cpscSubtotal.textContent = money(subtotal);
+
+  const cpscDiscount = $("#cpscDiscount");
+  if (cpscDiscount) cpscDiscount.textContent = money(discount);
+
+  const cpscTotal = $("#cpscTotal");
+  if (cpscTotal) cpscTotal.textContent = money(subtotal - discount);
+
   const submitBtn = $("#clientPaymentSubmitBtn");
   if (submitBtn) submitBtn.disabled = checkboxes.length === 0;
 }
@@ -5595,7 +5761,6 @@ function renderClientBalances() {
   const container = $("#clientBalancesList");
   if (!container) return;
 
-  
   const debts = [];
   state.clients.forEach(c => {
     const jobs = state.jobs.filter(j => j.clientId === c.id && j.status.includes("Terminado") && j.clientPaymentStatus !== "paid");
@@ -5612,16 +5777,47 @@ function renderClientBalances() {
     return;
   }
   
-  container.innerHTML = debts.map(d => `
-    <article class="receipt-item pending">
-      <strong>${escapeHtml(d.client.name)} - Deuda: ${money(d.debt)}</strong>
-      <span class="client-meta">${d.count} trabajo(s) terminado(s) sin pagar</span>
-      <div class="receipt-actions" style="margin-top: 10px;">
-        <button class="mini-action" type="button" onclick="document.querySelector('[data-finance-tab=\'clients\']')?.click();">Registrar cobro</button>
+  container.innerHTML = debts.map(d => {
+    const firstLetter = escapeHtml(d.client.name.charAt(0).toUpperCase());
+    return `
+    <article class="receipt-item">
+      <div class="receipt-item-row">
+        <div class="receipt-avatar">${firstLetter}</div>
+        <div class="receipt-info">
+          <strong>${escapeHtml(d.client.name)}</strong>
+          <small>${d.count} trabajo(s) terminado(s) sin pagar</small>
+        </div>
+        <div class="receipt-amount-col">
+          <span class="receipt-amount">${money(d.debt)}</span>
+          <span class="receipt-status-pending">Deuda</span>
+        </div>
+      </div>
+      <div class="receipt-actions" style="margin-top: 8px;">
+        <button class="mini-action" type="button" onclick="selectClientForPayment('${d.client.id}')">Registrar cobro</button>
       </div>
     </article>
-  `).join("");
+  `}).join("");
 }
+
+function selectClientForPayment(clientId) {
+  const tabBtn = document.querySelector('[data-finance-tab="clients"]');
+  if (tabBtn) {
+    tabBtn.click();
+  }
+  const select = document.getElementById("clientPaymentSelect");
+  if (select) {
+    select.value = clientId;
+    select.dispatchEvent(new Event("change"));
+    
+    // Also update client payment avatar
+    const client = state.clients.find(c => c.id === clientId);
+    const avatar = document.getElementById("clientPaymentAvatar");
+    if (avatar && client) {
+      avatar.textContent = client.name.charAt(0).toUpperCase();
+    }
+  }
+}
+window.selectClientForPayment = selectClientForPayment;
 
 function processPaymentForm(event) {
   $("#paymentForm").reset();
@@ -5764,6 +5960,8 @@ function setView(name) {
 }
 
 function setupEvents() {
+  state.language = "es";
+  localStorage.setItem("jobvisto-language", "es");
   applyStaticLanguage();
   $$("[data-language]").forEach((button) => {
     button.addEventListener("click", () => setLanguage(button.dataset.language));
@@ -6262,6 +6460,9 @@ function setupEvents() {
   $("#clientPaymentSelect")?.addEventListener("change", () => {
     renderClientPaymentJobPicker();
   });
+
+  $("#clientPaymentDiscount")?.addEventListener("input", updateClientPaymentTotal);
+  $("#clientPaymentAmountReceived")?.addEventListener("input", updateClientPaymentTotal);
   
   document.addEventListener("change", (e) => {
     if (e.target.matches(".client-payment-job-checkbox")) {
@@ -6380,12 +6581,44 @@ function setupEvents() {
       phone: data.phone?.trim() || "",
       email: data.email?.trim() || "",
       address: data.address?.trim() || "",
+      portalUrl: data.portalUrl?.trim() || "",
     };
     if (data.vatRate !== undefined) state.vatRate = Number(data.vatRate || 0);
     if (data.currencySymbol) state.currencySymbol = data.currencySymbol;
     save();
     renderAll();
     toast("Perfil guardado.");
+  });
+
+  // Client Portal Settings Modal listeners
+  $("#closeClientPortalSettingsModal")?.addEventListener("click", () => {
+    $("#clientPortalSettingsModal").classList.add("hidden");
+  });
+  
+  $("#cancelClientPortalSettings")?.addEventListener("click", () => {
+    $("#clientPortalSettingsModal").classList.add("hidden");
+  });
+  
+  $("#cpsGenerateCodeBtn")?.addEventListener("click", () => {
+    const clientId = $("#cpsClientId").value;
+    const client = state.clients.find(c => c.id === clientId);
+    const newCode = generateBrandPasscode(client ? client.name : "");
+    $("#cpsPortalPasscode").value = newCode;
+  });
+  
+  $("#clientPortalSettingsForm")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const clientId = $("#cpsClientId").value;
+    const client = state.clients.find(c => c.id === clientId);
+    if (!client) return;
+    
+    client.portalActive = $("#cpsPortalActive").value === "true";
+    client.portalPasscode = $("#cpsPortalPasscode").value.trim();
+    
+    save();
+    renderAll();
+    $("#clientPortalSettingsModal").classList.add("hidden");
+    toast("Ajustes del portal guardados.");
   });
   $("#profilePhotoInput")?.addEventListener("change", (event) => {
     const file = event.target.files?.[0];
