@@ -10,15 +10,23 @@ exports.handler = async (event, context) => {
 
   const sig = event.headers["stripe-signature"];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const allowUnsignedWebhook = process.env.ALLOW_UNSIGNED_STRIPE_WEBHOOKS === "true";
   let stripeEvent;
 
   try {
-    if (webhookSecret && sig) {
-      stripeEvent = stripe.webhooks.constructEvent(event.body, sig, webhookSecret);
-    } else {
-      // Direct parse if webhook secret is not configured (for initial testing/dev)
+    if (!webhookSecret || !sig) {
+      if (!allowUnsignedWebhook) {
+        console.error("Stripe webhook signature verification is not configured.");
+        return {
+          statusCode: 500,
+          body: JSON.stringify({ error: "Stripe webhook signature verification is not configured." })
+        };
+      }
+
       stripeEvent = JSON.parse(event.body);
-      console.warn("WARNING: Webhook signature verification skipped. Configure STRIPE_WEBHOOK_SECRET in Netlify.");
+      console.warn("WARNING: Webhook signature verification skipped by ALLOW_UNSIGNED_STRIPE_WEBHOOKS.");
+    } else {
+      stripeEvent = stripe.webhooks.constructEvent(event.body, sig, webhookSecret);
     }
   } catch (err) {
     console.error("Webhook signature verification failed:", err.message);
@@ -56,42 +64,63 @@ exports.handler = async (event, context) => {
       }
     }
 
-    if (email) {
-      console.log(`Saving Stripe payment for ${email}: plan=${planId}, customer=${customerId}`);
-      const supabaseUrl = process.env.SUPABASE_URL;
-      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!email) {
+      console.error("Stripe payment event is missing customer email.");
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: "Stripe payment event is missing customer email." })
+      };
+    }
 
-      if (supabaseUrl && serviceRoleKey) {
-        try {
-          const response = await fetch(`${supabaseUrl}/rest/v1/stripe_payments`, {
-            method: "POST",
-            headers: {
-              "apikey": serviceRoleKey,
-              "Authorization": `Bearer ${serviceRoleKey}`,
-              "Content-Type": "application/json",
-              "Prefer": "resolution=merge-duplicates"
-            },
-            body: JSON.stringify({
-              email: email.toLowerCase(),
-              plan_id: planId,
-              customer_id: customerId,
-              subscription_id: subscriptionId,
-              session_id: sessionId,
-              payment_status: paymentStatus
-            })
-          });
+    console.log(`Saving Stripe payment for ${email}: plan=${planId}, customer=${customerId}`);
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-          console.log("Supabase insert status:", response.status);
-          if (response.status >= 300) {
-            const errText = await response.text();
-            console.error("Failed to insert payment to Supabase:", errText);
-          }
-        } catch (e) {
-          console.error("Error saving payment to Supabase:", e);
-        }
-      } else {
-        console.error("Supabase environment variables are missing.");
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error("Supabase environment variables are missing.");
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: "Supabase environment variables are missing." })
+      };
+    }
+
+    try {
+      const url = new URL(`${supabaseUrl}/rest/v1/stripe_payments`);
+      url.searchParams.set("on_conflict", "session_id");
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "apikey": serviceRoleKey,
+          "Authorization": `Bearer ${serviceRoleKey}`,
+          "Content-Type": "application/json",
+          "Prefer": "resolution=merge-duplicates"
+        },
+        body: JSON.stringify({
+          email: email.toLowerCase(),
+          plan_id: planId,
+          customer_id: customerId,
+          subscription_id: subscriptionId,
+          session_id: sessionId,
+          payment_status: paymentStatus
+        })
+      });
+
+      console.log("Supabase insert status:", response.status);
+      if (response.status >= 300) {
+        const errText = await response.text();
+        console.error("Failed to insert payment to Supabase:", errText);
+        return {
+          statusCode: 500,
+          body: JSON.stringify({ error: "Failed to save Stripe payment." })
+        };
       }
+    } catch (e) {
+      console.error("Error saving payment to Supabase:", e);
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: "Error saving Stripe payment." })
+      };
     }
   }
 

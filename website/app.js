@@ -97,7 +97,7 @@ async function loadStateFromSupabase(currentUser = null) {
         state.jobs = jobs.map(j => {
           const dateStr = j.scheduled_start ? j.scheduled_start.slice(0, 10) : today();
           // Extract time or default
-          const startStr = j.scheduled_start ? new Date(j.scheduled_start).toISOString().slice(11, 16) : "08:00";
+          const startStr = (j.actual_start || j.scheduled_start) ? new Date(j.actual_start || j.scheduled_start).toISOString().slice(11, 16) : "08:00";
           const endStr = j.scheduled_end ? new Date(j.scheduled_end).toISOString().slice(11, 16) : "12:00";
           const actualEndStr = j.actual_end ? new Date(j.actual_end).toISOString().slice(11, 16) : "";
           
@@ -116,6 +116,7 @@ async function loadStateFromSupabase(currentUser = null) {
 
           return {
             id: j.id,
+            organizationId: j.organization_id,
             clientId: j.client_id,
             cleanerId: j.assigned_cleaner_id || "",
             date: dateStr,
@@ -128,6 +129,10 @@ async function loadStateFromSupabase(currentUser = null) {
             requestReview: Boolean(j.request_review),
             clientRating: j.client_rating ? Number(j.client_rating) : null,
             clientReviewText: j.client_review_text || "",
+            clientPaidAmount: Number(j.client_paid_amount || 0),
+            clientPaymentStatus: j.client_payment_status || "unpaid",
+            clientPaidDate: j.client_paid_date || "",
+            clientPaymentMethod: j.client_payment_method || "",
             status: j.status === 'scheduled' ? 'Asignado' : 
                     j.status === 'open' ? 'Disponible para tomar' : 
                     j.status === 'in_site' ? 'En progreso' :
@@ -185,6 +190,18 @@ async function loadStateFromSupabase(currentUser = null) {
         const currencySetting = settings.find(s => s.key === 'currency_symbol');
         if (currencySetting) {
           state.currencySymbol = currencySetting.value?.symbol || (state.country === 'IL' ? '₪' : '$');
+        }
+        const serviceRulesSetting = settings.find(s => s.key === 'service_rules');
+        if (serviceRulesSetting?.value) {
+          state.serviceRules = { ...state.serviceRules, ...serviceRulesSetting.value };
+        }
+        const clientPriceRulesSetting = settings.find(s => s.key === 'client_price_rules');
+        if (Array.isArray(clientPriceRulesSetting?.value?.rules)) {
+          state.clientPriceRules = clientPriceRulesSetting.value.rules;
+        }
+        const costRulesSetting = settings.find(s => s.key === 'cost_rules');
+        if (costRulesSetting?.value) {
+          state.costRules = { ...state.costRules, ...costRulesSetting.value };
         }
       }
     }
@@ -269,16 +286,8 @@ async function asyncSaveToSupabase() {
       { organization_id: state.orgId, key: 'company_address', value: { address: state.companyProfile.address || "" } }
     ]);
 
-    // 4. Update memory rules and cleaners. Clean up deleted clients
-    const currentClientIds = state.clients.map(c => c.id).filter(Boolean);
-    if (currentClientIds.length > 0) {
-      const formattedIds = currentClientIds.map(id => `'${id}'`).join(',');
-      await supabaseClient.from('clients').delete().eq('organization_id', state.orgId).not('id', 'in', `(${formattedIds})`);
-    } else {
-      await supabaseClient.from('clients').delete().eq('organization_id', state.orgId);
-    }
-
-    // 4. Sync clients & addresses
+    // 4. Sync clients & addresses. Do not reconcile-delete here: a partial local
+    // state or portal session must never delete production records.
     for (const client of state.clients) {
       await supabaseClient.from('clients').upsert({
         id: client.id,
@@ -303,16 +312,7 @@ async function asyncSaveToSupabase() {
       }
     }
 
-    // 5. Clean up deleted cleaners
-    const currentCleanerIds = state.cleaners.map(c => c.id).filter(Boolean);
-    if (currentCleanerIds.length > 0) {
-      const formattedIds = currentCleanerIds.map(id => `'${id}'`).join(',');
-      await supabaseClient.from('cleaners').delete().eq('organization_id', state.orgId).not('id', 'in', `(${formattedIds})`);
-    } else {
-      await supabaseClient.from('cleaners').delete().eq('organization_id', state.orgId);
-    }
-
-    // 6. Sync cleaners
+    // 5. Sync cleaners
     for (const cleaner of state.cleaners) {
       await supabaseClient.from('cleaners').upsert({
         id: cleaner.id,
@@ -328,18 +328,10 @@ async function asyncSaveToSupabase() {
       });
     }
 
-    // 7. Clean up deleted jobs
-    const currentJobIds = state.jobs.map(j => j.id).filter(Boolean);
-    if (currentJobIds.length > 0) {
-      const formattedIds = currentJobIds.map(id => `'${id}'`).join(',');
-      await supabaseClient.from('jobs').delete().eq('organization_id', state.orgId).not('id', 'in', `(${formattedIds})`);
-    } else {
-      await supabaseClient.from('jobs').delete().eq('organization_id', state.orgId);
-    }
-
-    // 8. Sync jobs
+    // 6. Sync jobs
     for (const job of state.jobs) {
-      const scheduledStart = `${job.date}T${job.start || "08:00"}:00Z`;
+      const scheduledStart = `${job.date}T${job.scheduledStart || job.start || "08:00"}:00Z`;
+      const actualStart = job.checkedIn ? `${job.date}T${job.start || "08:00"}:00Z` : null;
       const scheduledEnd = job.end ? `${job.date}T${job.end}:00Z` : null;
       const actualEnd = job.actualEnd ? `${job.date}T${job.actualEnd}:00Z` : null;
       
@@ -358,12 +350,17 @@ async function asyncSaveToSupabase() {
         service_type: job.serviceType,
         scheduled_start: scheduledStart,
         scheduled_end: scheduledEnd,
+        actual_start: actualStart,
         actual_end: actualEnd,
         client_hourly_rate: job.rate,
         extras_amount: job.extras,
         request_review: Boolean(job.requestReview),
         client_rating: job.clientRating || null,
         client_review_text: job.clientReviewText || null,
+        client_paid_amount: Number(job.clientPaidAmount || 0),
+        client_payment_status: job.clientPaymentStatus || 'unpaid',
+        client_paid_date: job.clientPaidDate || null,
+        client_payment_method: job.clientPaymentMethod || null,
         status: dbStatus,
         checklist: job.tasks
       });
@@ -408,25 +405,7 @@ async function asyncSaveToSupabase() {
       }
     }
 
-    // 9. Clean up deleted job evidence
-    const currentEvidenceIds = state.jobs.flatMap(j => (j.evidence || []).map(e => e.id)).filter(Boolean);
-    if (currentEvidenceIds.length > 0) {
-      const formattedIds = currentEvidenceIds.map(id => `'${id}'`).join(',');
-      await supabaseClient.from('job_evidence').delete().eq('organization_id', state.orgId).not('id', 'in', `(${formattedIds})`);
-    } else {
-      await supabaseClient.from('job_evidence').delete().eq('organization_id', state.orgId);
-    }
-
-    // 10. Clean up deleted payment receipts
-    const currentReceiptIds = state.receipts.map(r => r.id).filter(Boolean);
-    if (currentReceiptIds.length > 0) {
-      const formattedIds = currentReceiptIds.map(id => `'${id}'`).join(',');
-      await supabaseClient.from('payment_receipts').delete().eq('organization_id', state.orgId).not('id', 'in', `(${formattedIds})`);
-    } else {
-      await supabaseClient.from('payment_receipts').delete().eq('organization_id', state.orgId);
-    }
-
-    // 11. Sync receipts
+    // 7. Sync receipts
     for (const receipt of state.receipts) {
       const [start, end] = receipt.period ? receipt.period.split(" - ") : [today(), today()];
       await supabaseClient.from('payment_receipts').upsert({
@@ -442,7 +421,7 @@ async function asyncSaveToSupabase() {
       });
     }
 
-    // 12. Sync organization settings (vat_rate and currency_symbol)
+    // 8. Sync organization settings (vat_rate and currency_symbol)
     await supabaseClient.from('organization_settings').upsert({
       organization_id: state.orgId,
       key: 'vat_rate',
@@ -452,6 +431,21 @@ async function asyncSaveToSupabase() {
       organization_id: state.orgId,
       key: 'currency_symbol',
       value: { symbol: state.currencySymbol }
+    });
+    await supabaseClient.from('organization_settings').upsert({
+      organization_id: state.orgId,
+      key: 'service_rules',
+      value: state.serviceRules || {}
+    });
+    await supabaseClient.from('organization_settings').upsert({
+      organization_id: state.orgId,
+      key: 'client_price_rules',
+      value: { rules: state.clientPriceRules || [] }
+    });
+    await supabaseClient.from('organization_settings').upsert({
+      organization_id: state.orgId,
+      key: 'cost_rules',
+      value: state.costRules || {}
     });
   } catch (e) {
     console.error("Error saving state to Supabase: ", e);
@@ -472,7 +466,7 @@ function normalizePlanKey(plan) {
 const state = {
   mode: pageParams.get("mode") || localStorage.getItem("jobvisto-mode") || "independent",
   country: localStorage.getItem("jobvisto-country") || "IL",
-  language: "es",
+  language: localStorage.getItem("jobvisto-language") || "es",
   companyProfile: JSON.parse(localStorage.getItem("jobvisto-company-profile") || "null") || {
     businessName: "JobVisto Cleaning",
     ownerName: "Miguel",
@@ -1652,7 +1646,7 @@ function clientPortalKeyPrefix(key) {
 function clientPortalKeyMatches(client, key) {
   const accessKey = normalizeKey(key);
   const expected = normalizeKey(clientPortalPassword(client));
-  return expected === accessKey || clientPortalKeyPrefix(expected) === clientPortalKeyPrefix(accessKey);
+  return expected === accessKey;
 }
 
 function cleanerPortalPassword(cleaner) {
@@ -2165,7 +2159,7 @@ function readFileAsDataUrl(file) {
   });
 }
 
-async function compressImageFile(file, maxSize = 1280, quality = 0.72) {
+async function compressImageFile(file, maxSize = 960, quality = 0.58) {
   const original = await readFileAsDataUrl(file);
   if (!file.type.startsWith("image/")) return original;
   return new Promise((resolve) => {
@@ -2192,6 +2186,182 @@ function parsedCleanerAccess(params = new URLSearchParams(location.search)) {
   const embeddedKey = rawId.match(/clave:\s*([A-Z0-9-]+)/i)?.[1] || "";
   const key = params.get("clave") || embeddedKey;
   return { id, key: normalizeKey(key) };
+}
+
+function portalPageVisible(selector) {
+  const node = $(selector);
+  return Boolean(node && !node.classList.contains("hidden") && node.style.display !== "none");
+}
+
+function cleanerPortalCredentials() {
+  const access = parsedCleanerAccess();
+  return {
+    cleanerId: portalCleanerId || access.id,
+    cleanerKey: normalizeKey($("#cleanerPortalPassword")?.value || access.key)
+  };
+}
+
+function clientPortalCredentials() {
+  const params = new URLSearchParams(location.search);
+  return {
+    clientId: portalClientId || params.get("id"),
+    clientKey: normalizeKey($("#clientPortalPassword")?.value || params.get("clave"))
+  };
+}
+
+async function persistPortalEvidence(job, evidence) {
+  if (!supabaseClient) return;
+  const dbPhase = evidence.phase === "Antes" ? "before" : "after";
+  if (portalPageVisible("#cleanerPortalPage") && !portalCleanerAdmin) {
+    const { cleanerId, cleanerKey } = cleanerPortalCredentials();
+    const { error } = await supabaseClient.rpc("portal_cleaner_save_evidence", {
+      cleaner_id: cleanerId,
+      cleaner_key: cleanerKey,
+      evidence_id: evidence.id,
+      job_id: job.id,
+      p_area: evidence.section || "General",
+      p_phase: dbPhase,
+      p_file_path: evidence.url,
+      p_caption: evidence.comment || ""
+    });
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await supabaseClient.from("job_evidence").upsert({
+    id: evidence.id,
+    organization_id: job.organizationId || state.orgId,
+    job_id: job.id,
+    area: evidence.section || "General",
+    phase: dbPhase,
+    file_path: evidence.url,
+    caption: evidence.comment || ""
+  });
+  if (error) throw error;
+}
+
+async function persistCleanerJobAction(action, job, extra = {}) {
+  if (!supabaseClient) return;
+  if (portalPageVisible("#cleanerPortalPage") && !portalCleanerAdmin) {
+    const { cleanerId, cleanerKey } = cleanerPortalCredentials();
+    const rpcMap = {
+      take: "portal_cleaner_take_job",
+      arrived: "portal_cleaner_mark_arrived",
+      finish: "portal_cleaner_finish_job"
+    };
+    const payload = {
+      cleaner_id: cleanerId,
+      cleaner_key: cleanerKey,
+      job_id: job.id
+    };
+    if (action === "take") payload.assigned_cleaner_id = extra.assigned_cleaner_id;
+    if (action === "arrived") payload.p_actual_start = extra.actual_start;
+    if (action === "finish") payload.p_actual_end = extra.actual_end;
+    const { error } = await supabaseClient.rpc(rpcMap[action], payload);
+    if (error) throw error;
+    return;
+  }
+
+  if (action === "take") {
+    const { error } = await supabaseClient.from("jobs").update({
+      assigned_cleaner_id: extra.assigned_cleaner_id,
+      status: "scheduled"
+    }).eq("id", job.id);
+    if (error) throw error;
+  } else if (action === "arrived") {
+    const { error } = await supabaseClient.from("jobs").update({
+      status: "in_site",
+      actual_start: extra.actual_start
+    }).eq("id", job.id);
+    if (error) throw error;
+  } else if (action === "finish") {
+    const { error } = await supabaseClient.from("jobs").update({
+      status: "cleaner_finished",
+      actual_end: extra.actual_end
+    }).eq("id", job.id);
+    if (error) throw error;
+  }
+}
+
+async function persistPortalClientConfirmation(job) {
+  if (!supabaseClient) return;
+  if (portalPageVisible("#clientPortalPage")) {
+    const { clientId, clientKey } = clientPortalCredentials();
+    const { error } = await supabaseClient.rpc("portal_client_confirm_job", {
+      client_id: clientId,
+      client_key: clientKey,
+      job_id: job.id
+    });
+    if (error) throw error;
+    return;
+  }
+
+  await supabaseClient.from("jobs").update({ status: "client_confirmed" }).eq("id", job.id);
+  await supabaseClient.from("client_signatures").delete().eq("job_id", job.id).eq("signed_from", "private_link");
+  await supabaseClient.from("client_signatures").insert({
+    organization_id: job.organizationId || state.orgId,
+    job_id: job.id,
+    signer_name: "Cliente",
+    signature_data: "Confirmado via portal seguro",
+    signed_from: "private_link"
+  });
+}
+
+async function persistPortalSiteSignature(job) {
+  if (!supabaseClient) return;
+  if (portalPageVisible("#cleanerPortalPage") && !portalCleanerAdmin) {
+    const { cleanerId, cleanerKey } = cleanerPortalCredentials();
+    const { error } = await supabaseClient.rpc("portal_cleaner_save_site_signature", {
+      cleaner_id: cleanerId,
+      cleaner_key: cleanerKey,
+      job_id: job.id,
+      p_signer_name: job.siteSignerName || "Persona en sitio",
+      p_signature_data: job.siteSignature
+    });
+    if (error) throw error;
+    return;
+  }
+
+  await supabaseClient.from("client_signatures").delete().eq("job_id", job.id).eq("signed_from", "cleaner_device");
+  const { error } = await supabaseClient.from("client_signatures").insert({
+    organization_id: job.organizationId || state.orgId,
+    job_id: job.id,
+    signer_name: job.siteSignerName || "Persona en sitio",
+    signature_data: job.siteSignature,
+    signed_from: "cleaner_device"
+  });
+  if (error) throw error;
+}
+
+async function persistPortalReceiptSignature(receipt) {
+  if (!supabaseClient) return;
+  const cleanerId = receipt.cleanerId || state.cleaners.find(c => c.name === receipt.cleaner)?.id;
+  if (portalPageVisible("#cleanerPortalPage") && !portalCleanerAdmin) {
+    const { cleanerKey } = cleanerPortalCredentials();
+    const { error } = await supabaseClient.rpc("portal_cleaner_sign_receipt", {
+      cleaner_id: cleanerId,
+      cleaner_key: cleanerKey,
+      receipt_id: receipt.id,
+      p_receiver_name: receipt.receiver || "Cleaner",
+      p_signature_data: receipt.signature
+    });
+    if (error) throw error;
+    return;
+  }
+
+  const [start, end] = receipt.period ? receipt.period.split(" - ") : [today(), today()];
+  const { error } = await supabaseClient.from("payment_receipts").upsert({
+    id: receipt.id,
+    organization_id: receipt.organizationId || state.orgId,
+    cleaner_id: cleanerId || null,
+    period_start: start,
+    period_end: end,
+    amount: receipt.amount,
+    payment_method: receipt.method === "Efectivo" ? "cash" : "transfer",
+    receiver_signature_data: receipt.signature,
+    status: "signed"
+  });
+  if (error) throw error;
 }
 
 function toast(message) {
@@ -2327,7 +2497,7 @@ async function enterClientPortalFromUrl() {
 
         state.jobs = (data.jobs || []).map(j => {
           const dateStr = j.scheduled_start ? j.scheduled_start.slice(0, 10) : today();
-          const startStr = j.scheduled_start ? new Date(j.scheduled_start).toISOString().slice(11, 16) : "08:00";
+          const startStr = (j.actual_start || j.scheduled_start) ? new Date(j.actual_start || j.scheduled_start).toISOString().slice(11, 16) : "08:00";
           const endStr = j.scheduled_end ? new Date(j.scheduled_end).toISOString().slice(11, 16) : "12:00";
           const actualEndStr = j.actual_end ? new Date(j.actual_end).toISOString().slice(11, 16) : "";
           
@@ -2346,6 +2516,7 @@ async function enterClientPortalFromUrl() {
 
           return {
             id: j.id,
+            organizationId: j.organization_id,
             clientId: j.client_id,
             cleanerId: j.assigned_cleaner_id || "",
             date: dateStr,
@@ -2358,6 +2529,10 @@ async function enterClientPortalFromUrl() {
             requestReview: Boolean(j.request_review),
             clientRating: j.client_rating ? Number(j.client_rating) : null,
             clientReviewText: j.client_review_text || "",
+            clientPaidAmount: Number(j.client_paid_amount || 0),
+            clientPaymentStatus: j.client_payment_status || "unpaid",
+            clientPaidDate: j.client_paid_date || "",
+            clientPaymentMethod: j.client_payment_method || "",
             status: j.status === 'scheduled' ? 'Asignado' : 
                     j.status === 'open' ? 'Disponible para tomar' : 
                     j.status === 'in_site' ? 'En progreso' :
@@ -2384,7 +2559,7 @@ async function enterClientPortalFromUrl() {
   }
 
   const client = clientFromPortalAccess(clientId, accessKey);
-  const shouldUnlock = Boolean(client && (!accessKey || clientPortalKeyMatches(client, accessKey)));
+  const shouldUnlock = Boolean(client && accessKey && clientPortalKeyMatches(client, accessKey));
   portalClientId = client?.id || null;
   
   // Force hide auth screen and shell
@@ -2448,7 +2623,7 @@ async function enterCleanerPortalFromUrl(params = new URLSearchParams(location.s
 
         state.jobs = (data.jobs || []).map(j => {
           const dateStr = j.scheduled_start ? j.scheduled_start.slice(0, 10) : today();
-          const startStr = j.scheduled_start ? new Date(j.scheduled_start).toISOString().slice(11, 16) : "08:00";
+          const startStr = (j.actual_start || j.scheduled_start) ? new Date(j.actual_start || j.scheduled_start).toISOString().slice(11, 16) : "08:00";
           const endStr = j.scheduled_end ? new Date(j.scheduled_end).toISOString().slice(11, 16) : "12:00";
           const actualEndStr = j.actual_end ? new Date(j.actual_end).toISOString().slice(11, 16) : "";
           
@@ -2467,6 +2642,7 @@ async function enterCleanerPortalFromUrl(params = new URLSearchParams(location.s
 
           return {
             id: j.id,
+            organizationId: j.organization_id,
             clientId: j.client_id,
             cleanerId: j.assigned_cleaner_id || "",
             date: dateStr,
@@ -2479,6 +2655,10 @@ async function enterCleanerPortalFromUrl(params = new URLSearchParams(location.s
             requestReview: Boolean(j.request_review),
             clientRating: j.client_rating ? Number(j.client_rating) : null,
             clientReviewText: j.client_review_text || "",
+            clientPaidAmount: Number(j.client_paid_amount || 0),
+            clientPaymentStatus: j.client_payment_status || "unpaid",
+            clientPaidDate: j.client_paid_date || "",
+            clientPaymentMethod: j.client_payment_method || "",
             status: j.status === 'scheduled' ? 'Asignado' : 
                     j.status === 'open' ? 'Disponible para tomar' : 
                     j.status === 'in_site' ? 'En progreso' :
@@ -2517,7 +2697,7 @@ async function enterCleanerPortalFromUrl(params = new URLSearchParams(location.s
   }
 
   const cleaner = cleanerFromPortalAccess(access.id, access.key);
-  const shouldUnlock = Boolean(cleaner && (portalCleanerAdmin || !access.key || normalizeKey(cleanerPortalPassword(cleaner)) === access.key));
+  const shouldUnlock = Boolean(cleaner && (portalCleanerAdmin || (access.key && normalizeKey(cleanerPortalPassword(cleaner)) === access.key)));
   portalCleanerId = cleaner?.id;
   
   // Force hide auth screen and shell
@@ -2906,10 +3086,7 @@ function renderStandaloneCleanerPortal(unlocked = true) {
 
       if (supabaseClient) {
         try {
-          await supabaseClient.from("jobs").update({
-            assigned_cleaner_id: cleaner.id,
-            status: "scheduled"
-          }).eq("id", job.id);
+          await persistCleanerJobAction("take", job, { assigned_cleaner_id: cleaner.id });
         } catch (err) {
           console.error("Error taking job in portal mode:", err);
         }
@@ -2952,11 +3129,8 @@ function renderStandaloneCleanerPortal(unlocked = true) {
 
       if (supabaseClient) {
         try {
-          const scheduledStart = `${job.date}T${job.start}:00Z`;
-          await supabaseClient.from("jobs").update({
-            status: "in_site",
-            scheduled_start: scheduledStart
-          }).eq("id", job.id);
+          const actualStart = `${job.date}T${job.start}:00Z`;
+          await persistCleanerJobAction("arrived", job, { actual_start: actualStart });
         } catch (err) {
           console.error("Error saving arrival in portal mode:", err);
         }
@@ -3016,16 +3190,7 @@ function renderStandaloneCleanerPortal(unlocked = true) {
 
         if (supabaseClient) {
           try {
-            const dbPhase = photo.phase === "Antes" ? "before" : "after";
-            await supabaseClient.from("job_evidence").upsert({
-              id: photo.id,
-              organization_id: job.organizationId || state.orgId,
-              job_id: job.id,
-              area: photo.section,
-              phase: dbPhase,
-              file_path: photo.url,
-              caption: photo.comment
-            });
+            await persistPortalEvidence(job, photo);
           } catch (err) {
             console.error("Error updating evidence in portal mode:", err);
           }
@@ -3055,16 +3220,7 @@ function renderStandaloneCleanerPortal(unlocked = true) {
 
         if (supabaseClient) {
           try {
-            const dbPhase = newEv.phase === "Antes" ? "before" : "after";
-            await supabaseClient.from("job_evidence").insert({
-              id: newEv.id,
-              organization_id: job.organizationId || state.orgId,
-              job_id: job.id,
-              area: newEv.section,
-              phase: dbPhase,
-              file_path: newEv.url,
-              caption: newEv.comment
-            });
+            await persistPortalEvidence(job, newEv);
           } catch (err) {
             console.error("Error inserting evidence in portal mode:", err);
           }
@@ -3127,13 +3283,7 @@ function renderStandaloneCleanerPortal(unlocked = true) {
       if (supabaseClient) {
         try {
           const actualEnd = `${job.date}T${job.actualEnd}:00Z`;
-          const scheduledStart = `${job.date}T${job.start}:00Z`;
-          const statusStr = portalCleanerAdmin ? "Terminado por administrador" : "cleaner_finished";
-          await supabaseClient.from("jobs").update({
-            status: statusStr,
-            scheduled_start: scheduledStart,
-            actual_end: actualEnd
-          }).eq("id", job.id);
+          await persistCleanerJobAction("finish", job, { actual_end: actualEnd });
         } catch (err) {
           console.error("Error finishing job in portal mode:", err);
         }
@@ -3199,16 +3349,7 @@ async function handleCleanerHistoryEvidenceSubmit(event) {
 
     if (supabaseClient) {
       try {
-        const dbPhase = newEv.phase === "Antes" ? "before" : "after";
-        await supabaseClient.from("job_evidence").insert({
-          id: newEv.id,
-          organization_id: job.organizationId || state.orgId,
-          job_id: job.id,
-          area: newEv.section,
-          phase: dbPhase,
-          file_path: newEv.url,
-          caption: newEv.comment
-        });
+        await persistPortalEvidence(job, newEv);
       } catch (err) {
         console.error("Error inserting historical evidence in portal mode:", err);
       }
@@ -3328,7 +3469,7 @@ function cleanerJobHtml(job) {
           </select>
         </label>
         <label>Comentario <input name="comment" placeholder="Ej: grasa en cocina, ventana terminada..." ${formDisabled}></label>
-        <label>Camara o biblioteca <input name="photo" type="file" accept="image/*" capture="environment" multiple ${formDisabled}></label>
+        <label>Camara o biblioteca <input name="photo" type="file" accept="image/*" multiple ${formDisabled}></label>
         <div class="form-actions">
           <button class="primary" type="submit" ${formDisabled}>Guardar evidencia</button>
           <button class="ghost hidden" type="button" data-cancel-evidence-edit="${job.id}">Cancelar correccion</button>
@@ -5960,8 +6101,7 @@ function setView(name) {
 }
 
 function setupEvents() {
-  state.language = "es";
-  localStorage.setItem("jobvisto-language", "es");
+  state.language = localStorage.getItem("jobvisto-language") || state.language || "es";
   applyStaticLanguage();
   $$("[data-language]").forEach((button) => {
     button.addEventListener("click", () => setLanguage(button.dataset.language));
@@ -6399,18 +6539,7 @@ function setupEvents() {
     // Direct Supabase Write for portal-based confirm
     if (supabaseClient) {
       try {
-        await supabaseClient.from("jobs").update({
-          status: "client_confirmed"
-        }).eq("id", job.id);
-
-        await supabaseClient.from("client_signatures").delete().eq("job_id", job.id).eq("signed_from", "private_link");
-        await supabaseClient.from("client_signatures").insert({
-          organization_id: job.organizationId || state.orgId,
-          job_id: job.id,
-          signer_name: "Cliente",
-          signature_data: "Confirmado via portal seguro",
-          signed_from: "private_link"
-        });
+        await persistPortalClientConfirmation(job);
       } catch (err) {
         console.error("Error saving client confirmation in portal mode:", err);
       }
@@ -6739,14 +6868,7 @@ function setupEvents() {
 
       if (supabaseClient) {
         try {
-          await supabaseClient.from("client_signatures").delete().eq("job_id", job.id).eq("signed_from", "cleaner_device");
-          await supabaseClient.from("client_signatures").insert({
-            organization_id: job.organizationId || state.orgId,
-            job_id: job.id,
-            signer_name: job.siteSignerName || "Persona en sitio",
-            signature_data: job.siteSignature,
-            signed_from: "cleaner_device"
-          });
+          await persistPortalSiteSignature(job);
         } catch (err) {
           console.error("Error saving site signature in portal mode:", err);
         }
@@ -6766,19 +6888,7 @@ function setupEvents() {
 
     if (supabaseClient) {
       try {
-        const cleanerId = receipt.cleanerId || state.cleaners.find(c => c.name === receipt.cleaner)?.id;
-        const [start, end] = receipt.period ? receipt.period.split(" - ") : [today(), today()];
-        await supabaseClient.from("payment_receipts").upsert({
-          id: receipt.id,
-          organization_id: receipt.organizationId || state.orgId,
-          cleaner_id: cleanerId || null,
-          period_start: start,
-          period_end: end,
-          amount: receipt.amount,
-          payment_method: receipt.method === "Efectivo" ? "cash" : "transfer",
-          receiver_signature_data: receipt.signature,
-          status: "signed"
-        });
+        await persistPortalReceiptSignature(receipt);
       } catch (err) {
         console.error("Error saving receipt signature in portal mode:", err);
       }

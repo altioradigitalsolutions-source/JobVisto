@@ -32,15 +32,22 @@ http
         let event;
         const signature = req.headers["stripe-signature"];
         const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+        const allowUnsignedWebhook = process.env.ALLOW_UNSIGNED_STRIPE_WEBHOOKS === "true";
 
         try {
-          if (webhookSecret && signature) {
+          if (!webhookSecret || !signature) {
+            if (!allowUnsignedWebhook) {
+              console.error("Stripe webhook signature verification is not configured.");
+              res.writeHead(500, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "Stripe webhook signature verification is not configured." }));
+              return;
+            }
+
+            event = JSON.parse(body.toString());
+            console.warn("WARNING: Webhook signature verification skipped by ALLOW_UNSIGNED_STRIPE_WEBHOOKS.");
+          } else {
             const stripeInstance = new (require("stripe"))(process.env.STRIPE_SECRET_KEY);
             event = stripeInstance.webhooks.constructEvent(body, signature, webhookSecret);
-          } else {
-            // Dev mode fallback
-            event = JSON.parse(body.toString());
-            console.warn("WARNING: Webhook signature verification skipped. Configure STRIPE_WEBHOOK_SECRET in .env.");
           }
         } catch (err) {
           console.error("Webhook signature verification failed:", err.message);
@@ -73,53 +80,71 @@ http
             }
           }
 
-          if (email) {
-            console.log(`Saving Stripe payment for ${email}: plan=${planId}, customer=${customerId}`);
-            const supabaseUrl = process.env.SUPABASE_URL;
-            const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-            if (supabaseUrl && serviceRoleKey) {
-              const url = new URL(`${supabaseUrl}/rest/v1/stripe_payments`);
-              const payload = JSON.stringify({
-                email: email.toLowerCase(),
-                plan_id: planId,
-                customer_id: customerId,
-                subscription_id: subscriptionId,
-                session_id: sessionId,
-                payment_status: paymentStatus
-              });
-
-              const options = {
-                method: "POST",
-                headers: {
-                  "apikey": serviceRoleKey,
-                  "Authorization": `Bearer ${serviceRoleKey}`,
-                  "Content-Type": "application/json",
-                  "Prefer": "resolution=merge-duplicates"
-                }
-              };
-
-              const dbReq = https.request(url, options, (dbRes) => {
-                let dbData = "";
-                dbRes.on("data", (chunk) => dbData += chunk);
-                dbRes.on("end", () => {
-                  console.log("Supabase insert status:", dbRes.statusCode);
-                  if (dbRes.statusCode >= 300) {
-                    console.error("Failed to insert payment to Supabase:", dbData);
-                  }
-                });
-              });
-
-              dbReq.on("error", (e) => {
-                console.error("Error saving payment to Supabase:", e);
-              });
-
-              dbReq.write(payload);
-              dbReq.end();
-            } else {
-              console.error("Supabase environment variables are missing. Cannot save payment.");
-            }
+          if (!email) {
+            console.error("Stripe payment event is missing customer email.");
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Stripe payment event is missing customer email." }));
+            return;
           }
+
+          console.log(`Saving Stripe payment for ${email}: plan=${planId}, customer=${customerId}`);
+          const supabaseUrl = process.env.SUPABASE_URL;
+          const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+          if (!supabaseUrl || !serviceRoleKey) {
+            console.error("Supabase environment variables are missing. Cannot save payment.");
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Supabase environment variables are missing." }));
+            return;
+          }
+
+          const url = new URL(`${supabaseUrl}/rest/v1/stripe_payments`);
+          url.searchParams.set("on_conflict", "session_id");
+          const payload = JSON.stringify({
+            email: email.toLowerCase(),
+            plan_id: planId,
+            customer_id: customerId,
+            subscription_id: subscriptionId,
+            session_id: sessionId,
+            payment_status: paymentStatus
+          });
+
+          const options = {
+            method: "POST",
+            headers: {
+              "apikey": serviceRoleKey,
+              "Authorization": `Bearer ${serviceRoleKey}`,
+              "Content-Type": "application/json",
+              "Prefer": "resolution=merge-duplicates"
+            }
+          };
+
+          const dbReq = https.request(url, options, (dbRes) => {
+            let dbData = "";
+            dbRes.on("data", (chunk) => dbData += chunk);
+            dbRes.on("end", () => {
+              console.log("Supabase insert status:", dbRes.statusCode);
+              if (dbRes.statusCode >= 300) {
+                console.error("Failed to insert payment to Supabase:", dbData);
+                res.writeHead(500, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ error: "Failed to save Stripe payment." }));
+                return;
+              }
+
+              res.writeHead(200, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ received: true }));
+            });
+          });
+
+          dbReq.on("error", (e) => {
+            console.error("Error saving payment to Supabase:", e);
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "Error saving Stripe payment." }));
+          });
+
+          dbReq.write(payload);
+          dbReq.end();
+          return;
         }
 
         res.writeHead(200, { "Content-Type": "application/json" });
