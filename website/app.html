@@ -14,7 +14,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./app.css">
+    <link rel="stylesheet" href="./app.css?v=20">
   </head>
   <body>
     <div class="auth-screen" id="authScreen">
@@ -76,7 +76,7 @@
             <label><span data-i18n="fullName">Full name</span> <input name="fullName" placeholder="Name and last name" data-i18n-placeholder="fullNamePlaceholder"></label>
             <label><span data-i18n="companyName">Company name</span> <input name="companyName" placeholder="Only if applicable" data-i18n-placeholder="companyNamePlaceholder"></label>
             <label><span data-i18n="phone">Phone</span> <input name="phone" placeholder="Contact number" data-i18n-placeholder="phonePlaceholder"></label>
-            <label id="signupPlanField"><span data-i18n="plan">Plan</span>
+            <label id="signupPlanField" class="hidden"><span data-i18n="plan">Plan</span>
               <select name="plan" id="signupPlan">
                 <option value="free">Freelancer Free - $0/mes</option>
                 <option value="independent">Independent - $9.99/mes</option>
@@ -489,6 +489,7 @@
               <label>Pais del cleaner <select name="country" id="cleanerCountry"></select></label>
               <label>Ciudad o zona <input name="city" placeholder="Tel Aviv, Jerusalem, Guayaquil..."></label>
               <label>Clave de acceso <input name="key" placeholder="JV-MARIA"></label>
+              <button class="ghost" type="button" id="generateCleanerKey">Generar clave</button>
               <div class="form-actions">
                 <button class="primary" type="submit" id="saveCleanerButton">Guardar cleaner</button>
                 <button class="ghost hidden" type="button" id="cancelCleanerEdit">Cancelar edicion</button>
@@ -1188,6 +1189,11 @@
             <p class="eyebrow" data-i18n="clientAccessEyebrow">Secure client portal</p>
             <h1 data-i18n="clientAccessTitle">Client access</h1>
           </div>
+          <div class="language-switch portal-language-switch" aria-label="Language">
+            <button class="active" type="button" data-language="en">EN</button>
+            <button type="button" data-language="es">ES</button>
+            <button type="button" data-language="ru">RU</button>
+          </div>
         </div>
         <p class="muted client-access-copy" data-i18n="clientAccessCopy">Enter the password sent by the company or cleaner to view jobs, photos and confirmations.</p>
         <div class="client-access-trust">
@@ -1235,7 +1241,7 @@
             <div class="cp-activity-panel">
               <div class="cp-activity-header">
                 <h3 data-i18n="serviceActivity">Actividad del servicio</h3>
-                <span class="cp-live-badge"><span class="cp-live-dot"></span> En tiempo real</span>
+                <span class="cp-live-badge"><span class="cp-live-dot"></span> <span data-i18n="realTime">En tiempo real</span></span>
               </div>
               <div class="cp-activity-list" id="clientPortalActivity"></div>
             </div>
@@ -1245,15 +1251,15 @@
         <footer class="cp-footer-bar">
           <div class="cp-footer-info">
             <span class="cp-footer-icon">ℹ</span>
-            <p><strong>Este es tu portal privado.</strong> Aquí puedes dar seguimiento al estado de tu servicio en tiempo real, ver evidencias, revisar historial y confirmar cuando el trabajo haya sido completado.</p>
+            <p><strong data-i18n="privatePortalFooterTitle">Este es tu portal privado.</strong> <span data-i18n="privatePortalFooterCopy">Aqui puedes dar seguimiento al estado de tu servicio en tiempo real, ver evidencias, revisar historial y confirmar cuando el trabajo haya sido completado.</span></p>
           </div>
           <div class="cp-footer-help">
             <span class="cp-footer-icon">🎧</span>
             <div>
-              <strong>¿Necesitas ayuda?</strong>
-              <p>Contacta al administrador desde tu panel.</p>
+              <strong data-i18n="needHelp">Necesitas ayuda?</strong>
+              <p data-i18n="contactAdminPanel">Contacta al administrador desde tu panel.</p>
             </div>
-            <button class="ghost cp-contact-btn" type="button">Contactar</button>
+            <button class="ghost cp-contact-btn" type="button" data-i18n="contact">Contactar</button>
           </div>
         </footer>
       </section>
@@ -1265,53 +1271,53 @@
         <aside class="cleaner-sidebar">
           <a class="cleaner-sidebar-logo" href="./index.html">
             <img src="./assets/Logo Jobvisto white transparent.png" alt="JobVisto" class="sidebar-logo-img">
-            <small>Portal de Cleaner</small>
+            <small data-i18n="cleanerPortalLogo">Portal de cleaner</small>
           </a>
           
           <nav class="cleaner-sidebar-nav" role="tablist">
             <button class="active" type="button" data-cleaner-tab="summary">
               <span class="nav-icon">📊</span>
-              <span>Resumen</span>
+              <span data-i18n="cleanerSummaryTab">Resumen</span>
             </button>
             <button type="button" data-cleaner-tab="jobs">
               <span class="nav-icon">💼</span>
-              <span>Trabajos</span>
+              <span data-i18n="cleanerJobsTab">Trabajos</span>
             </button>
             <button type="button" data-cleaner-tab="calendar">
               <span class="nav-icon">📅</span>
-              <span>Calendario</span>
+              <span data-i18n="cleanerCalendarTab">Calendario</span>
             </button>
             <button type="button" data-cleaner-tab="hours">
               <span class="nav-icon">⏱️</span>
-              <span>Horas trabajadas</span>
+              <span data-i18n="cleanerHoursTab">Horas trabajadas</span>
             </button>
             <button type="button" data-cleaner-tab="payments">
               <span class="nav-icon">💳</span>
-              <span>Pagos</span>
+              <span data-i18n="cleanerPaymentsTab">Pagos</span>
             </button>
             <button type="button" data-cleaner-tab="report">
               <span class="nav-icon">📈</span>
-              <span>Reporte</span>
+              <span data-i18n="cleanerReportTab">Reporte</span>
             </button>
           </nav>
 
           <!-- Performance Widget -->
           <div class="cleaner-feedback-card">
             <div class="feedback-header">
-              <strong>¡Sigue así!</strong>
+              <strong data-i18n="cleanerEncouragementTitle">Sigue asi!</strong>
               <span>★</span>
             </div>
-            <p>Excelente trabajo. Tienes 95% de trabajos completados a tiempo.</p>
+            <p data-i18n="cleanerEncouragementCopy">Excelente trabajo. Tienes 95% de trabajos completados a tiempo.</p>
             <div class="progress-bar">
               <div class="progress-fill"></div>
             </div>
-            <button type="button" id="cleanerPerformanceBtn">Ver rendimiento</button>
+            <button type="button" id="cleanerPerformanceBtn" data-i18n="cleanerPerformance">Ver rendimiento</button>
           </div>
 
           <!-- Logout Button -->
           <button class="cleaner-logout-btn" type="button" id="cleanerPortalLogout">
             <span class="nav-icon">🚪</span>
-            <span>Cerrar sesión</span>
+            <span data-i18n="logout">Cerrar sesion</span>
           </button>
         </aside>
 
@@ -1320,10 +1326,15 @@
           <!-- Dynamic Topbar -->
           <header class="cleaner-topbar">
             <div class="cleaner-welcome">
-              <h2 id="cleanerWelcomeGreeting">Hola 👋</h2>
-              <p>Aquí tienes un resumen de tu activity del día.</p>
+              <h2 id="cleanerWelcomeGreeting">Hola</h2>
+              <p data-i18n="cleanerWelcomeCopy">Aqui tienes un resumen de tu actividad del dia.</p>
             </div>
             <div class="portal-actions">
+              <div class="language-switch portal-language-switch" aria-label="Language">
+                <button class="active" type="button" data-language="en">EN</button>
+                <button type="button" data-language="es">ES</button>
+                <button type="button" data-language="ru">RU</button>
+              </div>
               <!-- Notifications Icon -->
               <button class="ghost" type="button" id="cleanerNotificationsBtn" style="position:relative; font-size:1.3rem; padding:8px; border-radius:50%; margin-right:8px;">
                 🔔
@@ -1334,30 +1345,34 @@
                 <div class="widget-avatar">M</div>
                 <div class="widget-info">
                   <strong id="cleanerWidgetName">Cleaner</strong>
-                  <span>Cleaner <i class="widget-status"></i> En línea</span>
+                  <span>Cleaner <i class="widget-status"></i> <span data-i18n="cleanerOnline">En linea</span></span>
                 </div>
               </div>
               <!-- Mobile portal badge -->
-              <span class="status-chip" style="margin-left: 12px;">Acceso privado cleaner</span>
+              <span class="status-chip" style="margin-left: 12px;" data-i18n="cleanerAccessBadge">Acceso privado cleaner</span>
             </div>
           </header>
 
           <!-- Mobile Navigation Tabs (visible only on mobile) -->
-          <div class="cleaner-tabs hidden-desktop" role="tablist" style="display:none;">
-            <button class="active" type="button" data-cleaner-tab="summary">Resumen</button>
-            <button type="button" data-cleaner-tab="jobs">Trabajos</button>
-            <button type="button" data-cleaner-tab="calendar">Calendario</button>
-            <button type="button" data-cleaner-tab="hours">Horas</button>
-            <button type="button" data-cleaner-tab="payments">Pagos</button>
-            <button type="button" data-cleaner-tab="report">Reporte</button>
+          <button class="cleaner-mobile-menu-toggle hidden-desktop" type="button" id="cleanerMobileMenuToggle" aria-expanded="false">
+            <span data-i18n="menu">Menu</span>
+            <span aria-hidden="true">☰</span>
+          </button>
+          <div class="cleaner-tabs hidden-desktop" role="tablist">
+            <button class="active" type="button" data-cleaner-tab="summary" data-i18n="cleanerSummaryTab">Resumen</button>
+            <button type="button" data-cleaner-tab="jobs" data-i18n="cleanerJobsTab">Trabajos</button>
+            <button type="button" data-cleaner-tab="calendar" data-i18n="cleanerCalendarTab">Calendario</button>
+            <button type="button" data-cleaner-tab="hours" data-i18n="cleanerHoursTab">Horas</button>
+            <button type="button" data-cleaner-tab="payments" data-i18n="cleanerPaymentsTab">Pagos</button>
+            <button type="button" data-cleaner-tab="report" data-i18n="cleanerReportTab">Reporte</button>
           </div>
 
           <!-- Lock Screen (for access validation) -->
           <section class="portal-lock" id="cleanerPortalLock">
-            <h1>Acceso del equipo</h1>
-            <p class="muted">Entra para ver tus trabajos asignados, tomar trabajos abiertos y registrar llegada, fotos y salida.</p>
-            <label>Clave de acceso <input id="cleanerPortalPassword" placeholder="JV-MARIA"></label>
-            <button class="primary" id="unlockCleanerPortal">Entrar</button>
+            <h1 data-i18n="cleanerAccessTitle">Acceso del equipo</h1>
+            <p class="muted" data-i18n="cleanerAccessCopy">Entra para ver tus trabajos asignados, tomar trabajos abiertos y registrar llegada, fotos y salida.</p>
+            <label><span data-i18n="cleanerAccessPassword">Clave de acceso</span> <input id="cleanerPortalPassword" placeholder="JV-MARIA" data-i18n-placeholder="cleanerAccessPasswordPlaceholder"></label>
+            <button class="primary" id="unlockCleanerPortal" data-i18n="cleanerPortalEnter">Entrar al portal</button>
           </section>
 
           <!-- Tabs Panels Workspace -->
@@ -1371,16 +1386,16 @@
               <div class="summary-main-col" style="display:grid; gap:24px;">
                 <section class="panel">
                   <div class="panel-head">
-                    <h3 id="cleanerPortalTitle">Tus trabajos</h3>
-                    <span class="status-chip">Asignados</span>
+                    <h3 id="cleanerPortalTitle" data-i18n="cleanerAssignedTitle">Tus trabajos</h3>
+                    <span class="status-chip" data-i18n="cleanerAssignedChip">Asignados</span>
                   </div>
                   <div class="client-list" id="cleanerAssignedJobs"></div>
                 </section>
                 
                 <section class="panel">
                   <div class="panel-head">
-                    <h3>Trabajos abiertos</h3>
-                    <span class="status-chip">Tomar</span>
+                    <h3 data-i18n="cleanerOpenJobsTitle">Trabajos abiertos</h3>
+                    <span class="status-chip" data-i18n="cleanerTakeChip">Tomar</span>
                   </div>
                   <div class="client-list" id="cleanerOpenJobs"></div>
                 </section>
@@ -1390,8 +1405,8 @@
               <aside class="summary-side-col">
                 <div class="cleaner-recent-timeline">
                   <div class="timeline-header">
-                    <h3>Actividad reciente</h3>
-                    <a href="#" id="viewAllActivityBtn">Ver todas</a>
+                    <h3 data-i18n="cleanerRecentActivity">Actividad reciente</h3>
+                    <a href="#" id="viewAllActivityBtn" data-i18n="cleanerViewAll">Ver todas</a>
                   </div>
                   <div class="timeline-list" id="cleanerRecentActivity">
                     <!-- Dynamic items rendered by JS -->
@@ -1402,37 +1417,37 @@
 
             <!-- Other Tab Panels -->
             <section class="panel cleaner-tab-panel" id="cleanerTabJobs">
-              <div class="panel-head"><h3>Historial de trabajos</h3><span class="status-chip">Cerrados</span></div>
+              <div class="panel-head"><h3 data-i18n="cleanerJobHistory">Historial de trabajos</h3><span class="status-chip" data-i18n="cleanerClosedChip">Cerrados</span></div>
               <div class="admin-history-unlock" id="cleanerHistoryAdminBox">
                 <div>
-                  <strong>Correcciones con permiso admin</strong>
-                  <p class="muted">Para agregar fotos a trabajos cerrados, ingresa la clave administrativa.</p>
+                  <strong data-i18n="cleanerAdminCorrections">Correcciones con permiso admin</strong>
+                  <p class="muted" data-i18n="cleanerAdminCorrectionCopy">Para agregar fotos a trabajos cerrados, ingresa la clave administrativa.</p>
                 </div>
-                <label>Clave admin <input id="cleanerHistoryAdminKey" placeholder="JV-ADMIN"></label>
-                <button class="ghost" type="button" id="unlockCleanerHistoryAdmin">Activar permiso</button>
+                <label><span data-i18n="cleanerAdminPassword">Clave admin</span> <input id="cleanerHistoryAdminKey" placeholder="JV-ADMIN"></label>
+                <button class="ghost" type="button" id="unlockCleanerHistoryAdmin" data-i18n="cleanerActivatePermission">Activar permiso</button>
               </div>
               <div class="client-list" id="cleanerHistoryJobs"></div>
             </section>
 
             <section class="panel cleaner-tab-panel" id="cleanerTabCalendar">
-              <div class="panel-head"><h3>Mi calendario</h3><span class="status-chip">Agenda</span></div>
+              <div class="panel-head"><h3 data-i18n="cleanerMyCalendar">Mi calendario</h3><span class="status-chip" data-i18n="cleanerAgendaChip">Agenda</span></div>
               <div id="cleanerCalendar"></div>
             </section>
 
             <section class="panel cleaner-tab-panel" id="cleanerTabHours">
-              <div class="panel-head"><h3>Horas trabajadas</h3><span class="status-chip">Mes actual</span></div>
+              <div class="panel-head"><h3 data-i18n="cleanerHoursTab">Horas trabajadas</h3><span class="status-chip" data-i18n="cleanerCurrentMonth">Mes actual</span></div>
               <div id="cleanerHoursReport"></div>
             </section>
 
             <section class="panel cleaner-tab-panel" id="cleanerTabPayments">
-              <div class="panel-head"><h3>Pagos generados</h3><span class="status-chip">Firma requerida</span></div>
+              <div class="panel-head"><h3 data-i18n="cleanerGeneratedPayments">Pagos generados</h3><span class="status-chip" data-i18n="cleanerSignatureRequired">Firma requerida</span></div>
               <div class="client-list" id="cleanerPaymentReceipts"></div>
             </section>
 
             <section class="panel cleaner-tab-panel" id="cleanerTabReport">
               <div class="panel-head">
-                <h3>Reporte del cleaner</h3>
-                <label class="compact-filter">Mes <select id="cleanerReportMonth"></select></label>
+                <h3 data-i18n="cleanerReportTitle">Reporte del cleaner</h3>
+                <label class="compact-filter"><span data-i18n="cleanerMonth">Mes</span> <select id="cleanerReportMonth"></select></label>
               </div>
               <div id="cleanerMoneyReport"></div>
             </section>
@@ -1442,33 +1457,33 @@
               <div class="footer-reminder">
                 <i style="font-size:1.5rem;">🛡️</i>
                 <div>
-                  <strong>Recuerda</strong>
-                  <p>Sigue los pasos del checklist y sube fotos claras. Así garantizas pagos rápidos y buenas reseñas.</p>
+                  <strong data-i18n="cleanerRemember">Recuerda</strong>
+                  <p data-i18n="cleanerFooterCopy">Sigue los pasos del checklist y sube fotos claras. Asi garantizas pagos rapidos y buenas resenas.</p>
                 </div>
               </div>
               <div class="footer-steps">
                 <div class="step-item">
-                  <span class="step-num">Paso 1</span>
-                  <span>Revisa instrucciones <i>›</i></span>
+                  <span class="step-num" data-i18n="cleanerStep1">Paso 1</span>
+                  <span><span data-i18n="cleanerStep1Text">Revisa instrucciones</span> <i>›</i></span>
                 </div>
                 <div class="step-item">
-                  <span class="step-num">Paso 2</span>
-                  <span>Toma fotos <i>›</i></span>
+                  <span class="step-num" data-i18n="cleanerStep2">Paso 2</span>
+                  <span><span data-i18n="cleanerStep2Text">Marca llegada</span> <i>›</i></span>
                 </div>
                 <div class="step-item">
-                  <span class="step-num">Paso 3</span>
-                  <span>Completa checklist <i>›</i></span>
+                  <span class="step-num" data-i18n="cleanerStep3">Paso 3</span>
+                  <span><span data-i18n="cleanerStep3Text">Sube fotos</span> <i>›</i></span>
                 </div>
                 <div class="step-item">
-                  <span class="step-num">Paso 4</span>
-                  <span>Confirma salida <i>›</i></span>
+                  <span class="step-num" data-i18n="cleanerStep4">Paso 4</span>
+                  <span><span data-i18n="cleanerStep4Text">Termina trabajo</span> <i>›</i></span>
                 </div>
               </div>
               <div class="footer-help">
                 <i>🎧</i>
                 <div>
-                  <strong>¿Necesitas ayuda?</strong>
-                  <p>Contacta al administrador desde tu panel.</p>
+                  <strong data-i18n="needHelp">Necesitas ayuda?</strong>
+                  <p data-i18n="contactAdminPanel">Contacta al administrador desde tu panel.</p>
                 </div>
               </div>
             </footer>
@@ -1477,20 +1492,34 @@
       </div>
     </main>
 
+    <div class="modal hidden" id="planChoiceModal" role="dialog" aria-modal="true" aria-labelledby="planChoiceTitle">
+      <div class="modal-card plan-choice-card">
+        <div class="panel-head">
+          <div>
+            <span class="status-chip">JV</span>
+            <h3 id="planChoiceTitle">Elige tu plan</h3>
+            <p class="muted" id="planChoiceCopy">Selecciona el paquete que quieres activar para continuar.</p>
+          </div>
+          <button class="ghost" type="button" id="closePlanChoiceModal">Cerrar</button>
+        </div>
+        <div class="plan-choice-grid" id="planChoiceGrid"></div>
+      </div>
+    </div>
+
     <div class="modal hidden" id="signatureModal" role="dialog" aria-modal="true" aria-labelledby="signatureTitle">
       <div class="modal-card">
         <div class="panel-head">
           <div>
-            <h3 id="signatureTitle">Firma de pago recibido</h3>
-            <p class="muted">El cleaner firma con dedo o mouse para confirmar que recibio el pago externo.</p>
+            <h3 id="signatureTitle" data-i18n="paymentSignatureTitle">Firma de pago recibido</h3>
+            <p class="muted" data-i18n="paymentSignatureCopy">El cleaner firma con dedo o mouse para confirmar que recibio el pago externo.</p>
           </div>
-          <button class="ghost" type="button" id="closeSignatureModal">Cerrar</button>
+          <button class="ghost" type="button" id="closeSignatureModal" data-i18n="close">Cerrar</button>
         </div>
-        <label>Nombre de quien firma <input id="signatureReceiver" value="Maria Lopez"></label>
+        <label><span data-i18n="signerName">Nombre de quien firma</span> <input id="signatureReceiver" value="Maria Lopez"></label>
         <canvas id="signatureCanvas" width="720" height="220"></canvas>
         <div class="form-actions">
-          <button class="ghost" type="button" id="clearSignature">Limpiar firma</button>
-          <button class="primary" type="button" id="saveSignature">Guardar firma</button>
+          <button class="ghost" type="button" id="clearSignature" data-i18n="clearSignature">Limpiar firma</button>
+          <button class="primary" type="button" id="saveSignature" data-i18n="saveSignature">Guardar firma</button>
         </div>
       </div>
     </div>
@@ -1499,10 +1528,10 @@
       <div class="modal-card photo-modal-card">
         <div class="panel-head">
           <div>
-            <h3 id="photoModalTitle">Evidencia</h3>
-            <p class="muted" id="photoModalMeta">Foto del trabajo</p>
+            <h3 id="photoModalTitle" data-i18n="evidence">Evidencia</h3>
+            <p class="muted" id="photoModalMeta" data-i18n="photoOfJob">Foto del trabajo</p>
           </div>
-          <button class="ghost" type="button" id="closePhotoModal">Cerrar</button>
+          <button class="ghost" type="button" id="closePhotoModal" data-i18n="close">Cerrar</button>
         </div>
         <img id="photoModalImage" class="photo-modal-image" alt="Evidencia del servicio">
         <p class="photo-comment" id="photoModalComment"></p>
@@ -1513,16 +1542,16 @@
       <div class="modal-card confirm-modal-card">
         <div class="panel-head">
           <div>
-            <h3 id="deleteJobTitle">Confirmar eliminacion</h3>
-            <p class="muted">Se eliminara solo el trabajo seleccionado.</p>
+            <h3 id="deleteJobTitle" data-i18n="confirmDeletion">Confirmar eliminacion</h3>
+            <p class="muted" data-i18n="deleteSelectedJobCopy">Se eliminara solo el trabajo seleccionado.</p>
           </div>
-          <button class="ghost" type="button" id="closeDeleteJobModal">Cerrar</button>
+          <button class="ghost" type="button" id="closeDeleteJobModal" data-i18n="close">Cerrar</button>
         </div>
         <div class="delete-job-summary" id="deleteJobSummary"></div>
-        <p class="muted">Si existen otros trabajos del mismo cliente, quedan guardados porque son registros separados.</p>
+        <p class="muted" data-i18n="relatedJobsSafeCopy">Si existen otros trabajos del mismo cliente, quedan guardados porque son registros separados.</p>
         <div class="form-actions">
-          <button class="ghost" type="button" id="cancelDeleteJob">Cancelar</button>
-          <button class="mini-action danger confirm-danger" type="button" id="confirmDeleteJobButton">Eliminar este trabajo</button>
+          <button class="ghost" type="button" id="cancelDeleteJob" data-i18n="cancelCorrection">Cancelar</button>
+          <button class="mini-action danger confirm-danger" type="button" id="confirmDeleteJobButton" data-i18n="deleteThisJob">Eliminar este trabajo</button>
         </div>
       </div>
     </div>
@@ -1531,16 +1560,16 @@
       <div class="modal-card confirm-modal-card">
         <div class="panel-head">
           <div>
-            <h3 id="archiveCleanerTitle">Archivar cleaner</h3>
-            <p class="muted">El cleaner sale del equipo activo, pero su historial queda guardado.</p>
+            <h3 id="archiveCleanerTitle" data-i18n="archiveCleanerTitle">Archivar cleaner</h3>
+            <p class="muted" data-i18n="archiveCleanerCopy">El cleaner sale del equipo activo, pero su historial queda guardado.</p>
           </div>
-          <button class="ghost" type="button" id="closeArchiveCleanerModal">Cerrar</button>
+          <button class="ghost" type="button" id="closeArchiveCleanerModal" data-i18n="close">Cerrar</button>
         </div>
         <div class="delete-job-summary" id="archiveCleanerSummary"></div>
-        <p class="muted">Sus trabajos, pagos, fotos y firmas anteriores se mantienen para reportes e historial.</p>
+        <p class="muted" data-i18n="archiveCleanerHistoryCopy">Sus trabajos, pagos, fotos y firmas anteriores se mantienen para reportes e historial.</p>
         <div class="form-actions">
-          <button class="ghost" type="button" id="cancelArchiveCleaner">Cancelar</button>
-          <button class="mini-action danger confirm-danger" type="button" id="confirmArchiveCleanerButton">Archivar cleaner</button>
+          <button class="ghost" type="button" id="cancelArchiveCleaner" data-i18n="cancelCorrection">Cancelar</button>
+          <button class="mini-action danger confirm-danger" type="button" id="confirmArchiveCleanerButton" data-i18n="archiveCleanerAction">Archivar cleaner</button>
         </div>
       </div>
     </div>
@@ -1637,6 +1666,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./supabase-config.js"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-    <script src="./app.js?v=7"></script>
+    <script src="./app.js?v=20"></script>
   </body>
 </html>

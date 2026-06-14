@@ -270,7 +270,7 @@
           <p data-i18n="priceCopy">Start with the free plan and scale when you are ready. No contracts. Cancel anytime.</p>
           <div class="billing-toggle" aria-label="Billing period">
             <span data-i18n="toggleMonthly">Monthly</span>
-            <button class="toggle-switch" type="button" aria-label="Switch billing period">
+            <button class="toggle-switch" type="button" aria-label="Switch billing period" aria-pressed="false" data-billing-toggle>
               <span></span>
             </button>
             <span data-i18n="toggleAnnual">Annual</span>
@@ -302,8 +302,8 @@
             <div class="plan-icon"><i data-lucide="user-round-check"></i></div>
             <h3 data-i18n="planIndTitle">Independent</h3>
             <p class="plan-subtitle" data-i18n="planIndSubtitle">For independent cleaners</p>
-            <p class="price" data-i18n="planIndPrice">$9.99</p>
-            <p class="price-note" data-i18n="planIndNote">per month</p>
+            <p class="price" data-i18n="planIndPrice" data-plan-price="independent">$9.99</p>
+            <p class="price-note" data-i18n="planIndNote" data-plan-note="independent">per month</p>
             <div class="cleaner-limit"><i data-lucide="user-round"></i><strong data-i18n="planIndLimit">1 cleaner</strong></div>
             <ul>
               <li data-i18n="planIndItem1">Up to 20 clients</li>
@@ -314,7 +314,7 @@
               <li data-i18n="planIndItem6">Arrival and departure tracking</li>
               <li data-i18n="planIndItem7">Client portal</li>
             </ul>
-            <a class="button plan-button" href="https://buy.stripe.com/dRmfZh20RcvVcAuedT2ZO0o" data-i18n="planIndButton">Choose plan</a>
+            <a class="button plan-button" href="https://buy.stripe.com/dRmfZh20RcvVcAuedT2ZO0o" data-plan-link="independent" data-i18n="planIndButton">Choose plan</a>
             <small data-i18n="planIndCardNote">Cancel anytime</small>
           </article>
 
@@ -322,8 +322,8 @@
             <div class="plan-icon"><i data-lucide="users-round"></i></div>
             <h3 data-i18n="planCompTitle">Company</h3>
             <p class="plan-subtitle" data-i18n="planCompSubtitle">For growing teams</p>
-            <p class="price" data-i18n="planCompPrice">$29.99</p>
-            <p class="price-note" data-i18n="planCompNote">per month</p>
+            <p class="price" data-i18n="planCompPrice" data-plan-price="company">$29.99</p>
+            <p class="price-note" data-i18n="planCompNote" data-plan-note="company">per month</p>
             <div class="cleaner-limit"><i data-lucide="users-round"></i><strong data-i18n="planCompLimit">Up to 5 cleaners</strong></div>
             <ul>
               <li data-i18n="planCompItem1">Unlimited clients</li>
@@ -335,7 +335,7 @@
               <li data-i18n="planCompItem7">Operational reports</li>
               <li data-i18n="planCompItem8">Email support</li>
             </ul>
-            <a class="button plan-button" href="https://buy.stripe.com/eVq8wP8pfbrR1VQ8Tz2ZO0p" data-i18n="planIndButton">Choose plan</a>
+            <a class="button plan-button" href="https://buy.stripe.com/eVq8wP8pfbrR1VQ8Tz2ZO0p" data-plan-link="company" data-i18n="planIndButton">Choose plan</a>
             <small data-i18n="planIndCardNote">Cancel anytime</small>
           </article>
 
@@ -344,8 +344,8 @@
             <div class="plan-icon"><i data-lucide="chart-no-axes-column-increasing"></i></div>
             <h3 data-i18n="planProTitle">Pro</h3>
             <p class="plan-subtitle" data-i18n="planProSubtitle">For established companies</p>
-            <p class="price" data-i18n="planProPrice">$59.99</p>
-            <p class="price-note" data-i18n="planProNote">per month</p>
+            <p class="price" data-i18n="planProPrice" data-plan-price="pro">$59.99</p>
+            <p class="price-note" data-i18n="planProNote" data-plan-note="pro">per month</p>
             <div class="cleaner-limit"><i data-lucide="users-round"></i><strong data-i18n="planProLimit">Up to 20 cleaners</strong></div>
             <ul>
               <li data-i18n="planProItem1">Everything in Company</li>
@@ -357,7 +357,7 @@
               <li data-i18n="planProItem7">Simple data export</li>
               <li data-i18n="planProItem8">Priority support</li>
             </ul>
-            <a class="button plan-button" href="https://buy.stripe.com/cNifZh7lb9jJfMG8Tz2ZO0q" data-i18n="planIndButton">Choose plan</a>
+            <a class="button plan-button" href="https://buy.stripe.com/cNifZh7lb9jJfMG8Tz2ZO0q" data-plan-link="pro" data-i18n="planIndButton">Choose plan</a>
             <small data-i18n="planIndCardNote">Cancel anytime</small>
           </article>
 
@@ -375,7 +375,7 @@
               <li data-i18n="planEntItem5">Custom workflow setup</li>
               <li data-i18n="planEntItem6">Custom integrations if needed</li>
             </ul>
-            <a class="button plan-button secondary-plan" href="mailto:hello@jobvisto.com?subject=JobVisto%20Enterprise" data-i18n="enterpriseButton">Contact sales</a>
+            <a class="button plan-button secondary-plan" href="mailto:atelierverdeinternational@gmail.com?subject=JobVisto%20Enterprise%20request&body=Hello%20JobVisto%20team%2C%0A%0AI%20am%20interested%20in%20the%20Enterprise%20plan.%0A%0ACompany%20name%3A%0ACountry%3A%0ANumber%20of%20cleaners%3A%0ANumber%20of%20locations%3A%0APhone%20or%20WhatsApp%3A%0A%0AThank%20you." data-i18n="enterpriseButton">Contact sales</a>
             <small data-i18n="planFreeSubtitle">We help you grow</small>
           </article>
         </div>
@@ -415,7 +415,7 @@
           <a href="./app.html?intent=signup&plan=free&mode=independent" data-i18n="footerLinkInd">Independent cleaner</a>
           <a href="./app.html?intent=signup&mode=company" data-i18n="footerLinkComp">Cleaning company</a>
           <a href="#pricing" data-i18n="footerLinkCompare">Compare plans</a>
-          <a href="mailto:hello@jobvisto.com?subject=JobVisto%20Enterprise" data-i18n="footerLinkEnterprise">Enterprise</a>
+          <a href="mailto:atelierverdeinternational@gmail.com?subject=JobVisto%20Enterprise%20request&body=Hello%20JobVisto%20team%2C%0A%0AI%20am%20interested%20in%20the%20Enterprise%20plan.%0A%0ACompany%20name%3A%0ACountry%3A%0ANumber%20of%20cleaners%3A%0ANumber%20of%20locations%3A%0APhone%20or%20WhatsApp%3A%0A%0AThank%20you." data-i18n="footerLinkEnterprise">Enterprise</a>
         </nav>
 
         <div class="footer-column footer-cta">

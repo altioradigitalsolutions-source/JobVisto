@@ -1,4 +1,4 @@
-const CACHE_NAME = "jobvisto-app-v22";
+const CACHE_NAME = "jobvisto-app-v24";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -8,7 +8,7 @@ const APP_SHELL = [
   "./styles.css",
   "./script.js",
   "./app.css",
-  "./app.js?v=7",
+  "./app.js?v=9",
   "./manifest.webmanifest",
   "./assets/Logo Jobvisto.png",
   "./assets/Logo Jobvisto white transparent.png",

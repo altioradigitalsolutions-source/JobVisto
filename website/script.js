@@ -681,6 +681,106 @@ const translations = {
 
 let currentLang = "es";
 let currentMode = "company";
+let currentBilling = "monthly";
+
+const pricingPlans = {
+  independent: {
+    monthly: "$9.99",
+    annual: "$95.90",
+    links: {
+      live: {
+        monthly: "https://buy.stripe.com/dRmfZh20RcvVcAuedT2ZO0o",
+        annual: "https://buy.stripe.com/5kQ4gz20R7bB2ZU7Pv2ZO0r"
+      },
+      test: {
+        monthly: "https://buy.stripe.com/test_fZudR9eND9jJ6c6edT2ZO00",
+        annual: "https://buy.stripe.com/test_bJebJ16h7eE3eIC1r72ZO03"
+      }
+    }
+  },
+  company: {
+    monthly: "$29.99",
+    annual: "$287.90",
+    links: {
+      live: {
+        monthly: "https://buy.stripe.com/eVq8wP8pfbrR1VQ8Tz2ZO0p",
+        annual: "https://buy.stripe.com/aFa28r7lb53t6c66Lr2ZO0s"
+      },
+      test: {
+        monthly: "https://buy.stripe.com/test_cNi28raxn3Zp6c6d9P2ZO01",
+        annual: "https://buy.stripe.com/test_fZu6oHfRH3ZpeIC7Pv2ZO04"
+      }
+    }
+  },
+  pro: {
+    monthly: "$59.99",
+    annual: "$575.90",
+    links: {
+      live: {
+        monthly: "https://buy.stripe.com/cNifZh7lb9jJfMG8Tz2ZO0q",
+        annual: "https://buy.stripe.com/14AeVd9tj7bBasmgm12ZO0t"
+      },
+      test: {
+        monthly: "https://buy.stripe.com/test_4gMaEXdJz7bB8ke5Hn2ZO02",
+        annual: "https://buy.stripe.com/test_fZu4gz7lb3ZpfMG4Dj2ZO05"
+      }
+    }
+  }
+};
+
+const billingNotes = {
+  es: {
+    monthly: "por mes",
+    annual: "por año, 20% menos",
+    annualUnavailable: "Plan anual pendiente para produccion"
+  },
+  en: {
+    monthly: "per month",
+    annual: "per year, 20% off",
+    annualUnavailable: "Annual plan pending for production"
+  },
+  ru: {
+    monthly: "в месяц",
+    annual: "в год, скидка 20%",
+    annualUnavailable: "Годовой тариф ожидает настройки"
+  }
+};
+
+function stripeEnvironment() {
+  return "live";
+}
+
+function updateBillingPricing() {
+  const billing = currentBilling;
+  const notes = billingNotes[currentLang] || billingNotes.es;
+  const env = stripeEnvironment();
+
+  document.body.dataset.billing = billing;
+  document.querySelector("[data-billing-toggle]")?.setAttribute("aria-pressed", billing === "annual" ? "true" : "false");
+
+  document.querySelectorAll("[data-plan-price]").forEach((node) => {
+    const planKey = node.dataset.planPrice;
+    node.textContent = pricingPlans[planKey]?.[billing] || node.textContent;
+  });
+
+  document.querySelectorAll("[data-plan-note]").forEach((node) => {
+    const planKey = node.dataset.planNote;
+    const annualLink = pricingPlans[planKey]?.links?.[env]?.annual;
+    node.textContent = billing === "annual" && env === "live" && !annualLink
+      ? notes.annualUnavailable
+      : notes[billing];
+  });
+
+  document.querySelectorAll("[data-plan-link]").forEach((node) => {
+    const planKey = node.dataset.planLink;
+    const links = pricingPlans[planKey]?.links?.[env];
+    const target = links?.[billing] || "";
+    const unavailable = billing === "annual" && env === "live" && !target;
+    node.href = unavailable ? "#pricing" : target;
+    node.setAttribute("aria-disabled", unavailable ? "true" : "false");
+    node.classList.toggle("is-disabled", unavailable);
+  });
+}
 
 function applyLanguage(lang) {
   currentLang = lang;
@@ -695,6 +795,7 @@ function applyLanguage(lang) {
   });
 
   updateScreenMode();
+  updateBillingPricing();
 }
 
 function updateScreenMode() {
@@ -737,6 +838,11 @@ function setup() {
       });
       updateScreenMode();
     });
+  });
+
+  document.querySelector("[data-billing-toggle]")?.addEventListener("click", () => {
+    currentBilling = currentBilling === "monthly" ? "annual" : "monthly";
+    updateBillingPricing();
   });
 
   const menuToggle = document.getElementById("menuToggle");

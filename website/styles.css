@@ -673,6 +673,11 @@
   border-radius: 999px;
   background: #fff;
   box-shadow: 0 4px 10px rgba(0, 0, 0, .2);
+  transition: transform .18s ease;
+}
+
+body[data-billing="annual"] .toggle-switch span {
+  transform: translateX(26px);
 }
 
 .billing-toggle strong {
@@ -825,6 +830,11 @@
   margin-top: auto;
   color: #fff;
   background: linear-gradient(135deg, #00785a, #0aa06c);
+}
+
+.pricing .plan-button.is-disabled {
+  pointer-events: none;
+  opacity: .58;
 }
 
 .pricing .secondary-plan {
@@ -2840,4 +2850,20 @@ svg {
     width: 160px !important;
     max-height: 58px;
   }
+}
+
+/* Final footer layout guard: keep footer sections stacked on desktop and mobile. */
+.footer {
+  display: block;
+  padding: 0;
+}
+
+.footer-main,
+.footer-bottom {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.footer-bottom {
+  flex-wrap: wrap;
 }

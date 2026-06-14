@@ -5,7 +5,7 @@ const path = require("path");
 const apiKey = process.env.STRIPE_SECRET_KEY;
 const shimPath = path.join(__dirname, "../node_modules/@stripe/cli/bin/shim.js");
 
-if (!apiKey || apiKey === "sk_live_o_sk_test" || apiKey === "pk_live_o_pk_test" || apiKey.includes("your_")) {
+if (!apiKey || apiKey === "STRIPE_SECRET_KEY_HERE" || apiKey === "pk_live_o_pk_test" || apiKey.includes("your_")) {
   console.error("\n❌ ERROR: Debes configurar tu STRIPE_SECRET_KEY real (de pruebas, ej: sk_test_...) en tu archivo .env antes de correr este comando.\n");
   process.exit(1);
 }

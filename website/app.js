@@ -1,10 +1,51 @@
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
+const JOBVISTO_SUPABASE_URL = window.JOBVISTO_CONFIG?.supabaseUrl || "https://fmpzdmmmqwqxxgeytmkr.supabase.co";
+const JOBVISTO_SUPABASE_ANON_KEY = window.JOBVISTO_CONFIG?.supabaseAnonKey || "sb_publishable_YWE8eNstQh3KkkAWc6cXyA_Crhbvord";
+
 const supabaseClient = window.supabase ? window.supabase.createClient(
-  window.JOBVISTO_CONFIG?.supabaseUrl || "",
-  window.JOBVISTO_CONFIG?.supabaseAnonKey || ""
+  JOBVISTO_SUPABASE_URL,
+  JOBVISTO_SUPABASE_ANON_KEY
 ) : null;
+
+const DONE_DB_JOB_STATUSES = ["cleaner_finished", "client_confirmed", "signed", "admin_closed"];
+
+function appStatusFromDbStatus(status) {
+  const map = {
+    draft: "Asignado",
+    scheduled: "Asignado",
+    assigned: "Asignado",
+    open: "Disponible para tomar",
+    in_site: "En progreso",
+    cleaner_finished: "Terminado por cleaner",
+    client_confirmed: "Confirmado por cliente",
+    signed: "Firmado",
+    admin_closed: "Terminado por administrador",
+    suspended: "Vencido / no iniciado",
+    cancelled: "Cancelado"
+  };
+  return map[status] || status || "Asignado";
+}
+
+function dbStatusFromAppStatus(status, cleanerId = "") {
+  const map = {
+    "Programado": "scheduled",
+    "Asignado": "scheduled",
+    "Disponible para tomar": "open",
+    "En progreso": "in_site",
+    "En sitio": "in_site",
+    "En sitio vencido": "in_site",
+    "Vencido / no iniciado": "scheduled",
+    "Terminado por cleaner": "cleaner_finished",
+    "Confirmado por cliente": "client_confirmed",
+    "Terminado por cliente": "client_confirmed",
+    "Firmado": "signed",
+    "Terminado por administrador": "admin_closed",
+    "Cancelado": "cancelled"
+  };
+  return map[status] || (cleanerId ? "scheduled" : "open");
+}
 
 // Supabase Data Integration Helpers
 async function loadStateFromSupabase(currentUser = null) {
@@ -38,7 +79,7 @@ async function loadStateFromSupabase(currentUser = null) {
         state.mode = org.type;
         state.country = org.country;
         state.companyProfile.businessName = org.name;
-        selectedPlan = normalizePlanKey(org.plan_id);
+        selectedPlan = appPlanFromDbPlan(org.plan_id);
       }
 
       // Fetch clients
@@ -133,16 +174,11 @@ async function loadStateFromSupabase(currentUser = null) {
             clientPaymentStatus: j.client_payment_status || "unpaid",
             clientPaidDate: j.client_paid_date || "",
             clientPaymentMethod: j.client_payment_method || "",
-            status: j.status === 'scheduled' ? 'Asignado' : 
-                    j.status === 'open' ? 'Disponible para tomar' : 
-                    j.status === 'in_site' ? 'En progreso' :
-                    j.status === 'cleaner_finished' ? 'Terminado por cleaner' :
-                    j.status === 'client_confirmed' ? 'Confirmado por cliente' :
-                    j.status === 'signed' ? 'Firmado' : j.status,
+            status: appStatusFromDbStatus(j.status),
             tasks: j.checklist || [],
-            checkedIn: j.status === 'in_site' || j.status === 'cleaner_finished' || j.status === 'client_confirmed' || j.status === 'signed',
-            checkedOut: j.status === 'cleaner_finished' || j.status === 'client_confirmed' || j.status === 'signed' || jobSignatures.length > 0,
-            cleanerFinished: j.status === 'cleaner_finished' || j.status === 'client_confirmed' || j.status === 'signed' || jobSignatures.length > 0,
+            checkedIn: j.status === 'in_site' || DONE_DB_JOB_STATUSES.includes(j.status),
+            checkedOut: DONE_DB_JOB_STATUSES.includes(j.status) || jobSignatures.length > 0,
+            cleanerFinished: DONE_DB_JOB_STATUSES.includes(j.status) || jobSignatures.length > 0,
             clientConfirmed: j.status === 'client_confirmed' || j.status === 'signed' || clientSig !== undefined,
             signed: j.status === 'client_confirmed' || j.status === 'signed' || jobSignatures.length > 0,
             siteSignature: siteSig ? siteSig.signature_data : "",
@@ -284,7 +320,7 @@ async function asyncSaveToSupabase() {
     await supabaseClient.from('organization_settings').upsert([
       { organization_id: state.orgId, key: 'greeting_name', value: { name: state.companyProfile.greetingName || firstName(state.companyProfile.ownerName) } },
       { organization_id: state.orgId, key: 'company_address', value: { address: state.companyProfile.address || "" } }
-    ]);
+    ], { onConflict: 'organization_id,key' });
 
     // 4. Sync clients & addresses. Do not reconcile-delete here: a partial local
     // state or portal session must never delete production records.
@@ -335,12 +371,7 @@ async function asyncSaveToSupabase() {
       const scheduledEnd = job.end ? `${job.date}T${job.end}:00Z` : null;
       const actualEnd = job.actualEnd ? `${job.date}T${job.actualEnd}:00Z` : null;
       
-      const dbStatus = job.status === 'Asignado' ? 'scheduled' :
-                       job.status === 'Disponible para tomar' ? 'open' :
-                       (job.status === 'En progreso' || job.status === 'En sitio') ? 'in_site' :
-                       job.status === 'Terminado por cleaner' ? 'cleaner_finished' :
-                       job.status === 'Confirmado por cliente' ? 'client_confirmed' :
-                       job.status === 'Firmado' ? 'signed' : job.status;
+      const dbStatus = dbStatusFromAppStatus(job.status, job.cleanerId);
 
       await supabaseClient.from('jobs').upsert({
         id: job.id,
@@ -426,27 +457,27 @@ async function asyncSaveToSupabase() {
       organization_id: state.orgId,
       key: 'vat_rate',
       value: { rate: state.vatRate }
-    });
+    }, { onConflict: 'organization_id,key' });
     await supabaseClient.from('organization_settings').upsert({
       organization_id: state.orgId,
       key: 'currency_symbol',
       value: { symbol: state.currencySymbol }
-    });
+    }, { onConflict: 'organization_id,key' });
     await supabaseClient.from('organization_settings').upsert({
       organization_id: state.orgId,
       key: 'service_rules',
       value: state.serviceRules || {}
-    });
+    }, { onConflict: 'organization_id,key' });
     await supabaseClient.from('organization_settings').upsert({
       organization_id: state.orgId,
       key: 'client_price_rules',
       value: { rules: state.clientPriceRules || [] }
-    });
+    }, { onConflict: 'organization_id,key' });
     await supabaseClient.from('organization_settings').upsert({
       organization_id: state.orgId,
       key: 'cost_rules',
       value: state.costRules || {}
-    });
+    }, { onConflict: 'organization_id,key' });
   } catch (e) {
     console.error("Error saving state to Supabase: ", e);
   }
@@ -461,6 +492,19 @@ function normalizePlanKey(plan) {
   if (["starter", "empresa-starter", "empresa starter", "company", "empresa"].includes(value)) return "company";
   if (["pro", "empresa-pro", "empresa pro"].includes(value)) return "pro";
   return "";
+}
+
+function dbPlanIdForPlan(plan) {
+  const normalized = normalizePlanKey(plan);
+  if (normalized === "free") return "free";
+  if (normalized === "independent") return "solo";
+  if (normalized === "company") return "starter";
+  if (normalized === "pro") return "pro";
+  return "free";
+}
+
+function appPlanFromDbPlan(plan) {
+  return normalizePlanKey(plan) || "free";
 }
 
 const state = {
@@ -541,6 +585,9 @@ let cleanerHistoryAdminUnlocked = false;
 let cleanerHistoryAdminExpiresAt = 0;
 let cleanerHistoryAdminTimer = null;
 let cleanerReportMonth = "";
+let cleanerActiveTab = "summary";
+let pendingSignupData = null;
+let planChoiceContext = "signup";
 const ADMIN_CLEANER_KEY = "JV-ADMIN";
 const HISTORY_ADMIN_PERMISSION_MS = 60 * 60 * 1000;
 
@@ -580,11 +627,98 @@ const plans = {
   pro: { name: "Pro", price: "$59.99/mes", mode: "company" }
 };
 
-const stripePaymentLinks = {
+const PLAN_ENTITLEMENTS = {
+  free: {
+    label: "Freelancer Free",
+    maxClients: 3,
+    maxCleaners: 1,
+    maxMonthlyJobs: 5,
+    cleanerPortal: false,
+    cleanerPayments: false,
+    advancedReports: false,
+    simpleExport: false,
+    clientNotifications: false
+  },
+  independent: {
+    label: "Independent",
+    maxClients: 20,
+    maxCleaners: 1,
+    maxMonthlyJobs: Infinity,
+    cleanerPortal: false,
+    cleanerPayments: false,
+    advancedReports: false,
+    simpleExport: false,
+    clientNotifications: false
+  },
+  company: {
+    label: "Company",
+    maxClients: Infinity,
+    maxCleaners: 5,
+    maxMonthlyJobs: Infinity,
+    cleanerPortal: true,
+    cleanerPayments: false,
+    advancedReports: false,
+    simpleExport: false,
+    clientNotifications: false
+  },
+  pro: {
+    label: "Pro",
+    maxClients: Infinity,
+    maxCleaners: 20,
+    maxMonthlyJobs: Infinity,
+    cleanerPortal: true,
+    cleanerPayments: true,
+    advancedReports: true,
+    simpleExport: true,
+    clientNotifications: true
+  }
+};
+
+const PLAN_CHOICE_CARDS = {
+  free: {
+    name: "Freelancer Free",
+    price: "$0",
+    note: "Para probar JobVisto",
+    action: "Empezar gratis",
+    features: ["1 cleaner", "3 clientes", "5 trabajos por mes", "Portal del cliente"]
+  },
+  independent: {
+    name: "Independent",
+    price: "$9.99",
+    note: "Para cleaners independientes",
+    action: "Pagar Independent",
+    features: ["1 cleaner", "20 clientes", "Trabajos ilimitados", "Calendario completo"]
+  },
+  company: {
+    name: "Company",
+    price: "$29.99",
+    note: "Para equipos en crecimiento",
+    action: "Pagar Company",
+    features: ["5 cleaners", "Clientes ilimitados", "Portal cliente y cleaner", "Reportes operativos"]
+  },
+  pro: {
+    name: "Pro",
+    price: "$59.99",
+    note: "Para empresas establecidas",
+    action: "Pagar Pro",
+    featured: true,
+    features: ["20 cleaners", "Pagos a cleaners", "Reportes avanzados", "Avisos al cliente"]
+  }
+};
+
+const stripePaymentLinksLive = {
   independent: "https://buy.stripe.com/dRmfZh20RcvVcAuedT2ZO0o",
   company: "https://buy.stripe.com/eVq8wP8pfbrR1VQ8Tz2ZO0p",
   pro: "https://buy.stripe.com/cNifZh7lb9jJfMG8Tz2ZO0q"
 };
+
+const stripePaymentLinksTest = {
+  independent: "https://buy.stripe.com/test_fZudR9eND9jJ6c6edT2ZO00",
+  company: "https://buy.stripe.com/test_cNi28raxn3Zp6c6d9P2ZO01",
+  pro: "https://buy.stripe.com/test_4gMaEXdJz7bB8ke5Hn2ZO02"
+};
+
+const stripePaymentLinks = stripePaymentLinksLive;
 
 const demoAccounts = {
   "admin@jobvisto.com": {
@@ -632,6 +766,110 @@ const i18n = {
     fineprint: "Real payment will connect with Stripe. This screen prepares the registration, verification and activation flow.",
     cleanerArrived: "Cleaner arrived",
     cleanerArrivedCopy: "Client notified, GPS saved and job in progress.",
+    cleanerPrivatePortal: "Cleaner private portal",
+    cleanerPortalLogo: "Cleaner portal",
+    cleanerSummaryTab: "Summary",
+    cleanerJobsTab: "Jobs",
+    cleanerCalendarTab: "Calendar",
+    cleanerHoursTab: "Worked hours",
+    cleanerPaymentsTab: "Payments",
+    cleanerReportTab: "Report",
+    cleanerEncouragementTitle: "Keep it up!",
+    cleanerEncouragementCopy: "Great work. You have 95% of jobs completed on time.",
+    cleanerPerformance: "View performance",
+    cleanerWelcomeCopy: "Here is a summary of your activity today.",
+    cleanerOnline: "Online",
+    cleanerAccessBadge: "Private cleaner access",
+    cleanerAccessEyebrow: "Secure cleaner portal",
+    cleanerAccessTitle: "Team access",
+    cleanerAccessCopy: "Enter to view assigned jobs, take open jobs, and record arrival, photos and departure.",
+    cleanerAccessTrust1: "Private link",
+    cleanerAccessTrust2: "Evidence upload",
+    cleanerAccessTrust3: "Hours tracking",
+    cleanerAccessPassword: "Access password",
+    cleanerAccessPasswordPlaceholder: "Example: JV-MARIA",
+    cleanerPortalEnter: "Enter portal",
+    cleanerAssignedTitle: "Your jobs",
+    cleanerAssignedChip: "Assigned",
+    cleanerOpenJobsTitle: "Open jobs",
+    cleanerTakeChip: "Take",
+    cleanerRecentActivity: "Recent activity",
+    cleanerViewAll: "View all",
+    cleanerJobHistory: "Job history",
+    cleanerClosedChip: "Closed",
+    cleanerAdminCorrections: "Admin-permission corrections",
+    cleanerAdminCorrectionCopy: "To add photos to closed jobs, enter the admin password.",
+    cleanerAdminPassword: "Admin password",
+    cleanerActivatePermission: "Activate permission",
+    cleanerMyCalendar: "My calendar",
+    cleanerAgendaChip: "Schedule",
+    cleanerCurrentMonth: "Current month",
+    cleanerGeneratedPayments: "Generated payments",
+    cleanerSignatureRequired: "Signature required",
+    cleanerReportTitle: "Cleaner report",
+    cleanerMonth: "Month",
+    cleanerRemember: "Remember",
+    cleanerFooterCopy: "Follow the checklist steps and upload clear photos. This helps guarantee fast payments and good reviews.",
+    cleanerStep1: "Step 1",
+    cleanerStep1Text: "Review instructions",
+    cleanerStep2: "Step 2",
+    cleanerStep2Text: "Mark arrival",
+    cleanerStep3: "Step 3",
+    cleanerStep3Text: "Upload photos",
+    cleanerStep4: "Step 4",
+    cleanerStep4Text: "Finish job",
+    cleanerAdminView: "Admin view for cleaners",
+    helloCleaner: "Hello, {name}",
+    helloCleanerWave: "Hello, {name} \u{1F44B}",
+    pendingJobs: "Pending",
+    toDo: "to do",
+    highPriority: "High priority",
+    workedToday: "Worked today",
+    estimated: "estimated",
+    activeToday: "Active today",
+    noRecordsToday: "No records today",
+    workedMonth: "Worked month",
+    finishedJobs: "Finished",
+    readyToConfirm: "ready to confirm",
+    noCompleted: "No completed jobs",
+    masterAccess: "Master access",
+    visibleCleaners: "visible cleaners",
+    noRecentActivity: "No recent activity.",
+    jobAssigned: "Job assigned",
+    jobCompleted: "Job completed",
+    photosUploaded: "Photos uploaded",
+    checkInRegistered: "Check-in registered",
+    noActiveCleanerJobs: "You do not have active jobs. Finished jobs are in history.",
+    noFinishedJobs: "There are no finished jobs yet.",
+    timeUndefined: "to define",
+    editFromAdmin: "Edit from admin",
+    takeJob: "Take job",
+    noOpenJobs: "There are no open jobs to take.",
+    unassignedCleaner: "Unassigned",
+    adminCorrection: "Admin correction",
+    arrival: "Arrival",
+    actualDeparture: "Actual departure",
+    saveHours: "Save hours",
+    finishByAdmin: "Finish by admin",
+    overdueCleanerWarning: "This job is past the estimated time. Check if you should finish it or notify administration.",
+    arrivalReminder: "It is time for the service. Mark your arrival now so it is recorded for the client.",
+    futureJobActions: "Job scheduled for the future. Actions activate automatically on the service day.",
+    workBriefTitle: "What to do",
+    noChecklist: "no checklist",
+    workBriefInstruction: "First review instructions, mark arrival once, upload before/after photos by area, and confirm departure when finished.",
+    alreadyArrived: "Arrived {time}",
+    markArrived: "I arrived",
+    addPhoto: "Add photo",
+    finishedAt: "Finished {time}",
+    finishJob: "Finished",
+    areaOrPlace: "Area or place",
+    areaPlaceholder: "Example: kitchen, bathroom, desk",
+    moment: "Moment",
+    comment: "Comment",
+    commentPlaceholder: "Example: grease in kitchen, window finished...",
+    cameraOrLibrary: "Camera or library",
+    saveEvidence: "Save evidence",
+    cancelCorrection: "Cancel correction",
     tomorrowJobs: "3 jobs tomorrow",
     authPlatformKicker: "All in one platform",
     authVisualTitle: "Total control of your cleaning company, in real time.",
@@ -659,6 +897,16 @@ const i18n = {
     clientLinks: "Client links",
     reports: "Reports",
     payments: "Payments",
+    finances: "Finances",
+    cleanerPayments: "Cleaner payments",
+    clientPayments: "Client collections",
+    paymentsSubtitle: "Manage and record charges and payments for completed jobs.",
+    clientPaymentSubtitle: "Record client payments and keep pending balances up to date.",
+    registerClientPayment: "Register client payment",
+    clientBalances: "Client balances",
+    totalAmount: "Total amount",
+    amountReceived: "Amount received",
+    discount: "Discount",
     settings: "Settings",
     logout: "Log out",
     newJob: "New job",
@@ -786,6 +1034,38 @@ const i18n = {
     clientConfirmationShort: "Client confirmation",
     onsiteSignatureReceived: "received from",
     completedJobsHistoryBelow: "Completed jobs appear below in the history.",
+    serviceActivity: "Service activity",
+    realTime: "Real time",
+    privatePortalFooterTitle: "This is your private portal.",
+    privatePortalFooterCopy: "Here you can follow your service status in real time, view evidence, review history and confirm when the job has been completed.",
+    needHelp: "Need help?",
+    contactAdminPanel: "Contact the administrator from your panel.",
+    contact: "Contact",
+    paymentSignatureTitle: "Payment received signature",
+    paymentSignatureCopy: "The cleaner signs with finger or mouse to confirm the external payment was received.",
+    paymentSignatureCleanerPortalCopy: "Sign with finger or mouse to confirm the payment generated by administration and request payment processing.",
+    serviceSignatureTitle: "Service departure signature",
+    serviceSignatureCopy: "The person on site signs with finger or mouse to confirm the cleaner finished.",
+    signerName: "Signer name",
+    clearSignature: "Clear signature",
+    saveSignature: "Save signature",
+    photoOfJob: "Job photo",
+    close: "Close",
+    confirmDeletion: "Confirm deletion",
+    deleteSelectedJobCopy: "Only the selected job will be deleted.",
+    relatedJobsSafeCopy: "Other jobs from the same client remain saved because they are separate records.",
+    deleteThisJob: "Delete this job",
+    archiveCleanerTitle: "Archive cleaner",
+    archiveCleanerCopy: "The cleaner leaves the active team, but their history remains saved.",
+    archiveCleanerHistoryCopy: "Previous jobs, payments, photos and signatures remain available for reports and history.",
+    archiveCleanerAction: "Archive cleaner",
+    archiveClientTitle: "Archive client",
+    archiveClientCopy: "The client leaves the active list, but their history remains saved.",
+    archiveClientHistoryCopy: "Previous jobs, photos and signatures remain available for reports and history.",
+    archiveClientAction: "Archive client",
+    deleteReceiptTitle: "Delete receipt",
+    deleteReceiptCopy: "This action deletes the receipt and releases its jobs so another payment can be generated.",
+    deleteReceiptAction: "Delete receipt",
     confirmDeleteJob: "Are you sure you want to delete this job?",
     confirmDeletePhoto: "Are you sure you want to delete this photo?",
     confirmDeleteCostRule: "Are you sure you want to delete this special rule?",
@@ -823,6 +1103,110 @@ const i18n = {
     fineprint: "El pago real se conectara con Stripe. Esta pantalla deja armado el flujo de registro, verificacion y activacion.",
     cleanerArrived: "Cleaner llego",
     cleanerArrivedCopy: "Cliente notificado, GPS guardado y trabajo en progreso.",
+    cleanerPrivatePortal: "Portal privado cleaner",
+    cleanerPortalLogo: "Portal de cleaner",
+    cleanerSummaryTab: "Resumen",
+    cleanerJobsTab: "Trabajos",
+    cleanerCalendarTab: "Calendario",
+    cleanerHoursTab: "Horas trabajadas",
+    cleanerPaymentsTab: "Pagos",
+    cleanerReportTab: "Reporte",
+    cleanerEncouragementTitle: "Sigue asi!",
+    cleanerEncouragementCopy: "Excelente trabajo. Tienes 95% de trabajos completados a tiempo.",
+    cleanerPerformance: "Ver rendimiento",
+    cleanerWelcomeCopy: "Aqui tienes un resumen de tu actividad del dia.",
+    cleanerOnline: "En linea",
+    cleanerAccessBadge: "Acceso privado cleaner",
+    cleanerAccessEyebrow: "Portal seguro del cleaner",
+    cleanerAccessTitle: "Acceso del equipo",
+    cleanerAccessCopy: "Entra para ver tus trabajos asignados, tomar trabajos abiertos y registrar llegada, fotos y salida.",
+    cleanerAccessTrust1: "Link privado",
+    cleanerAccessTrust2: "Subida de evidencia",
+    cleanerAccessTrust3: "Registro de horas",
+    cleanerAccessPassword: "Clave de acceso",
+    cleanerAccessPasswordPlaceholder: "Ejemplo: JV-MARIA",
+    cleanerPortalEnter: "Entrar al portal",
+    cleanerAssignedTitle: "Tus trabajos",
+    cleanerAssignedChip: "Asignados",
+    cleanerOpenJobsTitle: "Trabajos abiertos",
+    cleanerTakeChip: "Tomar",
+    cleanerRecentActivity: "Actividad reciente",
+    cleanerViewAll: "Ver todas",
+    cleanerJobHistory: "Historial de trabajos",
+    cleanerClosedChip: "Cerrados",
+    cleanerAdminCorrections: "Correcciones con permiso admin",
+    cleanerAdminCorrectionCopy: "Para agregar fotos a trabajos cerrados, ingresa la clave administrativa.",
+    cleanerAdminPassword: "Clave admin",
+    cleanerActivatePermission: "Activar permiso",
+    cleanerMyCalendar: "Mi calendario",
+    cleanerAgendaChip: "Agenda",
+    cleanerCurrentMonth: "Mes actual",
+    cleanerGeneratedPayments: "Pagos generados",
+    cleanerSignatureRequired: "Firma requerida",
+    cleanerReportTitle: "Reporte del cleaner",
+    cleanerMonth: "Mes",
+    cleanerRemember: "Recuerda",
+    cleanerFooterCopy: "Sigue los pasos del checklist y sube fotos claras. Asi garantizas pagos rapidos y buenas resenas.",
+    cleanerStep1: "Paso 1",
+    cleanerStep1Text: "Revisa instrucciones",
+    cleanerStep2: "Paso 2",
+    cleanerStep2Text: "Marca llegada",
+    cleanerStep3: "Paso 3",
+    cleanerStep3Text: "Sube fotos",
+    cleanerStep4: "Paso 4",
+    cleanerStep4Text: "Termina trabajo",
+    cleanerAdminView: "Vista administrador de cleaners",
+    helloCleaner: "Hola, {name}",
+    helloCleanerWave: "Hola, {name} \u{1F44B}",
+    pendingJobs: "Pendientes",
+    toDo: "por hacer",
+    highPriority: "Prioridad alta",
+    workedToday: "Hoy trabajado",
+    estimated: "estimado",
+    activeToday: "Activo hoy",
+    noRecordsToday: "Sin registros hoy",
+    workedMonth: "Mes trabajado",
+    finishedJobs: "Terminados",
+    readyToConfirm: "listos para confirmar",
+    noCompleted: "Sin completados",
+    masterAccess: "Acceso maestro",
+    visibleCleaners: "cleaners visibles",
+    noRecentActivity: "Sin actividad reciente.",
+    jobAssigned: "Trabajo asignado",
+    jobCompleted: "Trabajo completado",
+    photosUploaded: "Fotos subidas",
+    checkInRegistered: "Check-in registrado",
+    noActiveCleanerJobs: "No tienes trabajos activos. Los terminados estan en historial.",
+    noFinishedJobs: "Todavia no hay trabajos terminados.",
+    timeUndefined: "por definir",
+    editFromAdmin: "Editar desde admin",
+    takeJob: "Tomar trabajo",
+    noOpenJobs: "No hay trabajos abiertos para tomar.",
+    unassignedCleaner: "Sin asignar",
+    adminCorrection: "Correccion de administrador",
+    arrival: "Llegada",
+    actualDeparture: "Salida real",
+    saveHours: "Guardar horas",
+    finishByAdmin: "Terminar por admin",
+    overdueCleanerWarning: "Este trabajo esta pasado de la hora estimada. Revisa si debes terminarlo o avisar a la administracion.",
+    arrivalReminder: "Ya es hora del servicio. Marca tu llegada ahora para que quede registrada para el cliente.",
+    futureJobActions: "Trabajo programado para el futuro. Las acciones se activan automaticamente el mismo dia del servicio.",
+    workBriefTitle: "Que hacer",
+    noChecklist: "sin checklist",
+    workBriefInstruction: "Primero revisa instrucciones, marca llegada una sola vez, sube fotos antes/despues por area y confirma salida al terminar.",
+    alreadyArrived: "Llegada {time}",
+    markArrived: "Ya llegue",
+    addPhoto: "Agregar foto",
+    finishedAt: "Terminado {time}",
+    finishJob: "Termine",
+    areaOrPlace: "Area o lugar",
+    areaPlaceholder: "Ej: cocina, bano, escritorio",
+    moment: "Momento",
+    comment: "Comentario",
+    commentPlaceholder: "Ej: grasa en cocina, ventana terminada...",
+    cameraOrLibrary: "Camara o biblioteca",
+    saveEvidence: "Guardar evidencia",
+    cancelCorrection: "Cancelar correccion",
     tomorrowJobs: "3 trabajos manana",
     authPlatformKicker: "Todo en una sola plataforma",
     authVisualTitle: "Control total de tu empresa de limpieza, en tiempo real.",
@@ -850,6 +1234,16 @@ const i18n = {
     clientLinks: "Links clientes",
     reports: "Reportes",
     payments: "Pagos",
+    finances: "Finanzas",
+    cleanerPayments: "Pagos a cleaners",
+    clientPayments: "Cobros a clientes",
+    paymentsSubtitle: "Gestiona y registra cobros y pagos de trabajos realizados.",
+    clientPaymentSubtitle: "Registra cobros de clientes y manten saldos pendientes al dia.",
+    registerClientPayment: "Registrar cobro de cliente",
+    clientBalances: "Saldos de clientes",
+    totalAmount: "Monto total",
+    amountReceived: "Monto recibido",
+    discount: "Descuento",
     settings: "Ajustes",
     logout: "Salir",
     newJob: "Nuevo trabajo",
@@ -977,6 +1371,38 @@ const i18n = {
     clientConfirmationShort: "Confirmacion cliente",
     onsiteSignatureReceived: "recibida de",
     completedJobsHistoryBelow: "Los trabajos realizados quedan abajo en historial.",
+    serviceActivity: "Actividad del servicio",
+    realTime: "En tiempo real",
+    privatePortalFooterTitle: "Este es tu portal privado.",
+    privatePortalFooterCopy: "Aqui puedes dar seguimiento al estado de tu servicio en tiempo real, ver evidencias, revisar historial y confirmar cuando el trabajo haya sido completado.",
+    needHelp: "Necesitas ayuda?",
+    contactAdminPanel: "Contacta al administrador desde tu panel.",
+    contact: "Contactar",
+    paymentSignatureTitle: "Firma de pago recibido",
+    paymentSignatureCopy: "El cleaner firma con dedo o mouse para confirmar que recibio el pago externo.",
+    paymentSignatureCleanerPortalCopy: "Firma con dedo o mouse para confirmar el pago generado por administracion y solicitar que se realice el pago.",
+    serviceSignatureTitle: "Firma de salida del servicio",
+    serviceSignatureCopy: "La persona en sitio firma con dedo o mouse para confirmar que el cleaner termino.",
+    signerName: "Nombre de quien firma",
+    clearSignature: "Limpiar firma",
+    saveSignature: "Guardar firma",
+    photoOfJob: "Foto del trabajo",
+    close: "Cerrar",
+    confirmDeletion: "Confirmar eliminacion",
+    deleteSelectedJobCopy: "Se eliminara solo el trabajo seleccionado.",
+    relatedJobsSafeCopy: "Si existen otros trabajos del mismo cliente, quedan guardados porque son registros separados.",
+    deleteThisJob: "Eliminar este trabajo",
+    archiveCleanerTitle: "Archivar cleaner",
+    archiveCleanerCopy: "El cleaner sale del equipo activo, pero su historial queda guardado.",
+    archiveCleanerHistoryCopy: "Sus trabajos, pagos, fotos y firmas anteriores se mantienen para reportes e historial.",
+    archiveCleanerAction: "Archivar cleaner",
+    archiveClientTitle: "Archivar cliente",
+    archiveClientCopy: "El cliente sale de la lista activa, pero su historial queda guardado.",
+    archiveClientHistoryCopy: "Sus trabajos, fotos y firmas anteriores se mantienen para reportes e historial.",
+    archiveClientAction: "Archivar cliente",
+    deleteReceiptTitle: "Eliminar comprobante",
+    deleteReceiptCopy: "Esta accion borra el comprobante y libera sus trabajos para generar otro pago.",
+    deleteReceiptAction: "Eliminar comprobante",
     confirmDeleteJob: "Seguro quieres eliminar este trabajo?",
     confirmDeletePhoto: "Seguro quieres eliminar esta foto?",
     confirmDeleteCostRule: "Seguro quieres eliminar esta regla especial?",
@@ -1014,6 +1440,110 @@ const i18n = {
     fineprint: "Реальная оплата будет подключена к Stripe. Этот экран готовит регистрацию, проверку и активацию.",
     cleanerArrived: "Клинер прибыл",
     cleanerArrivedCopy: "Клиент уведомлен, GPS сохранен, работа в процессе.",
+    cleanerPrivatePortal: "Личный портал клинера",
+    cleanerPortalLogo: "Портал клинера",
+    cleanerSummaryTab: "Сводка",
+    cleanerJobsTab: "Работы",
+    cleanerCalendarTab: "Календарь",
+    cleanerHoursTab: "Отработанные часы",
+    cleanerPaymentsTab: "Платежи",
+    cleanerReportTab: "Отчет",
+    cleanerEncouragementTitle: "Продолжайте так!",
+    cleanerEncouragementCopy: "Отличная работа. 95% работ выполнены вовремя.",
+    cleanerPerformance: "Посмотреть результат",
+    cleanerWelcomeCopy: "Здесь сводка вашей активности за сегодня.",
+    cleanerOnline: "Онлайн",
+    cleanerAccessBadge: "Личный доступ клинера",
+    cleanerAccessEyebrow: "Безопасный портал клинера",
+    cleanerAccessTitle: "Доступ команды",
+    cleanerAccessCopy: "Войдите, чтобы видеть назначенные работы, брать открытые работы и отмечать прибытие, фото и уход.",
+    cleanerAccessTrust1: "Личная ссылка",
+    cleanerAccessTrust2: "Загрузка фото",
+    cleanerAccessTrust3: "Учет часов",
+    cleanerAccessPassword: "Пароль доступа",
+    cleanerAccessPasswordPlaceholder: "Пример: JV-MARIA",
+    cleanerPortalEnter: "Войти в портал",
+    cleanerAssignedTitle: "Ваши работы",
+    cleanerAssignedChip: "Назначено",
+    cleanerOpenJobsTitle: "Открытые работы",
+    cleanerTakeChip: "Взять",
+    cleanerRecentActivity: "Последняя активность",
+    cleanerViewAll: "Показать все",
+    cleanerJobHistory: "История работ",
+    cleanerClosedChip: "Закрыто",
+    cleanerAdminCorrections: "Исправления с разрешением админа",
+    cleanerAdminCorrectionCopy: "Чтобы добавить фото к закрытым работам, введите пароль администратора.",
+    cleanerAdminPassword: "Пароль админа",
+    cleanerActivatePermission: "Активировать доступ",
+    cleanerMyCalendar: "Мой календарь",
+    cleanerAgendaChip: "Расписание",
+    cleanerCurrentMonth: "Текущий месяц",
+    cleanerGeneratedPayments: "Созданные платежи",
+    cleanerSignatureRequired: "Нужна подпись",
+    cleanerReportTitle: "Отчет клинера",
+    cleanerMonth: "Месяц",
+    cleanerRemember: "Помните",
+    cleanerFooterCopy: "Следуйте чеклисту и загружайте четкие фото. Это помогает получать быстрые выплаты и хорошие отзывы.",
+    cleanerStep1: "Шаг 1",
+    cleanerStep1Text: "Проверьте инструкции",
+    cleanerStep2: "Шаг 2",
+    cleanerStep2Text: "Отметьте прибытие",
+    cleanerStep3: "Шаг 3",
+    cleanerStep3Text: "Загрузите фото",
+    cleanerStep4: "Шаг 4",
+    cleanerStep4Text: "Завершите работу",
+    cleanerAdminView: "Админ-просмотр клинеров",
+    helloCleaner: "Здравствуйте, {name}",
+    helloCleanerWave: "Здравствуйте, {name} 👋",
+    pendingJobs: "Ожидают",
+    toDo: "к выполнению",
+    highPriority: "Высокий приоритет",
+    workedToday: "Сегодня отработано",
+    estimated: "примерно",
+    activeToday: "Активно сегодня",
+    noRecordsToday: "Сегодня записей нет",
+    workedMonth: "За месяц",
+    finishedJobs: "Завершено",
+    readyToConfirm: "готово к подтверждению",
+    noCompleted: "Нет завершенных",
+    masterAccess: "Мастер-доступ",
+    visibleCleaners: "видимых клинеров",
+    noRecentActivity: "Последней активности нет.",
+    jobAssigned: "Работа назначена",
+    jobCompleted: "Работа завершена",
+    photosUploaded: "Фото загружены",
+    checkInRegistered: "Прибытие отмечено",
+    noActiveCleanerJobs: "У вас нет активных работ. Завершенные работы находятся в истории.",
+    noFinishedJobs: "Пока нет завершенных работ.",
+    timeUndefined: "уточнить",
+    editFromAdmin: "Редактировать как админ",
+    takeJob: "Взять работу",
+    noOpenJobs: "Нет открытых работ, которые можно взять.",
+    unassignedCleaner: "Не назначено",
+    adminCorrection: "Исправление администратора",
+    arrival: "Прибытие",
+    actualDeparture: "Фактический уход",
+    saveHours: "Сохранить часы",
+    finishByAdmin: "Завершить как админ",
+    overdueCleanerWarning: "Работа просрочена по расчетному времени. Проверьте, нужно ли завершить ее или сообщить администрации.",
+    arrivalReminder: "Время услуги наступило. Отметьте прибытие, чтобы клиент видел реальное время.",
+    futureJobActions: "Работа запланирована на будущее. Действия включатся автоматически в день услуги.",
+    workBriefTitle: "Что делать",
+    noChecklist: "без чеклиста",
+    workBriefInstruction: "Сначала проверьте инструкции, один раз отметьте прибытие, загрузите фото до/после по зонам и подтвердите уход после завершения.",
+    alreadyArrived: "Прибытие {time}",
+    markArrived: "Я прибыл",
+    addPhoto: "Добавить фото",
+    finishedAt: "Завершено {time}",
+    finishJob: "Завершить",
+    areaOrPlace: "Зона или место",
+    areaPlaceholder: "Пример: кухня, ванная, стол",
+    moment: "Момент",
+    comment: "Комментарий",
+    commentPlaceholder: "Пример: жир на кухне, окно готово...",
+    cameraOrLibrary: "Камера или галерея",
+    saveEvidence: "Сохранить фото",
+    cancelCorrection: "Отменить исправление",
     tomorrowJobs: "3 работы завтра",
     authPlatformKicker: "Все в одной платформе",
     authVisualTitle: "Полный контроль клининговой компании в реальном времени.",
@@ -1041,6 +1571,16 @@ const i18n = {
     clientLinks: "Ссылки клиентов",
     reports: "Отчеты",
     payments: "Платежи",
+    finances: "Финансы",
+    cleanerPayments: "Выплаты клинерам",
+    clientPayments: "Оплаты клиентов",
+    paymentsSubtitle: "Управляйте оплатами и выплатами по выполненным работам.",
+    clientPaymentSubtitle: "Регистрируйте оплаты клиентов и обновляйте задолженности.",
+    registerClientPayment: "Зарегистрировать оплату клиента",
+    clientBalances: "Балансы клиентов",
+    totalAmount: "Общая сумма",
+    amountReceived: "Полученная сумма",
+    discount: "Скидка",
     settings: "Настройки",
     logout: "Выйти",
     newJob: "Новая работа",
@@ -1168,6 +1708,38 @@ const i18n = {
     clientConfirmationShort: "Подтверждение клиента",
     onsiteSignatureReceived: "получено от",
     completedJobsHistoryBelow: "Выполненные работы отображаются ниже в истории.",
+    serviceActivity: "Активность услуги",
+    realTime: "В реальном времени",
+    privatePortalFooterTitle: "Это ваш личный портал.",
+    privatePortalFooterCopy: "Здесь можно отслеживать статус услуги, смотреть фото, историю и подтверждать завершение работы.",
+    needHelp: "Нужна помощь?",
+    contactAdminPanel: "Свяжитесь с администратором через вашу панель.",
+    contact: "Связаться",
+    paymentSignatureTitle: "Подпись о получении оплаты",
+    paymentSignatureCopy: "Клинер подписывает пальцем или мышью, чтобы подтвердить получение внешней оплаты.",
+    paymentSignatureCleanerPortalCopy: "Подпишите пальцем или мышью, чтобы подтвердить платеж, созданный администрацией, и запросить выплату.",
+    serviceSignatureTitle: "Подпись ухода с услуги",
+    serviceSignatureCopy: "Человек на месте подписывает пальцем или мышью, чтобы подтвердить завершение работы клинером.",
+    signerName: "Имя подписанта",
+    clearSignature: "Очистить подпись",
+    saveSignature: "Сохранить подпись",
+    photoOfJob: "Фото работы",
+    close: "Закрыть",
+    confirmDeletion: "Подтвердить удаление",
+    deleteSelectedJobCopy: "Будет удалена только выбранная работа.",
+    relatedJobsSafeCopy: "Другие работы этого клиента останутся сохраненными, потому что это отдельные записи.",
+    deleteThisJob: "Удалить эту работу",
+    archiveCleanerTitle: "Архивировать клинера",
+    archiveCleanerCopy: "Клинер уйдет из активной команды, но история сохранится.",
+    archiveCleanerHistoryCopy: "Предыдущие работы, платежи, фото и подписи останутся для отчетов и истории.",
+    archiveCleanerAction: "Архивировать клинера",
+    archiveClientTitle: "Архивировать клиента",
+    archiveClientCopy: "Клиент уйдет из активного списка, но история сохранится.",
+    archiveClientHistoryCopy: "Предыдущие работы, фото и подписи останутся для отчетов и истории.",
+    archiveClientAction: "Архивировать клиента",
+    deleteReceiptTitle: "Удалить квитанцию",
+    deleteReceiptCopy: "Это действие удалит квитанцию и освободит ее работы для нового платежа.",
+    deleteReceiptAction: "Удалить квитанцию",
     confirmDeleteJob: "Вы уверены, что хотите удалить эту работу?",
     confirmDeletePhoto: "Вы уверены, что хотите удалить это фото?",
     confirmDeleteCostRule: "Вы уверены, что хотите удалить это специальное правило?",
@@ -1296,9 +1868,200 @@ function syncPlanSelection() {
   }
 }
 
-function showPaymentStep() {
-  $("#paymentStep")?.classList.remove("hidden");
+function planChoiceCopy(context, reason = "") {
+  if (context === "limit") {
+    return reason || "Llegaste al limite de tu plan actual. Elige un paquete superior para seguir creciendo.";
+  }
+  if (stripePaymentReturn) {
+    return "Ya recibimos el pago. Completa el registro para activar tu cuenta.";
+  }
+  return "Primero guardamos tus datos basicos. Ahora elige si quieres empezar gratis o activar un plan pagado.";
+}
+
+function renderPlanChoiceGrid() {
+  const grid = $("#planChoiceGrid");
+  if (!grid) return;
+  grid.innerHTML = Object.entries(PLAN_CHOICE_CARDS).map(([planKey, card]) => `
+    <article class="plan-choice-option ${card.featured ? "is-featured" : ""}">
+      <div>
+        <h4>${escapeHtml(card.name)}</h4>
+        <p class="muted">${escapeHtml(card.note)}</p>
+      </div>
+      <div class="plan-choice-price">${escapeHtml(card.price)}<small>/mes</small></div>
+      <ul>
+        ${card.features.map((feature) => `<li>${escapeHtml(feature)}</li>`).join("")}
+      </ul>
+      <button class="${planKey === "free" ? "ghost" : "primary"}" type="button" data-choose-plan="${planKey}">
+        ${escapeHtml(card.action)}
+      </button>
+    </article>
+  `).join("");
+}
+
+function openPlanChoiceModal(context = "signup", reason = "") {
+  planChoiceContext = context;
+  $("#planChoiceTitle").textContent = context === "limit" ? "Actualiza tu plan" : "Elige tu plan";
+  $("#planChoiceCopy").textContent = planChoiceCopy(context, reason);
+  renderPlanChoiceGrid();
+  $("#planChoiceModal")?.classList.remove("hidden");
+}
+
+function closePlanChoiceModal() {
+  $("#planChoiceModal")?.classList.add("hidden");
+}
+
+function goToStripeForPlan(planKey, email = "") {
+  const link = stripePaymentLinks[planKey] || stripePaymentLinks.independent;
+  const suffix = email ? `?prefilled_email=${encodeURIComponent(email)}` : "";
+  location.href = `${link}${suffix}`;
+}
+
+async function choosePlan(planKey) {
+  selectedPlan = normalizePlanKey(planKey) || "free";
   syncPlanSelection();
+  closePlanChoiceModal();
+  const email = pendingSignupData?.email || $("#authForm")?.elements.email?.value || "";
+
+  if (selectedPlan !== "free") {
+    goToStripeForPlan(selectedPlan, email);
+    return;
+  }
+
+  if (pendingSignupData) {
+    const data = pendingSignupData;
+    pendingSignupData = null;
+    await registerAccountWithSelectedPlan(data);
+    return;
+  }
+
+  if (planChoiceContext === "limit") {
+    toast("Ya estas en el plan gratis. Elige un plan pagado para aumentar limites.");
+  }
+}
+
+async function registerAccountWithSelectedPlan(data) {
+  toast("Registrando cuenta...");
+  let finalPlan = selectedPlan;
+
+  let stripePayment = null;
+  try {
+    const { data: payment } = await supabaseClient
+      .from("stripe_payments")
+      .select("*")
+      .eq("email", data.email.toLowerCase())
+      .in("payment_status", ["paid", "complete", "active", "trialing"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (payment) {
+      stripePayment = payment;
+      finalPlan = payment.plan_id === "solo" ? "independent" : (payment.plan_id === "starter" ? "company" : payment.plan_id);
+    }
+  } catch (err) {
+    console.error("Error looking up Stripe payment:", err);
+  }
+
+  if (selectedPlan !== "free" && !stripePayment) {
+    toast("Aun no encontramos el pago confirmado de Stripe para este email. Espera unos segundos y vuelve a intentar.");
+    return;
+  }
+
+  const dbPlanId = dbPlanIdForPlan(finalPlan);
+  const finalMode = ["free", "independent"].includes(finalPlan) ? "independent" : "company";
+
+  const { data: authData, error } = await supabaseClient.auth.signUp({
+    email: data.email,
+    password: data.password,
+    options: {
+      data: {
+        full_name: data.fullName || data.email.split('@')[0],
+        phone: data.phone || "",
+        company_name: data.companyName || `${data.fullName || 'Mi Empresa'}`,
+        mode: finalMode,
+        plan_id: dbPlanId,
+        country: state.country || "IL",
+        language: state.language || "es"
+      }
+    }
+  });
+
+  if (error) {
+    toast("Error: " + error.message);
+    return;
+  }
+
+  const user = authData.user;
+  if (user) {
+    state.user = user;
+
+    if (stripePayment && authData.session) {
+      await new Promise(resolve => setTimeout(resolve, 800));
+      await loadStateFromSupabase();
+      if (state.orgId) {
+        await supabaseClient.from("subscriptions").insert({
+          organization_id: state.orgId,
+          plan_id: dbPlanId,
+          status: "active",
+          provider: "stripe",
+          provider_customer_id: stripePayment.customer_id,
+          provider_subscription_id: stripePayment.subscription_id,
+          billing_cycle: stripePayment.billing_cycle || "monthly",
+          started_at: new Date().toISOString()
+        });
+      }
+    }
+
+    if (authData.session) {
+      await loadStateFromSupabase();
+      enterApp(finalMode);
+      toast("Cuenta creada y activada.");
+    } else {
+      toast("Registro exitoso. Por favor verifica tu correo para activar tu cuenta.");
+    }
+  }
+}
+
+async function applyPaidPlanForCurrentUser() {
+  if (!stripePaymentReturn || !supabaseClient || !state.user?.email || !state.orgId) return;
+  try {
+    const { data: payment } = await supabaseClient
+      .from("stripe_payments")
+      .select("*")
+      .eq("email", state.user.email.toLowerCase())
+      .in("payment_status", ["paid", "complete", "active", "trialing"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!payment) return;
+
+    const paidPlan = appPlanFromDbPlan(payment.plan_id);
+    if (!paidPlan || paidPlan === "free") return;
+    const dbPlanId = dbPlanIdForPlan(paidPlan);
+    const orgType = ["independent", "free"].includes(paidPlan) ? "independent" : "company";
+
+    await supabaseClient
+      .from("organizations")
+      .update({ plan_id: dbPlanId, type: orgType })
+      .eq("id", state.orgId);
+
+    await supabaseClient.from("subscriptions").insert({
+      organization_id: state.orgId,
+      plan_id: dbPlanId,
+      status: "active",
+      provider: "stripe",
+      provider_customer_id: payment.customer_id,
+      provider_subscription_id: payment.subscription_id,
+      billing_cycle: payment.billing_cycle || "monthly",
+      started_at: new Date().toISOString()
+    });
+
+    selectedPlan = paidPlan;
+    state.mode = orgType;
+    toast(`Plan actualizado a ${PLAN_CHOICE_CARDS[paidPlan]?.name || paidPlan}.`);
+  } catch (err) {
+    console.error("Error applying paid plan:", err);
+  }
 }
 
 function applyStripePaymentReturnState() {
@@ -1561,7 +2324,10 @@ function rateForClientService(clientId, serviceType) {
 }
 
 function normalizeKey(value) {
-  return String(value || "").trim().toUpperCase();
+  let key = String(value || "").trim();
+  const labelMatch = key.match(/(?:clave|key):\s*([A-Za-z0-9-]+)/i);
+  if (labelMatch) key = labelMatch[1];
+  return key.trim().toUpperCase();
 }
 
 function safeId() {
@@ -1654,6 +2420,10 @@ function cleanerPortalPassword(cleaner) {
   return cleaner?.key || `JV-${fallbackName.slice(0, 10).toUpperCase()}`;
 }
 
+function cleanerPortalDisplayKey(cleaner) {
+  return cleanerPortalPassword(cleaner).trim();
+}
+
 function localClientPortalUrl(client) {
   if (state.companyProfile && state.companyProfile.portalUrl) {
     let customUrl = state.companyProfile.portalUrl.trim();
@@ -1669,17 +2439,18 @@ function localClientPortalUrl(client) {
 }
 
 function localCleanerPortalUrl(cleaner) {
+  const cleanKey = cleanerPortalDisplayKey(cleaner);
   if (state.companyProfile && state.companyProfile.portalUrl) {
     let customUrl = state.companyProfile.portalUrl.trim();
     if (customUrl) {
       if (!/^https?:\/\//i.test(customUrl)) {
         customUrl = 'https://' + customUrl;
       }
-      return `${customUrl.replace(/\/$/, "").replace(/\/portal-cleaners\.html$/i, "")}/portal-cleaners.html?id=${encodeURIComponent(cleaner.id)}&clave=${encodeURIComponent(cleanerPortalPassword(cleaner))}`;
+      return `${customUrl.replace(/\/$/, "").replace(/\/portal-cleaners\.html$/i, "")}/portal-cleaners.html?id=${encodeURIComponent(cleaner.id)}&clave=${encodeURIComponent(cleanKey)}`;
     }
   }
   const basePath = location.pathname.replace(/\/[^/]*$/, "");
-  return `${location.origin}${basePath}/portal-cleaners.html?id=${encodeURIComponent(cleaner.id)}&clave=${encodeURIComponent(cleanerPortalPassword(cleaner))}`;
+  return `${location.origin}${basePath}/portal-cleaners.html?id=${encodeURIComponent(cleaner.id)}&clave=${encodeURIComponent(cleanKey)}`;
 }
 
 function currentTime() {
@@ -1729,6 +2500,7 @@ function localText(key) {
 
 function localizedJobStatus(status) {
   const labels = {
+    "Programado": { en: "Scheduled", es: "Programado", ru: "Запланировано" },
     "Asignado": { en: "Assigned", es: "Asignado", ru: "Назначено" },
     "Disponible para tomar": { en: "Available to take", es: "Disponible para tomar", ru: "Доступно для принятия" },
     "En progreso": { en: "In progress", es: "En progreso", ru: "В процессе" },
@@ -1740,7 +2512,9 @@ function localizedJobStatus(status) {
     "Terminado por cliente": { en: "Finished by client", es: "Terminado por cliente", ru: "Завершено клиентом" },
     "Confirmado por cliente": { en: "Finished by client", es: "Terminado por cliente", ru: "Завершено клиентом" },
     "Terminado por administrador": { en: "Finished by administrator", es: "Terminado por administrador", ru: "Завершено администратором" },
+    "Firmado": { en: "Signed", es: "Firmado", ru: "Подписано" },
     "Pagado": { en: "Paid", es: "Pagado", ru: "Оплачено" },
+    "Cancelado": { en: "Cancelled", es: "Cancelado", ru: "Отменено" },
     "No iniciado": { en: "Not started", es: "No iniciado", ru: "Не начато" }
   };
   return labels[status]?.[state.language] || labels[status]?.en || status;
@@ -1838,6 +2612,106 @@ function isBillableDone(job) {
   return Boolean(isDone(job) && hasFinalTime(job));
 }
 
+function currentPlanKey() {
+  const userPlan = normalizePlanKey(state.user?.plan);
+  const selected = normalizePlanKey(selectedPlan);
+  if (userPlan) return userPlan;
+  if (selected) return selected;
+  return state.mode === "company" ? "company" : "free";
+}
+
+function currentEntitlements() {
+  return PLAN_ENTITLEMENTS[currentPlanKey()] || PLAN_ENTITLEMENTS.free;
+}
+
+function isUnlimited(value) {
+  return value === Infinity;
+}
+
+function limitText(value) {
+  return isUnlimited(value) ? "ilimitado" : String(value);
+}
+
+function recurringJobsPreview(payload, count, recurrence) {
+  const safeCount = Math.max(1, Math.min(24, Number(count || 1)));
+  const baseDate = new Date(`${payload.date}T00:00:00`);
+  const intervalDays = recurrence === "weekly" ? 7 : recurrence === "biweekly" ? 14 : 0;
+
+  return Array.from({ length: safeCount }, (_, index) => {
+    const date = new Date(baseDate);
+    if (recurrence === "monthly") date.setMonth(baseDate.getMonth() + index);
+    else date.setDate(baseDate.getDate() + (intervalDays * index));
+    return date.toISOString().slice(0, 10);
+  });
+}
+
+function planUpgradeMessage(reason) {
+  const plan = currentEntitlements().label;
+  return `${reason} Tu plan actual es ${plan}. Mejora el plan para desbloquear mas capacidad.`;
+}
+
+function canCreateClient(editingId = "") {
+  const limit = currentEntitlements().maxClients;
+  if (isUnlimited(limit) || editingId) return true;
+  return activeClients().length < limit;
+}
+
+function canCreateCleaner(editingId = "") {
+  const limit = currentEntitlements().maxCleaners;
+  if (isUnlimited(limit) || editingId) return true;
+  return activeCleaners().length < limit;
+}
+
+function canCreateJobs(payload, count, recurrence, editingId = "") {
+  const limit = currentEntitlements().maxMonthlyJobs;
+  if (isUnlimited(limit) || editingId) return true;
+  const existingByMonth = new Map();
+  state.jobs
+    .filter((job) => job.id !== editingId)
+    .forEach((job) => {
+      const monthKey = String(job.date || "").slice(0, 7);
+      if (!monthKey) return;
+      existingByMonth.set(monthKey, (existingByMonth.get(monthKey) || 0) + 1);
+    });
+
+  for (const date of recurringJobsPreview(payload, count, recurrence)) {
+    const monthKey = date.slice(0, 7);
+    existingByMonth.set(monthKey, (existingByMonth.get(monthKey) || 0) + 1);
+    if ((existingByMonth.get(monthKey) || 0) > limit) return false;
+  }
+  return true;
+}
+
+function enforcePlanAction(action, details = {}) {
+  const entitlements = currentEntitlements();
+  if (action === "client" && !canCreateClient(details.editingId)) {
+    openPlanChoiceModal("limit", planUpgradeMessage(`El limite de clientes es ${limitText(entitlements.maxClients)}.`));
+    return false;
+  }
+  if (action === "cleaner" && !canCreateCleaner(details.editingId)) {
+    openPlanChoiceModal("limit", planUpgradeMessage(`El limite de cleaners es ${limitText(entitlements.maxCleaners)}.`));
+    return false;
+  }
+  if (action === "job" && !canCreateJobs(details.payload, details.count, details.recurrence, details.editingId)) {
+    openPlanChoiceModal("limit", planUpgradeMessage(`El limite del plan gratis es ${limitText(entitlements.maxMonthlyJobs)} trabajos por mes.`));
+    return false;
+  }
+  if (action === "cleanerPayments" && !entitlements.cleanerPayments) {
+    openPlanChoiceModal("limit", planUpgradeMessage("Los recibos y pagos a cleaners son una funcion Pro."));
+    return false;
+  }
+  if (action === "advancedReports" && !entitlements.advancedReports) {
+    openPlanChoiceModal("limit", planUpgradeMessage("Los reportes avanzados son una funcion Pro."));
+    return false;
+  }
+  return true;
+}
+
+function viewAllowedByPlan(name) {
+  if (name === "cleaners") return currentEntitlements().cleanerPortal;
+  return true;
+}
+
 function hasRealBillingTimes(job) {
   return Boolean(job.checkedIn && job.actualEnd && isDone(job));
 }
@@ -1889,6 +2763,11 @@ function cleanerFromPortalAccess(id, key) {
   const byId = state.cleaners.find((item) => item.id === id);
   if (byId && (!accessKey || normalizeKey(cleanerPortalPassword(byId)) === accessKey || portalCleanerAdmin)) return byId;
   return state.cleaners.find((item) => normalizeKey(cleanerPortalPassword(item)) === accessKey) || byId;
+}
+
+function cleanerPortalPendingCount(cleaner) {
+  const jobs = portalCleanerAdmin ? state.jobs.filter((job) => job.cleanerId) : state.jobs.filter((job) => job.cleanerId === cleaner?.id);
+  return jobs.filter((job) => !job.checkedOut && !job.cleanerFinished).length;
 }
 
 function clientJobHistory(clientId) {
@@ -2188,6 +3067,14 @@ function parsedCleanerAccess(params = new URLSearchParams(location.search)) {
   return { id, key: normalizeKey(key) };
 }
 
+function parsedClientAccess(params = new URLSearchParams(location.search)) {
+  const rawId = decodeURIComponent(params.get("id") || "");
+  const id = rawId.split(/\s+(clave|key):/i)[0].trim();
+  const embeddedKey = rawId.match(/(?:clave|key):\s*([A-Z0-9-]+)/i)?.[1] || "";
+  const key = params.get("clave") || params.get("key") || embeddedKey;
+  return { id, key: normalizeKey(key) };
+}
+
 function portalPageVisible(selector) {
   const node = $(selector);
   return Boolean(node && !node.classList.contains("hidden") && node.style.display !== "none");
@@ -2202,10 +3089,10 @@ function cleanerPortalCredentials() {
 }
 
 function clientPortalCredentials() {
-  const params = new URLSearchParams(location.search);
+  const access = parsedClientAccess();
   return {
-    clientId: portalClientId || params.get("id"),
-    clientKey: normalizeKey($("#clientPortalPassword")?.value || params.get("clave"))
+    clientId: portalClientId || access.id,
+    clientKey: normalizeKey($("#clientPortalPassword")?.value || access.key)
   };
 }
 
@@ -2276,7 +3163,7 @@ async function persistCleanerJobAction(action, job, extra = {}) {
     if (error) throw error;
   } else if (action === "finish") {
     const { error } = await supabaseClient.from("jobs").update({
-      status: "cleaner_finished",
+      status: dbStatusFromAppStatus(job.status, job.cleanerId),
       actual_end: extra.actual_end
     }).eq("id", job.id);
     if (error) throw error;
@@ -2437,20 +3324,40 @@ function validateDemoAccount(action, data = {}) {
   return true;
 }
 
-async function enterClientPortalFromUrl() {
-  const params = new URLSearchParams(location.search);
+async function enterClientPortalFromUrl(params = new URLSearchParams(location.search)) {
   if (params.get("portal") === "cleaner") return await enterCleanerPortalFromUrl(params);
-  if (params.get("portal") !== "client") return false;
+  const isClientPortalPath = window.location.pathname.toLowerCase().includes("portal-clientes");
+  if (params.get("portal") !== "client" && !isClientPortalPath) return false;
   portalCleanerAdmin = false;
-  const clientId = params.get("id");
-  const accessKey = normalizeKey(params.get("clave"));
+  const access = parsedClientAccess(params);
+  const clientId = access.id;
+  const accessKey = access.key;
 
-  if (supabaseClient && (!state.clients || state.clients.length === 0 || !state.clients.some(c => c.id === clientId))) {
+  if (accessKey && (supabaseClient || JOBVISTO_SUPABASE_URL) && (!state.clients || state.clients.length === 0 || !state.clients.some(c => c.id === clientId))) {
     try {
-      const { data, error } = await supabaseClient.rpc('get_portal_client', {
-        client_id: clientId,
-        client_key: accessKey
-      });
+      let data = null;
+      let error = null;
+      if (supabaseClient) {
+        ({ data, error } = await supabaseClient.rpc('get_portal_client', {
+          client_id: clientId || null,
+          client_key: accessKey
+        }));
+      }
+      if ((!data || error) && JOBVISTO_SUPABASE_URL && JOBVISTO_SUPABASE_ANON_KEY) {
+        const response = await fetch(`${JOBVISTO_SUPABASE_URL}/rest/v1/rpc/get_portal_client`, {
+          method: "POST",
+          headers: {
+            apikey: JOBVISTO_SUPABASE_ANON_KEY,
+            authorization: `Bearer ${JOBVISTO_SUPABASE_ANON_KEY}`,
+            "content-type": "application/json"
+          },
+          body: JSON.stringify({ client_id: clientId || null, client_key: accessKey })
+        });
+        if (response.ok) {
+          data = await response.json();
+          error = null;
+        }
+      }
       if (!error && data) {
         const cl = data.client;
         const org = data.organization;
@@ -2458,7 +3365,11 @@ async function enterClientPortalFromUrl() {
         state.country = org.country || "IL";
         state.currencySymbol = org.currency === "ILS" ? "₪" : (org.currency === "USD" ? "$" : org.currency);
 
-        const { data: settings } = await supabaseClient.from('organization_settings').select('*').eq('organization_id', cl.organization_id);
+        let settings = data.settings || [];
+        if (!settings.length) {
+          const { data: settingsRows } = await supabaseClient.from('organization_settings').select('*').eq('organization_id', cl.organization_id);
+          settings = settingsRows || [];
+        }
         if (settings) {
           const vatSetting = settings.find(s => s.key === 'vat_rate');
           if (vatSetting) state.vatRate = Number(vatSetting.value?.rate !== undefined ? vatSetting.value.rate : 18);
@@ -2475,11 +3386,15 @@ async function enterClientPortalFromUrl() {
           country: state.country || "IL",
           paymentMethod: cl.default_payment_method === 'cash' ? 'Efectivo' : 'Transferencia',
           notes: cl.notes || "",
-          portalPasscode: cl.portal_passcode || null,
+          portalPasscode: accessKey || null,
           portalActive: cl.portal_active !== false
         }];
 
-        const { data: addresses } = await supabaseClient.from('client_addresses').select('*').eq('client_id', cl.id);
+        let addresses = data.addresses || [];
+        if (!addresses.length) {
+          const { data: addressRows } = await supabaseClient.from('client_addresses').select('*').eq('client_id', cl.id);
+          addresses = addressRows || [];
+        }
         if (addresses && addresses[0]) {
           state.clients[0].address = addresses[0].address_line;
         }
@@ -2490,7 +3405,7 @@ async function enterClientPortalFromUrl() {
           phone: c.phone || "",
           email: c.email || "",
           status: c.status === 'available' ? 'Disponible' : 'Ocupada',
-          key: c.access_key,
+          key: "",
           country: c.country || state.country || "IL",
           city: c.city || "Zona principal"
         }));
@@ -2533,16 +3448,11 @@ async function enterClientPortalFromUrl() {
             clientPaymentStatus: j.client_payment_status || "unpaid",
             clientPaidDate: j.client_paid_date || "",
             clientPaymentMethod: j.client_payment_method || "",
-            status: j.status === 'scheduled' ? 'Asignado' : 
-                    j.status === 'open' ? 'Disponible para tomar' : 
-                    j.status === 'in_site' ? 'En progreso' :
-                    j.status === 'cleaner_finished' ? 'Terminado por cleaner' :
-                    j.status === 'client_confirmed' ? 'Confirmado por cliente' :
-                    j.status === 'signed' ? 'Firmado' : j.status,
+            status: appStatusFromDbStatus(j.status),
             tasks: j.checklist || [],
-            checkedIn: j.status === 'in_site' || j.status === 'cleaner_finished' || j.status === 'client_confirmed' || j.status === 'signed',
-            checkedOut: j.status === 'cleaner_finished' || j.status === 'client_confirmed' || j.status === 'signed' || jobSignatures.length > 0,
-            cleanerFinished: j.status === 'cleaner_finished' || j.status === 'client_confirmed' || j.status === 'signed' || jobSignatures.length > 0,
+            checkedIn: j.status === 'in_site' || DONE_DB_JOB_STATUSES.includes(j.status),
+            checkedOut: DONE_DB_JOB_STATUSES.includes(j.status) || jobSignatures.length > 0,
+            cleanerFinished: DONE_DB_JOB_STATUSES.includes(j.status) || jobSignatures.length > 0,
             clientConfirmed: j.status === 'client_confirmed' || j.status === 'signed' || clientSig !== undefined,
             signed: j.status === 'client_confirmed' || j.status === 'signed' || jobSignatures.length > 0,
             siteSignature: siteSig ? siteSig.signature_data : "",
@@ -2569,8 +3479,8 @@ async function enterClientPortalFromUrl() {
   $("#appShell").style.display = "none";
   
   $("#clientPortalPage").classList.remove("hidden");
-  $("#clientPortalPassword").value = params.get("clave") || (client ? clientPortalPassword(client) : "");
-  renderStandaloneClientPortal(shouldUnlock);
+  $("#clientPortalPassword").value = access.key || (client ? clientPortalPassword(client) : "");
+  renderStandaloneClientPortal(shouldUnlock, { showMissingToast: Boolean(clientId || accessKey) });
   return true;
 }
 
@@ -2581,7 +3491,7 @@ async function enterCleanerPortalFromUrl(params = new URLSearchParams(location.s
   if (supabaseClient && (!state.cleaners || state.cleaners.length === 0 || !state.cleaners.some(c => c.id === access.id))) {
     try {
       const { data, error } = await supabaseClient.rpc('get_portal_cleaner', {
-        cleaner_id: access.id,
+        cleaner_id: access.id || null,
         cleaner_key: access.key
       });
       if (!error && data) {
@@ -2591,7 +3501,11 @@ async function enterCleanerPortalFromUrl(params = new URLSearchParams(location.s
         state.country = org.country || "IL";
         state.currencySymbol = org.currency === "ILS" ? "₪" : (org.currency === "USD" ? "$" : org.currency);
 
-        const { data: settings } = await supabaseClient.from('organization_settings').select('*').eq('organization_id', cl.organization_id);
+        let settings = data.settings || [];
+        if (!settings.length) {
+          const { data: settingsRows } = await supabaseClient.from('organization_settings').select('*').eq('organization_id', cl.organization_id);
+          settings = settingsRows || [];
+        }
         if (settings) {
           const vatSetting = settings.find(s => s.key === 'vat_rate');
           if (vatSetting) state.vatRate = Number(vatSetting.value?.rate !== undefined ? vatSetting.value.rate : 18);
@@ -2605,7 +3519,7 @@ async function enterCleanerPortalFromUrl(params = new URLSearchParams(location.s
           phone: cl.phone || "",
           email: cl.email || "",
           status: cl.status === 'available' ? 'Disponible' : 'Ocupada',
-          key: cl.access_key,
+          key: access.key || "",
           country: cl.country || state.country || "IL",
           city: cl.city || "Zona principal"
         }];
@@ -2615,7 +3529,7 @@ async function enterCleanerPortalFromUrl(params = new URLSearchParams(location.s
           name: c.name,
           phone: c.phone || "",
           email: c.email || "",
-          address: "",
+          address: c.address || "",
           country: state.country || "IL",
           paymentMethod: c.default_payment_method === 'cash' ? 'Efectivo' : 'Transferencia',
           notes: c.notes || ""
@@ -2659,16 +3573,11 @@ async function enterCleanerPortalFromUrl(params = new URLSearchParams(location.s
             clientPaymentStatus: j.client_payment_status || "unpaid",
             clientPaidDate: j.client_paid_date || "",
             clientPaymentMethod: j.client_payment_method || "",
-            status: j.status === 'scheduled' ? 'Asignado' : 
-                    j.status === 'open' ? 'Disponible para tomar' : 
-                    j.status === 'in_site' ? 'En progreso' :
-                    j.status === 'cleaner_finished' ? 'Terminado por cleaner' :
-                    j.status === 'client_confirmed' ? 'Confirmado por cliente' :
-                    j.status === 'signed' ? 'Firmado' : j.status,
+            status: appStatusFromDbStatus(j.status),
             tasks: j.checklist || [],
-            checkedIn: j.status === 'in_site' || j.status === 'cleaner_finished' || j.status === 'client_confirmed' || j.status === 'signed',
-            checkedOut: j.status === 'cleaner_finished' || j.status === 'client_confirmed' || j.status === 'signed' || jobSignatures.length > 0,
-            cleanerFinished: j.status === 'cleaner_finished' || j.status === 'client_confirmed' || j.status === 'signed' || jobSignatures.length > 0,
+            checkedIn: j.status === 'in_site' || DONE_DB_JOB_STATUSES.includes(j.status),
+            checkedOut: DONE_DB_JOB_STATUSES.includes(j.status) || jobSignatures.length > 0,
+            cleanerFinished: DONE_DB_JOB_STATUSES.includes(j.status) || jobSignatures.length > 0,
             clientConfirmed: j.status === 'client_confirmed' || j.status === 'signed' || clientSig !== undefined,
             signed: j.status === 'client_confirmed' || j.status === 'signed' || jobSignatures.length > 0,
             siteSignature: siteSig ? siteSig.signature_data : "",
@@ -2709,17 +3618,21 @@ async function enterCleanerPortalFromUrl(params = new URLSearchParams(location.s
   $("#clientPortalPage").classList.add("hidden");
   $("#cleanerPortalPage").classList.remove("hidden");
   $("#cleanerPortalPassword").value = access.key || (cleaner ? cleanerPortalPassword(cleaner) : "");
-  renderStandaloneCleanerPortal(shouldUnlock);
+  renderStandaloneCleanerPortal(shouldUnlock, { showMissingToast: Boolean(access.id || access.key) });
   return true;
 }
 
-function renderStandaloneClientPortal(unlocked = true) {
+function renderStandaloneClientPortal(unlocked = true, options = {}) {
+  $("#clientPortalPage")?.classList.toggle("is-unlocked", unlocked);
   const client = state.clients.find((item) => item.id === portalClientId);
   if (!client) {
+    $("#clientPortalPage")?.classList.remove("is-unlocked");
     $("#clientPortalLock").classList.remove("hidden");
     $("#clientPortalContent").classList.add("hidden");
     $("#clientPortalPassword").value = "";
-    toast("Acceso de cliente no encontrado. Copia el link actualizado desde Links clientes.");
+    if (options.showMissingToast) {
+      toast("Acceso de cliente no encontrado. Copia el link actualizado desde Links clientes.");
+    }
     return;
   }
   const job = currentClientJob(client?.id);
@@ -2905,12 +3818,15 @@ function renderStandaloneClientPortal(unlocked = true) {
   }
 }
 
-function renderStandaloneCleanerPortal(unlocked = true) {
+function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
   const cleaner = state.cleaners.find((item) => item.id === portalCleanerId);
   if (!cleaner) {
     $("#cleanerPortalLock").classList.remove("hidden");
     $("#cleanerPortalContent").classList.add("hidden");
-    toast("Acceso de cleaner no encontrado. Copia el link actualizado desde Cleaners.");
+    $("#cleanerPortalPage").classList.remove("is-unlocked");
+    if (options.showMissingToast) {
+      toast("Acceso de cleaner no encontrado. Copia el link actualizado desde Cleaners.");
+    }
     return;
   }
   const assignedJobs = portalCleanerAdmin ? state.jobs.filter((job) => job.cleanerId) : state.jobs.filter((job) => job.cleanerId === cleaner.id);
@@ -2930,11 +3846,13 @@ function renderStandaloneCleanerPortal(unlocked = true) {
   $("#cleanerPortalLock").classList.toggle("hidden", unlocked);
   $("#cleanerPortalContent").classList.toggle("hidden", !unlocked);
   $("#cleanerPortalPage").classList.toggle("is-unlocked", unlocked);
-  $("#cleanerPortalTitle").textContent = portalCleanerAdmin ? "Vista administrador de cleaners" : `Hola, ${cleaner.name}`;
+  $("#cleanerPortalTitle").textContent = portalCleanerAdmin
+    ? t("cleanerAdminView")
+    : t("helloCleaner").replace("{name}", cleaner.name);
   // Update greeting and avatar with real name
   const cleanerFirstName = (cleaner.name || "").split(" ")[0];
   const cleanerInitials = (cleaner.name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
-  if ($("#cleanerWelcomeGreeting")) $("#cleanerWelcomeGreeting").textContent = `Hola, ${cleanerFirstName} \u{1F44B}`;
+  if ($("#cleanerWelcomeGreeting")) $("#cleanerWelcomeGreeting").textContent = t("helloCleanerWave").replace("{name}", cleanerFirstName);
   if ($("#cleanerWidgetName")) $("#cleanerWidgetName").textContent = cleaner.name;
   const avatarEl = document.querySelector(".widget-avatar");
   if (avatarEl) {
@@ -2961,45 +3879,45 @@ function renderStandaloneCleanerPortal(unlocked = true) {
   const lastWeekMinutes = lastWeekJobs.reduce((s, j) => s + billableMinutes(j), 0);
   const trendLabel = lastWeekMinutes > 0
     ? (totalMinutes > lastWeekMinutes
-      ? `\u2197 ${Math.round(((totalMinutes - lastWeekMinutes) / lastWeekMinutes) * 100)}% m\u00e1s que sem. pasada`
-      : `\u2198 ${Math.round(((lastWeekMinutes - totalMinutes) / lastWeekMinutes) * 100)}% menos que sem. pasada`)
-    : (totalMinutes > 0 ? "\u2197 \u00a1Buen trabajo!" : "\u2014 Sin registros hoy");
+      ? `\u2197 ${Math.round(((totalMinutes - lastWeekMinutes) / lastWeekMinutes) * 100)}%`
+      : `\u2198 ${Math.round(((lastWeekMinutes - totalMinutes) / lastWeekMinutes) * 100)}%`)
+    : (totalMinutes > 0 ? `\u2197 ${t("cleanerEncouragementTitle")}` : `\u2014 ${t("noRecordsToday")}`);
   const kpiHtml = `
     <article class="cleaner-kpi-card${hasPriority ? ' kpi-alert' : ''}">
       <div class="kpi-icon-wrap"><span class="kpi-icon">\u{1F4CB}</span></div>
       <div class="kpi-body">
-        <span class="kpi-label">Pendientes</span>
-        <strong class="kpi-value">${activeAssignedJobs.length}</strong>
-        <small class="kpi-note">por hacer</small>
-      </div>
-      ${hasPriority ? `<span class="kpi-badge kpi-badge-red">\u2691 Prioridad alta: ${urgentJobs.length}</span>` : ''}
+          <span class="kpi-label">${t("pendingJobs")}</span>
+          <strong class="kpi-value">${activeAssignedJobs.length}</strong>
+          <small class="kpi-note">${t("toDo")}</small>
+        </div>
+      ${hasPriority ? `<span class="kpi-badge kpi-badge-red">\u2691 ${t("highPriority")}: ${urgentJobs.length}</span>` : ''}
     </article>
     <article class="cleaner-kpi-card">
       <div class="kpi-icon-wrap"><span class="kpi-icon">\u23F1</span></div>
       <div class="kpi-body">
-        <span class="kpi-label">Hoy trabajado</span>
+        <span class="kpi-label">${t("workedToday")}</span>
         <strong class="kpi-value">${minutesLabel(todayMinutes)}</strong>
-        <small class="kpi-note">${money(todayEarned)} estimado</small>
+        <small class="kpi-note">${money(todayEarned)} ${t("estimated")}</small>
       </div>
-      <span class="kpi-trend ${todayMinutes > 0 ? 'kpi-trend-up' : 'kpi-trend-neutral'}">${todayMinutes > 0 ? '\u2197 Activo hoy' : '\u2014 Sin registros hoy'}</span>
+      <span class="kpi-trend ${todayMinutes > 0 ? 'kpi-trend-up' : 'kpi-trend-neutral'}">${todayMinutes > 0 ? `\u2197 ${t("activeToday")}` : `\u2014 ${t("noRecordsToday")}`}</span>
     </article>
     <article class="cleaner-kpi-card">
       <div class="kpi-icon-wrap"><span class="kpi-icon">\u{1F4C5}</span></div>
       <div class="kpi-body">
-        <span class="kpi-label">Mes trabajado</span>
+        <span class="kpi-label">${t("workedMonth")}</span>
         <strong class="kpi-value">${minutesLabel(totalMinutes)}</strong>
-        <small class="kpi-note">${money(earned)} estimado</small>
+        <small class="kpi-note">${money(earned)} ${t("estimated")}</small>
       </div>
       <span class="kpi-trend ${totalMinutes >= lastWeekMinutes ? 'kpi-trend-up' : 'kpi-trend-down'}">${trendLabel}</span>
     </article>
     <article class="cleaner-kpi-card">
       <div class="kpi-icon-wrap"><span class="kpi-icon">\u2705</span></div>
       <div class="kpi-body">
-        <span class="kpi-label">Terminados</span>
+        <span class="kpi-label">${t("finishedJobs")}</span>
         <strong class="kpi-value">${completedJobs.length}</strong>
-        <small class="kpi-note">listos para confirmar</small>
+        <small class="kpi-note">${t("readyToConfirm")}</small>
       </div>
-      <span class="kpi-trend ${completedJobs.length > 0 ? 'kpi-trend-up' : 'kpi-trend-neutral'}">${completedJobs.length > 0 ? '\u2197 \u00a1Buen trabajo!' : '\u2014 Sin completados'}</span>
+      <span class="kpi-trend ${completedJobs.length > 0 ? 'kpi-trend-up' : 'kpi-trend-neutral'}">${completedJobs.length > 0 ? `\u2197 ${t("cleanerEncouragementTitle")}` : `\u2014 ${t("noCompleted")}`}</span>
     </article>
   `;
   $("#cleanerStats").innerHTML = kpiHtml;
@@ -3008,9 +3926,9 @@ function renderStandaloneCleanerPortal(unlocked = true) {
       <article class="cleaner-kpi-card admin-stat">
         <div class="kpi-icon-wrap"><span class="kpi-icon">\u{1F451}</span></div>
         <div class="kpi-body">
-          <span class="kpi-label">Acceso maestro</span>
+          <span class="kpi-label">${t("masterAccess")}</span>
           <strong class="kpi-value">${state.cleaners.length}</strong>
-          <small class="kpi-note">cleaners visibles</small>
+          <small class="kpi-note">${t("visibleCleaners")}</small>
         </div>
       </article>
     `);
@@ -3023,7 +3941,7 @@ function renderStandaloneCleanerPortal(unlocked = true) {
       .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
       .slice(0, 5);
     if (recent.length === 0) {
-      recentEl.innerHTML = "<p class='muted'>Sin actividad reciente.</p>";
+      recentEl.innerHTML = `<p class='muted'>${t("noRecentActivity")}</p>`;
     } else {
       recentEl.innerHTML = recent.map(job => {
         const client = clientFor(job);
@@ -3032,10 +3950,10 @@ function renderStandaloneCleanerPortal(unlocked = true) {
         const isCheckedIn = job.checkedIn;
         let iconClass = "take";
         let iconEmoji = "\u{1F4CB}";
-        let actLabel = "Trabajo asignado";
-        if (isDone) { iconClass = "completed"; iconEmoji = "\u2705"; actLabel = "Trabajo completado"; }
-        else if (hasPhotos) { iconClass = "photos"; iconEmoji = "\u{1F4F7}"; actLabel = "Fotos subidas"; }
-        else if (isCheckedIn) { iconClass = "checkin"; iconEmoji = "\u{1F4CD}"; actLabel = "Check-in registrado"; }
+        let actLabel = t("jobAssigned");
+        if (isDone) { iconClass = "completed"; iconEmoji = "\u2705"; actLabel = t("jobCompleted"); }
+        else if (hasPhotos) { iconClass = "photos"; iconEmoji = "\u{1F4F7}"; actLabel = t("photosUploaded"); }
+        else if (isCheckedIn) { iconClass = "checkin"; iconEmoji = "\u{1F4CD}"; actLabel = t("checkInRegistered"); }
         return `
           <div class="timeline-item">
             <span class="timeline-icon ${iconClass}">${iconEmoji}</span>
@@ -3049,8 +3967,8 @@ function renderStandaloneCleanerPortal(unlocked = true) {
       }).join("");
     }
   }
-  $("#cleanerAssignedJobs").innerHTML = activeAssignedJobs.length ? activeAssignedJobs.map(cleanerJobHtml).join("") : "<p class='muted'>No tienes trabajos activos. Los terminados estan en historial.</p>";
-  $("#cleanerHistoryJobs").innerHTML = completedJobs.length ? completedJobs.map(cleanerHistoryHtml).join("") : "<p class='muted'>Todavia no hay trabajos terminados.</p>";
+  $("#cleanerAssignedJobs").innerHTML = activeAssignedJobs.length ? activeAssignedJobs.map(cleanerJobHtml).join("") : `<p class='muted'>${t("noActiveCleanerJobs")}</p>`;
+  $("#cleanerHistoryJobs").innerHTML = completedJobs.length ? completedJobs.map(cleanerHistoryHtml).join("") : `<p class='muted'>${t("noFinishedJobs")}</p>`;
   $("#cleanerCalendar").innerHTML = cleanerCalendarHtml(assignedJobs);
   $("#cleanerHoursReport").innerHTML = cleanerHoursHtml(workedJobs, totalMinutes);
   $("#cleanerPaymentReceipts").innerHTML = cleanerPaymentsHtml(cleanerReceipts);
@@ -3062,15 +3980,17 @@ function renderStandaloneCleanerPortal(unlocked = true) {
     return `
       <article class="client-item">
         <strong>${client.name}</strong>
-        <span class="client-meta">${job.date} - ${job.start}-${job.end || "por definir"} - ${client.address}</span>
+        <span class="client-meta">${job.date} - ${job.start}-${job.end || t("timeUndefined")} - ${client.address}</span>
         ${portalCleanerAdmin
-          ? `<button class="ghost" type="button" data-admin-edit-job="${job.id}">Editar desde admin</button>`
-          : `<button class="primary" type="button" data-take-job="${job.id}">Tomar trabajo</button>`}
+          ? `<button class="ghost" type="button" data-admin-edit-job="${job.id}">${t("editFromAdmin")}</button>`
+          : `<button class="primary" type="button" data-take-job="${job.id}">${t("takeJob")}</button>`}
       </article>
     `;
-  }).join("") : "<p class='muted'>No hay trabajos abiertos para tomar.</p>";
+  }).join("") : `<p class='muted'>${t("noOpenJobs")}</p>`;
+  bindCleanerPortalChrome(cleaner);
+  setCleanerTab(cleanerActiveTab);
   $$("[data-admin-edit-job]").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       $("#cleanerPortalPage").classList.add("hidden");
       $("#appShell").classList.remove("hidden");
       startJobEdit(button.dataset.adminEditJob);
@@ -3141,7 +4061,7 @@ function renderStandaloneCleanerPortal(unlocked = true) {
     });
   });
   $$("[data-cleaner-photo]").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       const job = state.jobs.find((item) => item.id === button.dataset.cleanerPhoto);
       if (!job) return;
       if (cleanerActionsLocked(job)) {
@@ -3242,7 +4162,7 @@ function renderStandaloneCleanerPortal(unlocked = true) {
       form.elements.section.value = found.photo.section || "";
       form.elements.phase.value = found.photo.phase || "Antes";
       form.elements.comment.value = found.photo.comment || "";
-      form.querySelector('button[type="submit"]').textContent = "Guardar correccion";
+      form.querySelector('button[type="submit"]').textContent = t("saveEvidence");
       form.querySelector("[data-cancel-evidence-edit]")?.classList.remove("hidden");
       form.scrollIntoView({ behavior: "smooth", block: "center" });
     });
@@ -3253,7 +4173,7 @@ function renderStandaloneCleanerPortal(unlocked = true) {
       if (!form) return;
       form.reset();
       form.elements.evidenceId.value = "";
-      form.querySelector('button[type="submit"]').textContent = "Guardar evidencia";
+      form.querySelector('button[type="submit"]').textContent = t("saveEvidence");
       button.classList.add("hidden");
     });
   });
@@ -3299,7 +4219,10 @@ function renderStandaloneCleanerPortal(unlocked = true) {
 }
 
 function setCleanerTab(tabName = "summary") {
+  cleanerActiveTab = tabName || "summary";
   $$("[data-cleaner-tab]").forEach((button) => button.classList.toggle("active", button.dataset.cleanerTab === tabName));
+  $("#cleanerMobileMenuToggle")?.setAttribute("aria-expanded", "false");
+  $("#cleanerPortalPage")?.classList.remove("mobile-menu-open");
   const map = {
     summary: "#cleanerTabSummary",
     jobs: "#cleanerTabJobs",
@@ -3309,7 +4232,41 @@ function setCleanerTab(tabName = "summary") {
     report: "#cleanerTabReport"
   };
   Object.values(map).forEach((selector) => $(selector)?.classList.remove("active"));
-  $(map[tabName] || map.summary)?.classList.add("active");
+  const activePanel = $(map[tabName] || map.summary);
+  activePanel?.classList.add("active");
+  $("#cleanerStats")?.classList.toggle("hidden", cleanerActiveTab !== "summary");
+  if (cleanerActiveTab !== "summary") {
+    activePanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+  } else {
+    $("#cleanerPortalContent")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+function bindCleanerPortalChrome(cleaner) {
+  const pendingCount = cleanerPortalPendingCount(cleaner);
+  const mobileMenuBtn = $("#cleanerMobileMenuToggle");
+  if (mobileMenuBtn) {
+    mobileMenuBtn.onclick = () => {
+      const isOpen = $("#cleanerPortalPage")?.classList.toggle("mobile-menu-open");
+      mobileMenuBtn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    };
+  }
+  const notificationBtn = $("#cleanerNotificationsBtn");
+  if (notificationBtn) {
+    notificationBtn.onclick = () => {
+      setCleanerTab("jobs");
+      toast(pendingCount
+        ? `${pendingCount} trabajo${pendingCount === 1 ? "" : "s"} pendiente${pendingCount === 1 ? "" : "s"} en tu portal.`
+        : "No tienes trabajos pendientes ahora.");
+    };
+  }
+  const performanceBtn = $("#cleanerPerformanceBtn");
+  if (performanceBtn) {
+    performanceBtn.onclick = () => {
+      setCleanerTab("report");
+      toast("Reporte de rendimiento abierto.");
+    };
+  }
 }
 
 async function handleCleanerHistoryEvidenceSubmit(event) {
@@ -3378,6 +4335,14 @@ async function completeJobByAdmin(jobId) {
   if (!await brandConfirm("¿Seguro que quieres cerrar este trabajo como terminado por administrador?")) return;
   closeJobByAdmin(job);
   save();
+  if (supabaseClient) {
+    const actualEnd = `${job.date}T${job.actualEnd}:00Z`;
+    try {
+      await persistCleanerJobAction("finish", job, { actual_end: actualEnd });
+    } catch (err) {
+      console.error("Error closing job by admin:", err);
+    }
+  }
   renderAll();
   if (!$("#cleanerPortalPage")?.classList.contains("hidden")) renderStandaloneCleanerPortal(true);
   toast("Trabajo cerrado como terminado por administrador.");
@@ -3386,7 +4351,7 @@ async function completeJobByAdmin(jobId) {
 function bindCleanerAdminCorrections() {
   if (!portalCleanerAdmin) return;
   $$("[data-admin-save-job]").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       const job = state.jobs.find((item) => item.id === button.dataset.adminSaveJob);
       if (!job) return;
       const start = document.querySelector(`[data-admin-start="${job.id}"]`)?.value;
@@ -3398,6 +4363,19 @@ function bindCleanerAdminCorrections() {
       }
       if (end) closeJobByAdmin(job, start, end);
       save();
+      if (supabaseClient) {
+        const payload = {
+          status: dbStatusFromAppStatus(job.status, job.cleanerId),
+          actual_start: job.checkedIn && job.start ? `${job.date}T${job.start}:00Z` : null,
+          actual_end: job.actualEnd ? `${job.date}T${job.actualEnd}:00Z` : null
+        };
+        try {
+          const { error } = await supabaseClient.from("jobs").update(payload).eq("id", job.id);
+          if (error) throw error;
+        } catch (err) {
+          console.error("Error saving admin job correction:", err);
+        }
+      }
       renderAll();
       renderStandaloneCleanerPortal(true);
       toast(end ? "Horas guardadas y trabajo cerrado por administrador." : "Llegada corregida por administrador.");
@@ -3410,69 +4388,69 @@ function bindCleanerAdminCorrections() {
 
 function cleanerJobHtml(job) {
   const client = clientFor(job);
-  const cleanerName = state.cleaners.find((item) => item.id === job.cleanerId)?.name || "Sin asignar";
+  const cleanerName = state.cleaners.find((item) => item.id === job.cleanerId)?.name || t("unassignedCleaner");
   const actionsLocked = cleanerActionsLocked(job);
   const actionDisabled = actionsLocked ? "disabled" : "";
   const formDisabled = actionsLocked ? "disabled" : "";
   const arrivedDisabled = (actionsLocked || (job.checkedIn && !portalCleanerAdmin)) ? "disabled" : "";
-  const arrivedText = job.checkedIn ? `Llegada ${job.start}` : "Ya llegue";
+  const arrivedText = job.checkedIn ? t("alreadyArrived").replace("{time}", job.start || "") : t("markArrived");
   const finishedDisabled = (actionsLocked || ((job.checkedOut || job.cleanerFinished) && !portalCleanerAdmin)) ? "disabled" : "";
-  const finishedText = job.checkedOut || job.cleanerFinished ? `Terminado ${job.actualEnd || ""}` : "Termine";
+  const finishedText = job.checkedOut || job.cleanerFinished ? t("finishedAt").replace("{time}", job.actualEnd || "") : t("finishJob");
   const areaOptions = [...new Set([...(job.tasks || []), ...evidenceFor(job).map((item) => item.section).filter(Boolean)])];
   const areaListId = `areas-${job.id}`;
   return `
     <article class="client-item">
       <strong>${client.name}</strong>
-      <span class="client-meta">${job.date} - ${job.start}-${job.actualEnd || job.end || "por definir"} - ${job.status}</span>
+      <span class="client-meta">${job.date} - ${job.start}-${job.actualEnd || job.end || t("timeUndefined")} - ${jobStatusLabel(job)}</span>
       ${portalCleanerAdmin ? `<span class="client-meta">Cleaner: ${cleanerName}</span>` : ""}
       <span class="client-meta">${client.address}</span>
       ${portalCleanerAdmin ? `
         <div class="admin-correction-box">
-          <strong>Correccion de administrador</strong>
+          <strong>${t("adminCorrection")}</strong>
           <div class="admin-correction-grid">
-            <label>Llegada
+            <label>${t("arrival")}
               <input type="time" data-admin-start="${job.id}" value="${job.start || ""}">
             </label>
-            <label>Salida real
+            <label>${t("actualDeparture")}
               <input type="time" data-admin-end="${job.id}" value="${job.actualEnd || ""}">
             </label>
-            <button class="mini-action" type="button" data-admin-save-job="${job.id}">Guardar horas</button>
-            <button class="mini-action danger" type="button" data-admin-finish-job="${job.id}">Terminar por admin</button>
+            <button class="mini-action" type="button" data-admin-save-job="${job.id}">${t("saveHours")}</button>
+            <button class="mini-action danger" type="button" data-admin-finish-job="${job.id}">${t("finishByAdmin")}</button>
           </div>
         </div>
       ` : ""}
-      ${isOverdueLive(job) ? `<div class="arrival-alert">Este trabajo esta pasado de la hora estimada. Revisa si debes terminarlo o avisar a la administracion.</div>` : ""}
-      ${shouldRemindArrival(job) ? `<div class="arrival-alert">Ya es hora del servicio. Marca tu llegada ahora para que quede registrada para el cliente.</div>` : ""}
-      ${actionsLocked ? `<div class="future-job-alert">Trabajo programado para el futuro. Las acciones se activan automaticamente el mismo dia del servicio.</div>` : ""}
+      ${isOverdueLive(job) ? `<div class="arrival-alert">${t("overdueCleanerWarning")}</div>` : ""}
+      ${shouldRemindArrival(job) ? `<div class="arrival-alert">${t("arrivalReminder")}</div>` : ""}
+      ${actionsLocked ? `<div class="future-job-alert">${t("futureJobActions")}</div>` : ""}
       <div class="work-brief">
-        <strong>Que hacer</strong>
-        <p>${job.serviceType}. Checklist: ${(job.tasks || []).join(", ") || "sin checklist"}.</p>
-        <p>Primero revisa instrucciones, marca llegada una sola vez, sube fotos antes/despues por area y confirma salida al terminar.</p>
+        <strong>${t("workBriefTitle")}</strong>
+        <p>${job.serviceType}. ${t("checklist")}: ${(job.tasks || []).join(", ") || t("noChecklist")}.</p>
+        <p>${t("workBriefInstruction")}</p>
       </div>
       <div class="receipt-actions">
         <button class="mini-action" type="button" data-cleaner-arrived="${job.id}" ${arrivedDisabled}>${arrivedText}</button>
-        <button class="mini-action" type="button" data-cleaner-photo="${job.id}" ${actionDisabled}>Agregar foto</button>
+        <button class="mini-action" type="button" data-cleaner-photo="${job.id}" ${actionDisabled}>${t("addPhoto")}</button>
         <button class="mini-action" type="button" data-cleaner-finish="${job.id}" ${finishedDisabled}>${finishedText}</button>
       </div>
       <form class="evidence-form ${actionsLocked ? "is-locked" : ""}" data-evidence-form="${job.id}">
         <input type="hidden" name="evidenceId">
-        <label>Area o lugar
-          <input name="section" list="${areaListId}" placeholder="Ej: Kitchen, bathroom, escritorio" required ${formDisabled}>
+        <label>${t("areaOrPlace")}
+          <input name="section" list="${areaListId}" placeholder="${t("areaPlaceholder")}" required ${formDisabled}>
           <datalist id="${areaListId}">
             ${areaOptions.map((task) => `<option value="${escapeHtml(task)}"></option>`).join("")}
           </datalist>
         </label>
-        <label>Momento
+        <label>${t("moment")}
           <select name="phase" ${formDisabled}>
-            <option>Antes</option>
-            <option>Despues</option>
+            <option value="Antes">${t("before")}</option>
+            <option value="Despues">${t("after")}</option>
           </select>
         </label>
-        <label>Comentario <input name="comment" placeholder="Ej: grasa en cocina, ventana terminada..." ${formDisabled}></label>
-        <label>Camara o biblioteca <input name="photo" type="file" accept="image/*" multiple ${formDisabled}></label>
+        <label>${t("comment")} <input name="comment" placeholder="${t("commentPlaceholder")}" ${formDisabled}></label>
+        <label>${t("cameraOrLibrary")} <input name="photo" type="file" accept="image/*" multiple ${formDisabled}></label>
         <div class="form-actions">
-          <button class="primary" type="submit" ${formDisabled}>Guardar evidencia</button>
-          <button class="ghost hidden" type="button" data-cancel-evidence-edit="${job.id}">Cancelar correccion</button>
+          <button class="primary" type="submit" ${formDisabled}>${t("saveEvidence")}</button>
+          <button class="ghost hidden" type="button" data-cancel-evidence-edit="${job.id}">${t("cancelCorrection")}</button>
         </div>
       </form>
       ${photoBoardHtml(job, true, { canDelete: true })}
@@ -3489,36 +4467,36 @@ function cleanerHistoryHtml(job) {
     <details class="history-job">
       <summary>
         <strong>${client.name}</strong>
-        <span>${job.date} - ${job.start}-${job.actualEnd || job.end || "por definir"} - ${money(cleanerCostForJob(job))}</span>
+        <span>${job.date} - ${job.start}-${job.actualEnd || job.end || t("timeUndefined")} - ${money(cleanerCostForJob(job))}</span>
       </summary>
       <div class="history-body">
         <p class="muted">${client.address}</p>
-        <p>Tiempo trabajado: <strong>${minutesLabel(billableMinutes(job))}</strong></p>
-        <p>Estado: <strong>${job.status}</strong></p>
-        <p>Fotos: <strong>${evidenceCount(job)}</strong></p>
-        <p>Firma en sitio: <strong>${job.siteSignature ? `recibida de ${job.siteSignerName || "persona en sitio"}` : "pendiente"}</strong></p>
+        <p>${t("cleanerHoursTab")}: <strong>${minutesLabel(billableMinutes(job))}</strong></p>
+        <p>${t("status")}: <strong>${jobStatusLabel(job)}</strong></p>
+        <p>${t("photos")}: <strong>${evidenceCount(job)}</strong></p>
+        <p>${t("onsiteSignature")}: <strong>${job.siteSignature ? `${t("onsiteSignatureReceived")} ${job.siteSignerName || t("onsitePerson")}` : t("pending")}</strong></p>
         ${canAdminEditHistory ? `
           <form class="evidence-form history-evidence-form" data-cleaner-history-evidence-form="${job.id}">
-            <label>Area o lugar
-              <input name="section" list="${areaListId}" placeholder="Ej: Kitchen, bathroom, escritorio" required>
+            <label>${t("areaOrPlace")}
+              <input name="section" list="${areaListId}" placeholder="${t("areaPlaceholder")}" required>
               <datalist id="${areaListId}">
                 ${areaOptions.map((task) => `<option value="${escapeHtml(task)}"></option>`).join("")}
               </datalist>
             </label>
-            <label>Momento
+            <label>${t("moment")}
               <select name="phase">
-                <option>Antes</option>
-                <option>Despues</option>
+                <option value="Antes">${t("before")}</option>
+                <option value="Despues">${t("after")}</option>
               </select>
             </label>
-            <label>Comentario <input name="comment" placeholder="Ej: foto agregada con permiso admin..."></label>
-            <label>Fotos <input name="photo" type="file" accept="image/*" multiple></label>
+            <label>${t("comment")} <input name="comment" placeholder="${t("commentPlaceholder")}"></label>
+            <label>${t("photos")} <input name="photo" type="file" accept="image/*" multiple></label>
             <div class="form-actions">
-              <button class="primary" type="submit">Agregar fotos al historial</button>
+              <button class="primary" type="submit">${t("addPhoto")}</button>
             </div>
           </form>
         ` : `
-          <div class="future-job-alert">Fotos historicas bloqueadas. Requiere clave admin para corregir evidencia.</div>
+          <div class="future-job-alert">${t("cleanerAdminCorrectionCopy")}</div>
         `}
         ${photoBoardHtml(job, true)}
       </div>
@@ -3531,7 +4509,7 @@ function cleanerCalendarHtml(jobs) {
     .filter((job) => !isDone(job))
     .sort((a, b) => `${a.date} ${a.start}`.localeCompare(`${b.date} ${b.start}`))
     .slice(0, 16);
-  if (!upcoming.length) return "<p class='muted'>No tienes trabajos pendientes en calendario. Los terminados quedan en Historial.</p>";
+  if (!upcoming.length) return `<p class='muted'>${t("noActiveCleanerJobs")}</p>`;
   return `
     <div class="mini-calendar-list">
       ${upcoming.map((job) => {
@@ -3545,7 +4523,7 @@ function cleanerCalendarHtml(jobs) {
               <strong>${client.name}</strong>
               <p>${job.start}-${job.actualEnd || job.end || t("undefinedTime")} - ${jobStatusLabel(job)}</p>
               <p>${fullAddress}</p>
-              <a class="map-link" href="${mapsUrl}" target="_blank" rel="noreferrer">Abrir en Google Maps</a>
+              <a class="map-link" href="${mapsUrl}" target="_blank" rel="noreferrer">Google Maps</a>
             </div>
           </article>
         `;
@@ -3555,9 +4533,9 @@ function cleanerCalendarHtml(jobs) {
 }
 
 function cleanerHoursHtml(jobs, totalMinutes) {
-  if (!jobs.length) return "<p class='muted'>Cuando marques llegada y salida, aqui se veran tus horas reales.</p>";
+  if (!jobs.length) return `<p class='muted'>${t("noRecordsToday")}</p>`;
   return `
-    <div class="report-line"><span>Total del mes</span><strong>${minutesLabel(totalMinutes)}</strong></div>
+    <div class="report-line"><span>${t("cleanerCurrentMonth")}</span><strong>${minutesLabel(totalMinutes)}</strong></div>
     <div class="hour-list">
       ${jobs.map((job) => {
         const client = clientFor(job);
@@ -3574,18 +4552,18 @@ function receiptsForCleaner(cleaner) {
 
 function cleanerPaymentsHtml(receipts) {
   if (!receipts.length) {
-    return "<p class='muted'>Todavia no hay pagos generados por el administrador.</p>";
+    return `<p class='muted'>${t("noOpenJobs")}</p>`;
   }
   return receipts.map((receipt) => `
     <article class="receipt-item cleaner-payment-card ${receipt.status === "pending_signature" ? "pending" : ""}">
-      <strong>Pago generado por administrador</strong>
-      <span class="client-meta">${receipt.period || "Periodo no definido"} - ${receipt.method} - ${receipt.date}</span>
+      <strong>${t("cleanerGeneratedPayments")}</strong>
+      <span class="client-meta">${receipt.period || t("timeUndefined")} - ${receipt.method} - ${receipt.date}</span>
       <div class="cleaner-payment-amount">${money(receipt.amount || 0)}</div>
       <span class="badge ${receipt.status === "signed" ? "dark" : "gold"}">${receipt.status === "signed" ? localText("paymentSignatureReceived") : localText("paymentSignaturePending")}</span>
       ${receipt.signature ? `<img class="signature-preview" src="${receipt.signature}" alt="Firma de ${receipt.receiver || receipt.cleaner}">` : ""}
-      <p class="muted">Firma este pago para confirmar que lo revisaste y que administracion puede realizar el pago.</p>
+      <p class="muted">${t("signaturePending")}</p>
       <div class="receipt-actions">
-        <button class="primary" type="button" data-cleaner-sign-payment="${receipt.id}">${receipt.signature ? "Ver / reemplazar firma" : "Firmar para recibir pago"}</button>
+        <button class="primary" type="button" data-cleaner-sign-payment="${receipt.id}">${receipt.signature ? t("onsiteSignature") : t("clientSignature")}</button>
       </div>
     </article>
   `).join("");
@@ -3600,7 +4578,7 @@ function cleanerMoneyHtml(jobs, earned, monthKey = currentMonthKey()) {
         <div>
           <span>${monthLabelFromKey(monthKey)}</span>
           <strong>${money(0)}</strong>
-          <small>Sin trabajos con horas reales en este periodo.</small>
+          <small>${t("noRecordsToday")}</small>
         </div>
       </div>
     `;
@@ -3610,11 +4588,11 @@ function cleanerMoneyHtml(jobs, earned, monthKey = currentMonthKey()) {
       <div>
         <span>${monthLabelFromKey(monthKey)}</span>
         <strong>${money(earned)}</strong>
-        <small>Total estimado a recibir</small>
+        <small>${t("estimated")}</small>
       </div>
       <div class="cleaner-report-mini">
         <span>${jobs.length}</span>
-        <small>trabajos</small>
+        <small>${t("jobsWord")}</small>
       </div>
       <div class="cleaner-report-mini">
         <span>${minutesLabel(totalMinutes)}</span>
@@ -3665,6 +4643,7 @@ function renderMode() {
   const label = state.mode === "company" ? t("companyMode") : t("independentMode");
   const country = countryInfo(state.country);
   const profile = state.companyProfile || {};
+  const entitlements = currentEntitlements();
   $("#modeLabel").textContent = label;
   $("#accountCountryPill").textContent = `${country.name} - ${country.dial}`;
   $("#clientDialCode").value = country.dial;
@@ -3679,6 +4658,7 @@ function renderMode() {
     node.textContent = dashboardGreetingText();
   });
   $$("[data-company-nav]").forEach((node) => node.classList.toggle("hidden", state.mode !== "company"));
+  $$('[data-view="cleaners"]').forEach((node) => node.classList.toggle("hidden", !entitlements.cleanerPortal));
 }
 
 function renderDashboardReminders() {
@@ -4409,6 +5389,8 @@ function renderCleaners() {
     const live = assigned.filter(isLiveJob);
     const stateLabel = isArchived ? localText("inHistory") : live.length ? localText("inAction") : active.length ? localizedJobStatus("Asignado") : localText("available");
     const badgeClass = isArchived ? "dark" : live.length ? "green" : active.length ? "gold" : "dark";
+    const accessKey = cleanerPortalDisplayKey(cleaner);
+    const accessUrl = localCleanerPortalUrl(cleaner);
     return `
       <article class="client-item territory-card ${isArchived ? "archived-card" : ""}">
         <strong>${cleaner.name}</strong>
@@ -4416,7 +5398,10 @@ function renderCleaners() {
         <span class="client-meta">${loc.country} - ${loc.city} - ${loc.region}</span>
         <span class="client-meta">${cleaner.phone || "sin telefono"} - ${cleaner.email || "sin email"}</span>
         <span class="client-meta">${active.length} pendiente${active.length === 1 ? "" : "s"} - ${done.length} terminado${done.length === 1 ? "" : "s"} - ${assigned.length} total</span>
-        <code class="inline-link">${localCleanerPortalUrl(cleaner)}</code>
+        <div class="portal-access-box">
+          <span>Clave: <strong>${accessKey}</strong></span>
+          <code class="inline-link">${accessUrl}</code>
+        </div>
         <div class="receipt-actions">
           ${isArchived ? `
             <button class="mini-action" type="button" data-edit-cleaner="${cleaner.id}">Editar historial</button>
@@ -4425,7 +5410,8 @@ function renderCleaners() {
           ` : `
             <button class="mini-action" type="button" data-edit-cleaner="${cleaner.id}">Editar cleaner</button>
             <button class="mini-action danger" type="button" data-archive-cleaner="${cleaner.id}">Eliminar cleaner</button>
-            <button class="mini-action" type="button" data-copy-cleaner-link="${cleaner.id}">Copiar acceso</button>
+            <button class="mini-action" type="button" data-copy-cleaner-key="${cleaner.id}">Copiar clave</button>
+            <button class="mini-action" type="button" data-copy-cleaner-link="${cleaner.id}">Copiar link</button>
             <button class="mini-action" type="button" data-open-cleaner-portal="${cleaner.id}">Ver portal</button>
           `}
         </div>
@@ -4439,6 +5425,9 @@ function renderCleaners() {
   $("#archivedCleanerList").innerHTML = archived.map((cleaner) => cleanerCard(cleaner, true)).join("") || "<p class='muted'>Todavia no hay cleaners en historial.</p>";
   $$("[data-copy-cleaner-link]").forEach((button) => {
     button.addEventListener("click", () => copyCleanerLink(button.dataset.copyCleanerLink));
+  });
+  $$("[data-copy-cleaner-key]").forEach((button) => {
+    button.addEventListener("click", () => copyCleanerKey(button.dataset.copyCleanerKey));
   });
   $$("[data-edit-cleaner]").forEach((button) => {
     button.addEventListener("click", () => startCleanerEdit(button.dataset.editCleaner));
@@ -4503,12 +5492,24 @@ function territoryHtml(records, label) {
 async function copyCleanerLink(cleanerId) {
   const cleaner = state.cleaners.find((item) => item.id === cleanerId);
   if (!cleaner) return;
-  const text = `${localCleanerPortalUrl(cleaner)}\nClave: ${cleaner.key}`;
+  const text = `${localCleanerPortalUrl(cleaner)}\nClave: ${cleanerPortalDisplayKey(cleaner)}`;
   try {
     await navigator.clipboard.writeText(text);
-    toast("Acceso del cleaner copiado.");
+    toast("Link y clave del cleaner copiados.");
   } catch {
     window.prompt("Copia este acceso del cleaner:", text);
+  }
+}
+
+async function copyCleanerKey(cleanerId) {
+  const cleaner = state.cleaners.find((item) => item.id === cleanerId);
+  if (!cleaner) return;
+  const text = cleanerPortalDisplayKey(cleaner);
+  try {
+    await navigator.clipboard.writeText(text);
+    toast("Clave del cleaner copiada.");
+  } catch {
+    window.prompt("Copia esta clave del cleaner:", text);
   }
 }
 
@@ -4913,6 +5914,7 @@ function renderClientLinks() {
           </div>
           <div class="client-link-key">
             <code>${escapeHtml(portalPassword)}</code>
+            <button type="button" title="Generar clave nueva" data-generate-client-key="${client.id}">↻</button>
             <button type="button" title="Copiar clave" data-copy-client-key="${client.id}">⧉</button>
           </div>
           <div class="client-link-url">
@@ -4920,6 +5922,7 @@ function renderClientLinks() {
             <span>Copiado el ${copiedLabel}</span>
           </div>
           <div class="client-link-actions">
+            <button class="ghost" type="button" data-generate-client-key="${client.id}">Generar clave</button>
             <button class="ghost" type="button" data-copy-client-link="${client.id}">Copiar link</button>
             <button class="primary" type="button" data-open-client-portal="${client.id}">Ver portal</button>
             <button class="ghost icon-only" type="button" data-open-client-portal="${client.id}" aria-label="Mas opciones">⋮</button>
@@ -4935,6 +5938,9 @@ function renderClientLinks() {
   });
   $$("[data-copy-client-key]").forEach((button) => {
     button.addEventListener("click", () => copyClientKey(button.dataset.copyClientKey));
+  });
+  $$("[data-generate-client-key]").forEach((button) => {
+    button.addEventListener("click", () => generateClientPortalKey(button.dataset.generateClientKey));
   });
   $$("[data-open-client-portal]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -4955,6 +5961,36 @@ async function copyClientLink(clientId) {
     toast("Link copiado. La clave ya esta incluida en la URL.");
   } catch {
     window.prompt("Copia este link:", text);
+  }
+}
+
+async function generateClientPortalKey(clientId) {
+  const client = state.clients.find((item) => item.id === clientId);
+  if (!client) return;
+  client.portalActive = true;
+  client.portalPasscode = generateBrandPasscode(client.name);
+  if (supabaseClient && state.user) {
+    toast("Guardando clave nueva...");
+    const { error } = await supabaseClient
+      .from("clients")
+      .update({
+        portal_active: true,
+        portal_passcode: client.portalPasscode
+      })
+      .eq("id", client.id);
+    if (error) {
+      toast("No se pudo guardar la clave nueva. Intenta otra vez.");
+      return;
+    }
+  }
+  save();
+  renderClientLinks();
+  const text = `${localClientPortalUrl(client)}\nClave: ${client.portalPasscode}`;
+  try {
+    await navigator.clipboard.writeText(text);
+    toast("Clave nueva generada y acceso copiado.");
+  } catch {
+    window.prompt("Copia este acceso del cliente:", text);
   }
 }
 
@@ -4980,6 +6016,17 @@ function generateBrandPasscode(clientName) {
   const randomChars = Array.from({ length: 3 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
   const randomDigits = Math.floor(10 + Math.random() * 90);
   return `JV-${prefix}-${randomChars}-${randomDigits}`;
+}
+
+function generateCleanerPasscode(cleanerName) {
+  const cleanName = String(cleanerName || "CLN")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z]/g, "")
+    .slice(0, 5)
+    .toUpperCase();
+  const prefix = cleanName.length >= 2 ? cleanName : "CLN";
+  const randomDigits = Math.floor(100 + Math.random() * 900);
+  return `JV-${prefix}-${randomDigits}`;
 }
 
 function renderClientPortal(clientId, keepHidden = false) {
@@ -5427,7 +6474,7 @@ async function loadAndRenderAdminPayments() {
     listEl.innerHTML = payments.map(p => `
       <article class="receipt-item">
         <strong>${p.email}</strong>
-        <span class="client-meta">Plan: ${p.plan_id} · Cliente: ${p.customer_id || 'N/A'}</span>
+        <span class="client-meta">Plan: ${p.plan_id} · Ciclo: ${p.billing_cycle || 'monthly'} · Cliente: ${p.customer_id || 'N/A'}</span>
         <span class="client-meta">Suscripcion: ${p.subscription_id || 'N/A'}</span>
         <span class="client-meta">Sesion: ${p.session_id || 'N/A'}</span>
         <span class="badge ${p.payment_status === 'paid' || p.payment_status === 'complete' ? 'dark' : 'gold'}">${p.payment_status}</span>
@@ -5562,10 +6609,10 @@ function renderPayments() {
   // Toggle visibility of cleaners tab button based on mode
   const cleanersTabBtn = document.querySelector('[data-finance-tab="cleaners"]');
   const clientsTabBtn = document.querySelector('[data-finance-tab="clients"]');
+  const cleanerPaymentsAllowed = currentEntitlements().cleanerPayments;
   
-  if (state.mode === "independent") {
+  if (!cleanerPaymentsAllowed) {
     if (cleanersTabBtn) cleanersTabBtn.classList.add("hidden");
-    // Force active tab to clients if cleaners tab was active
     if (cleanersTabBtn && cleanersTabBtn.classList.contains("active")) {
       cleanersTabBtn.classList.remove("active");
       if (clientsTabBtn) {
@@ -5590,6 +6637,11 @@ function renderPayments() {
   renderClientPaymentJobPicker();
   renderClientBalances();
   
+  if (!cleanerPaymentsAllowed) {
+    $("#paymentReceipts").innerHTML = "<p class='muted'>Los recibos y pagos a cleaners estan disponibles desde el plan Pro.</p>";
+    return;
+  }
+
   $("#paymentReceipts").innerHTML = state.receipts.length
     ? state.receipts.map((receipt) => `
       <article class="receipt-item ${receipt.status === "pending_signature" ? "pending" : ""}">
@@ -6003,10 +7055,10 @@ function openSignatureModal(receiptId) {
   signingJobId = null;
   const receipt = state.receipts.find((item) => item.id === receiptId);
   const isCleanerPortal = !$("#cleanerPortalPage")?.classList.contains("hidden");
-  $("#signatureTitle").textContent = "Firma de pago recibido";
+  $("#signatureTitle").textContent = t("paymentSignatureTitle");
   $("#signatureModal .muted").textContent = isCleanerPortal
-    ? "Firma con dedo o mouse para confirmar el pago generado por administracion y solicitar que se realice el pago."
-    : "El cleaner firma con dedo o mouse para confirmar que recibio el pago externo.";
+    ? t("paymentSignatureCleanerPortalCopy")
+    : t("paymentSignatureCopy");
   $("#signatureReceiver").value = receipt?.receiver || receipt?.cleaner || "";
   $("#signatureModal").classList.remove("hidden");
   prepareSignaturePad();
@@ -6017,8 +7069,8 @@ function openJobSignatureModal(jobId) {
   signingReceiptId = null;
   const job = state.jobs.find((item) => item.id === jobId);
   const client = job ? clientFor(job) : null;
-  $("#signatureTitle").textContent = "Firma de salida del servicio";
-  $("#signatureModal .muted").textContent = "La persona en sitio firma con dedo o mouse para confirmar que el cleaner termino.";
+  $("#signatureTitle").textContent = t("serviceSignatureTitle");
+  $("#signatureModal .muted").textContent = t("serviceSignatureCopy");
   $("#signatureReceiver").value = client?.name || "";
   $("#signatureModal").classList.remove("hidden");
   prepareSignaturePad();
@@ -6087,8 +7139,14 @@ function toggleMobileMenu() {
 }
 
 function setView(name) {
+  if (!viewAllowedByPlan(name)) {
+    openPlanChoiceModal("limit", planUpgradeMessage("La gestion de equipo y portal de cleaners empieza en Company."));
+    name = "dashboard";
+  }
   $$(".view").forEach((view) => view.classList.remove("active"));
-  $(`#${name}View`).classList.add("active");
+  const targetView = $(`#${name}View`);
+  if (!targetView) return;
+  targetView.classList.add("active");
   $$(".sidebar nav button").forEach((button) => button.classList.toggle("active", button.dataset.view === name));
   
   // Sync mobile bottom nav items
@@ -6123,6 +7181,21 @@ function setupEvents() {
   $("#signupPlan").addEventListener("change", (event) => {
     selectedPlan = event.target.value;
     syncPlanSelection();
+  });
+  $("#closePlanChoiceModal")?.addEventListener("click", () => {
+    pendingSignupData = null;
+    closePlanChoiceModal();
+  });
+  $("#planChoiceModal")?.addEventListener("click", (event) => {
+    if (event.target.id === "planChoiceModal") {
+      pendingSignupData = null;
+      closePlanChoiceModal();
+    }
+  });
+  $("#planChoiceGrid")?.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-choose-plan]");
+    if (!button) return;
+    await choosePlan(button.dataset.choosePlan);
   });
   $("#sendVerification").addEventListener("click", () => {
     verificationSent = true;
@@ -6162,87 +7235,13 @@ function setupEvents() {
       return;
     }
     
-    if (selectedPlan !== "free" && !stripePaymentReturn) {
-      toast("Redirigiendo a Stripe para realizar el pago...");
-      const link = stripePaymentLinks[selectedPlan] || stripePaymentLinks.independent;
-      setTimeout(() => {
-        location.href = `${link}?prefilled_email=${encodeURIComponent(data.email)}`;
-      }, 1000);
+    if (!stripePaymentReturn) {
+      pendingSignupData = data;
+      openPlanChoiceModal("signup");
       return;
     }
 
-    toast("Registrando cuenta...");
-    let finalPlan = selectedPlan;
-    
-    // Check for Stripe payment matching the email before signing up
-    let stripePayment = null;
-    try {
-      const { data: payment } = await supabaseClient
-        .from("stripe_payments")
-        .select("*")
-        .eq("email", data.email.toLowerCase())
-        .maybeSingle();
-      if (payment) {
-        stripePayment = payment;
-        finalPlan = payment.plan_id === "solo" ? "independent" : (payment.plan_id === "starter" ? "company" : payment.plan_id);
-      }
-    } catch (err) {
-      console.error("Error looking up Stripe payment:", err);
-    }
-
-    const dbPlanId = finalPlan === "independent" ? "solo" : (finalPlan === "company" ? "starter" : finalPlan);
-
-    const { data: authData, error } = await supabaseClient.auth.signUp({
-      email: data.email,
-      password: data.password,
-      options: {
-        data: {
-          full_name: data.fullName || data.email.split('@')[0],
-          phone: data.phone || "",
-          company_name: data.companyName || `${data.fullName || 'Mi Empresa'}`,
-          mode: finalPlan === "independent" ? "independent" : "company",
-          plan_id: dbPlanId,
-          country: state.country || "IL",
-          language: state.language || "es"
-        }
-      }
-    });
-
-    if (error) {
-      toast("Error: " + error.message);
-      return;
-    }
-
-    const user = authData.user;
-    if (user) {
-      state.user = user;
-      
-      // If Stripe payment exists, associate it with the subscription in the database (will require orgId)
-      if (stripePayment && authData.session) {
-        // Wait briefly for trigger execution to complete organization setup
-        await new Promise(resolve => setTimeout(resolve, 800));
-        await loadStateFromSupabase();
-        if (state.orgId) {
-          await supabaseClient.from("subscriptions").insert({
-            organization_id: state.orgId,
-            plan_id: dbPlanId,
-            status: "active",
-            provider: "stripe",
-            provider_customer_id: stripePayment.customer_id,
-            provider_subscription_id: stripePayment.subscription_id,
-            started_at: new Date().toISOString()
-          });
-        }
-      }
-
-      if (authData.session) {
-        await loadStateFromSupabase();
-        enterApp(finalPlan === "independent" ? "independent" : "company");
-        toast("Cuenta creada y activada.");
-      } else {
-        toast("Registro exitoso. Por favor verifica tu correo para activar tu cuenta.");
-      }
-    }
+    await registerAccountWithSelectedPlan(data);
   });
   $("#googleLogin").addEventListener("click", async () => {
     if (supabaseClient) {
@@ -6312,6 +7311,7 @@ function setupEvents() {
   $("#clientForm").addEventListener("submit", (event) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
+    if (!enforcePlanAction("client", { editingId: data.id || "" })) return;
     const country = countryInfo(state.country);
     const payload = {
       id: data.id || crypto.randomUUID(),
@@ -6339,6 +7339,7 @@ function setupEvents() {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
     const index = state.cleaners.findIndex((cleaner) => cleaner.id === data.id);
+    if (!enforcePlanAction("cleaner", { editingId: data.id || "" })) return;
     const existingCleaner = index >= 0 ? state.cleaners[index] : null;
     const payload = {
       id: data.id || crypto.randomUUID(),
@@ -6348,7 +7349,7 @@ function setupEvents() {
       country: data.country || state.country || "IL",
       city: data.city || "Zona principal",
       status: existingCleaner?.status || "Disponible",
-      key: data.key || `JV-${data.name.slice(0, 5).toUpperCase().replace(/\s/g, "")}`
+      key: data.key || existingCleaner?.key || generateCleanerPasscode(data.name)
     };
     if (index >= 0) state.cleaners[index] = { ...state.cleaners[index], ...payload };
     else state.cleaners.push(payload);
@@ -6358,6 +7359,12 @@ function setupEvents() {
     toast(index >= 0 ? "Cleaner actualizado." : "Cleaner registrado y listo para recibir trabajos.");
   });
   $("#cancelCleanerEdit").addEventListener("click", resetCleanerForm);
+  $("#generateCleanerKey")?.addEventListener("click", () => {
+    const form = $("#cleanerForm");
+    const name = form.elements.name.value || "Cleaner";
+    form.elements.key.value = generateCleanerPasscode(name);
+    toast("Clave generada para este cleaner.");
+  });
   $("#jobForm").addEventListener("submit", (event) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
@@ -6384,6 +7391,12 @@ function setupEvents() {
       requestReview: event.currentTarget.elements.requestReview ? event.currentTarget.elements.requestReview.checked : false
     };
     const index = state.jobs.findIndex((job) => job.id === data.id);
+    if (!enforcePlanAction("job", {
+      payload,
+      count: data.repeatCount,
+      recurrence: data.recurrence,
+      editingId: data.id || ""
+    })) return;
     const previousJob = index >= 0 ? state.jobs[index] : {};
     applyJobStatusControl(payload, previousJob);
     if (index >= 0) {
@@ -6434,9 +7447,21 @@ function setupEvents() {
     renderAll();
     toast("Firma del cliente guardada.");
   });
-  $("#unlockClientPortal").addEventListener("click", () => {
+  $("#unlockClientPortal").addEventListener("click", async () => {
     const entered = $("#clientPortalPassword").value.trim();
-    const client = clientFromPortalAccess(portalClientId, entered);
+    let client = clientFromPortalAccess(portalClientId, entered);
+    if (!client && supabaseClient && entered) {
+      const toastEl = $("#toast");
+      if (toastEl) toastEl.textContent = "";
+      const remoteParams = new URLSearchParams();
+      remoteParams.set("clave", entered);
+      await enterClientPortalFromUrl(remoteParams);
+      client = clientFromPortalAccess(portalClientId, entered);
+      if (client && clientPortalKeyMatches(client, entered)) {
+        renderStandaloneClientPortal(true);
+        return;
+      }
+    }
     if (!client) {
       toast("Acceso de cliente no encontrado. Usa el link actualizado.");
       return;
@@ -6453,7 +7478,7 @@ function setupEvents() {
     renderStandaloneClientPortal(false);
     toast("Sesion cerrada. Ingresa la clave para volver al portal.");
   });
-  $("#unlockCleanerPortal").addEventListener("click", () => {
+  $("#unlockCleanerPortal").addEventListener("click", async () => {
     let cleaner = state.cleaners.find((item) => item.id === portalCleanerId);
     const entered = normalizeKey($("#cleanerPortalPassword").value);
     if (entered === normalizeKey(ADMIN_CLEANER_KEY)) {
@@ -6463,12 +7488,26 @@ function setupEvents() {
       toast("Acceso maestro activado.");
       return;
     }
-    const cleanerByKey = state.cleaners.find((item) => normalizeKey(item.key) === entered);
+    const cleanerByKey = cleanerFromPortalAccess(portalCleanerId, entered);
     if (cleanerByKey) {
       cleaner = cleanerByKey;
       portalCleanerId = cleanerByKey.id;
     }
-    if (!cleaner || entered !== normalizeKey(cleaner.key)) {
+    if (!cleaner && supabaseClient && entered) {
+      const toastEl = $("#toast");
+      if (toastEl) toastEl.textContent = "";
+      const remoteParams = new URLSearchParams();
+      remoteParams.set("clave", $("#cleanerPortalPassword").value.trim());
+      await enterCleanerPortalFromUrl(remoteParams);
+      cleaner = cleanerFromPortalAccess(portalCleanerId, entered);
+      if (cleaner && entered === normalizeKey(cleanerPortalPassword(cleaner))) {
+        portalCleanerAdmin = false;
+        clearCleanerHistoryAdminPermission();
+        renderStandaloneCleanerPortal(true);
+        return;
+      }
+    }
+    if (!cleaner || entered !== normalizeKey(cleanerPortalPassword(cleaner))) {
       toast("Clave incorrecta.");
       return;
     }
@@ -6551,6 +7590,7 @@ function setupEvents() {
 
   $("#paymentForm").addEventListener("submit", (event) => {
     event.preventDefault();
+    if (!enforcePlanAction("cleanerPayments")) return;
     const data = Object.fromEntries(new FormData(event.currentTarget));
     if (!data.cleaner) {
       toast("Primero registra o selecciona un cleaner activo.");
@@ -6602,6 +7642,7 @@ function setupEvents() {
   document.addEventListener("click", (e) => {
     if (e.target.matches("[data-finance-tab]")) {
       const tabName = e.target.dataset.financeTab;
+      if (tabName === "cleaners" && !enforcePlanAction("cleanerPayments")) return;
       document.querySelectorAll("[data-finance-tab]").forEach(btn => btn.classList.remove("active"));
       e.target.classList.add("active");
       document.querySelectorAll(".finance-tab-content").forEach(tab => tab.classList.add("hidden"));
@@ -6983,6 +8024,7 @@ if (supabaseClient) {
 
       try {
         await loadStateFromSupabase(user);
+        await applyPaidPlanForCurrentUser();
 
         // If they don't have an organization, they signed up via OAuth (Google/Microsoft) or email verification completed but profile/org weren't created due to RLS
         if (!state.orgId) {
@@ -7001,11 +8043,12 @@ if (supabaseClient) {
             if (profileInsertError) throw profileInsertError;
           }
 
-          // Create organization with a valid plan ID ('solo' for independent/free, 'starter' for company)
-          const dbPlanId = (state.mode === 'independent') ? 'solo' : 'starter';
+          const oauthPlan = currentPlanKey();
+          const dbPlanId = dbPlanIdForPlan(oauthPlan);
+          const orgType = ["free", "independent"].includes(oauthPlan) ? "independent" : "company";
           const { data: org, error: orgError } = await supabaseClient.from('organizations').insert({
             name: `${user.user_metadata?.full_name || user.email.split('@')[0]}'s Company`,
-            type: state.mode || 'independent',
+            type: orgType,
             owner_user_id: user.id,
             country: state.country || 'IL',
             default_language: state.language || 'es',

@@ -15,6 +15,85 @@ const types = {
   ".png": "image/png"
 };
 
+function normalizePlanId(value) {
+  const plan = String(value || "").toLowerCase();
+  if (plan === "independent") return "solo";
+  if (plan === "company") return "starter";
+  if (["solo", "starter", "pro"].includes(plan)) return plan;
+  return "";
+}
+
+function inferPlanFromAmount(amount = 0) {
+  const amountInDollars = Number(amount || 0) / 100;
+  if (amountInDollars <= 0) return "solo";
+  if (amountInDollars < 15) return "solo";
+  if (amountInDollars < 50) return "starter";
+  return "pro";
+}
+
+function isActivatingPaymentStatus(status) {
+  return ["paid", "complete", "active", "trialing"].includes(String(status || "").toLowerCase());
+}
+
+function normalizeBillingCycle(value) {
+  const billing = String(value || "").toLowerCase();
+  if (["year", "annual", "yearly"].includes(billing)) return "annual";
+  return "monthly";
+}
+
+async function paymentRecordFromStripeEvent(stripe, stripeEvent) {
+  const object = stripeEvent.data.object;
+  let email = object.customer_details?.email || object.customer_email || object.email || "";
+  let customerId = object.customer || object.id;
+  let subscriptionId = object.subscription || (object.object === "subscription" ? object.id : "");
+  let paymentStatus = object.payment_status || object.status;
+  let planId = normalizePlanId(object.metadata?.plan || object.metadata?.plan_id);
+  let billingCycle = normalizeBillingCycle(
+    object.metadata?.billing ||
+    object.metadata?.billing_cycle ||
+    object.lines?.data?.[0]?.price?.recurring?.interval
+  );
+
+  if ((!email || !planId) && subscriptionId && stripe) {
+    try {
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+      planId = planId || normalizePlanId(subscription.metadata?.plan || subscription.metadata?.plan_id);
+      billingCycle = normalizeBillingCycle(
+        subscription.metadata?.billing ||
+        subscription.metadata?.billing_cycle ||
+        subscription.items?.data?.[0]?.price?.recurring?.interval ||
+        billingCycle
+      );
+      customerId = customerId || subscription.customer;
+    } catch (err) {
+      console.warn("Could not enrich Stripe subscription:", err.message);
+    }
+  }
+
+  if (!email && customerId && stripe) {
+    try {
+      const customer = await stripe.customers.retrieve(customerId);
+      email = customer.email || "";
+    } catch (err) {
+      console.warn("Could not enrich Stripe customer:", err.message);
+    }
+  }
+
+  if (!planId) {
+    planId = inferPlanFromAmount(object.amount_total || object.amount_paid || object.total || 0);
+  }
+
+  return {
+    email,
+    planId,
+    customerId,
+    subscriptionId,
+    sessionId: object.id,
+    paymentStatus,
+    billingCycle
+  };
+}
+
 http
   .createServer((req, res) => {
     let urlPath = decodeURIComponent(req.url.split("?")[0]);
@@ -26,13 +105,14 @@ http
       req.on("data", (chunk) => {
         body.push(chunk);
       });
-      req.on("end", () => {
+      req.on("end", async () => {
         body = Buffer.concat(body);
 
         let event;
         const signature = req.headers["stripe-signature"];
         const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
         const allowUnsignedWebhook = process.env.ALLOW_UNSIGNED_STRIPE_WEBHOOKS === "true";
+        const stripeInstance = process.env.STRIPE_SECRET_KEY ? new (require("stripe"))(process.env.STRIPE_SECRET_KEY) : null;
 
         try {
           if (!webhookSecret || !signature) {
@@ -46,7 +126,11 @@ http
             event = JSON.parse(body.toString());
             console.warn("WARNING: Webhook signature verification skipped by ALLOW_UNSIGNED_STRIPE_WEBHOOKS.");
           } else {
-            const stripeInstance = new (require("stripe"))(process.env.STRIPE_SECRET_KEY);
+            if (!stripeInstance) {
+              res.writeHead(500, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "Stripe secret key is not configured." }));
+              return;
+            }
             event = stripeInstance.webhooks.constructEvent(body, signature, webhookSecret);
           }
         } catch (err) {
@@ -59,31 +143,19 @@ http
         console.log("Stripe Webhook received event:", event.type);
 
         if (event.type === "checkout.session.completed" || event.type === "invoice.paid" || event.type === "customer.subscription.updated") {
-          const session = event.data.object;
-          const email = session.customer_details?.email || session.customer_email || session.email;
-          const customerId = session.customer;
-          const subscriptionId = session.subscription;
-          const sessionId = session.id;
-          const paymentStatus = session.payment_status || session.status;
-          
-          // Determine the plan (solo, starter, pro)
-          let planId = session.metadata?.plan || session.metadata?.plan_id;
-          if (!planId) {
-            const amountTotal = session.amount_total || session.amount_paid || 0;
-            const amountInDollars = amountTotal / 100;
-            if (amountInDollars > 0) {
-              if (amountInDollars < 15) planId = "solo";
-              else if (amountInDollars < 50) planId = "starter";
-              else planId = "pro";
-            } else {
-              planId = "solo"; // default fallback
-            }
-          }
+          const { email, planId, customerId, subscriptionId, sessionId, paymentStatus, billingCycle } = await paymentRecordFromStripeEvent(stripeInstance, event);
 
           if (!email) {
             console.error("Stripe payment event is missing customer email.");
             res.writeHead(500, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ error: "Stripe payment event is missing customer email." }));
+            return;
+          }
+
+          if (!isActivatingPaymentStatus(paymentStatus)) {
+            console.log(`Ignoring Stripe event with non-activating status: ${paymentStatus}`);
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ received: true, ignored: true }));
             return;
           }
 
@@ -106,7 +178,8 @@ http
             customer_id: customerId,
             subscription_id: subscriptionId,
             session_id: sessionId,
-            payment_status: paymentStatus
+            payment_status: paymentStatus,
+            billing_cycle: billingCycle
           });
 
           const options = {

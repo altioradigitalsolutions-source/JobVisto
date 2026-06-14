@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Confirma tu cuenta de JobVisto</title>
+  </head>
+  <body style="margin:0;padding:0;background:#f4f7f2;font-family:Arial,Helvetica,sans-serif;color:#10201b;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f7f2;padding:28px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #dbe5e1;border-radius:14px;overflow:hidden;">
+            <tr>
+              <td style="background:#07302d;padding:28px 30px;color:#ffffff;">
+                <div style="font-size:26px;font-weight:800;letter-spacing:.2px;">JobVisto</div>
+                <div style="margin-top:8px;color:#bfe6d5;font-size:14px;">Limpiezas organizadas, firmadas y registradas.</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:34px 30px 28px;">
+                <h1 style="margin:0 0 14px;font-size:26px;line-height:1.2;color:#07302d;">Confirma tu cuenta</h1>
+                <p style="margin:0 0 18px;font-size:16px;line-height:1.6;color:#4e5a70;">Gracias por registrarte en JobVisto. Para proteger tu cuenta y evitar correos falsos, confirma tu email antes de entrar.</p>
+                <table role="presentation" cellspacing="0" cellpadding="0" style="margin:28px 0;">
+                  <tr>
+                    <td style="border-radius:8px;background:#1f7a58;">
+                      <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:15px 24px;color:#ffffff;text-decoration:none;font-weight:800;font-size:15px;">Confirmar mi cuenta</a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#60736b;">Si el boton no funciona, copia y pega este enlace en tu navegador:</p>
+                <p style="margin:0;word-break:break-all;font-size:13px;line-height:1.5;color:#1f7a58;">{{ .ConfirmationURL }}</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 30px;background:#f8fbf7;color:#708078;font-size:13px;line-height:1.5;">
+                Si no creaste una cuenta en JobVisto, puedes ignorar este correo.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
