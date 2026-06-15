@@ -14,7 +14,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./app.css?v=20">
+    <link rel="stylesheet" href="./app.css?v=21">
     <style>
       /* Ensure admin screens NEVER show on this dedicated cleaner page */
       #authScreen, #appShell, #clientPortalPage { display: none !important; }
@@ -799,8 +799,8 @@
                 <label class="pf-label pf-label-grow">
                   <span class="pf-label-text">Monto total</span>
                   <div class="pf-input-currency">
-                    <input name="amount" id="paymentAmount" type="number" value="0">
-                    <span class="pf-currency-badge">USD</span>
+                    <input name="amount" id="paymentAmount" type="text" inputmode="decimal" value="0">
+                    <span class="pf-currency-badge">₪</span>
                   </div>
                 </label>
               </div>
@@ -819,8 +819,8 @@
                 <label class="pf-label">
                   <span class="pf-label-text">Monto recibido</span>
                   <div class="pf-input-currency">
-                    <input name="amountReceived" id="paymentAmountReceived" type="number" value="0">
-                    <span class="pf-currency-badge">USD</span>
+                    <input name="amountReceived" id="paymentAmountReceived" type="text" inputmode="decimal" value="0">
+                    <span class="pf-currency-badge">₪</span>
                   </div>
                 </label>
               </div>
@@ -1489,6 +1489,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./supabase-config.js"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-    <script src="./app.js?v=20"></script>
+    <script src="./app.js?v=21"></script>
   </body>
 </html>

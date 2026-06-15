@@ -195,6 +195,7 @@ async function loadStateFromSupabase(currentUser = null) {
       if (receipts) {
         state.receipts = receipts.map(r => ({
           id: r.id,
+          organizationId: r.organization_id,
           cleanerId: r.cleaner_id,
           cleaner: state.cleaners.find(c => c.id === r.cleaner_id)?.name || 'Cleaner',
           amount: Number(r.amount),
@@ -202,7 +203,29 @@ async function loadStateFromSupabase(currentUser = null) {
           period: `${r.period_start} - ${r.period_end}`,
           status: r.status === 'draft' ? 'pending_signature' : 'signed',
           signature: r.receiver_signature_data,
+          receiver: r.receiver_name || "",
           date: new Date(r.paid_at).toLocaleDateString('es')
+        }));
+      }
+
+      const { data: clientPayments } = await supabaseClient
+        .from('client_payment_receipts')
+        .select('*')
+        .eq('organization_id', orgId);
+      if (clientPayments) {
+        state.clientPayments = clientPayments.map(p => ({
+          id: p.id,
+          organizationId: p.organization_id,
+          clientId: p.client_id,
+          clientName: state.clients.find(c => c.id === p.client_id)?.name || p.client_name || "Cliente",
+          amountReceived: Number(p.amount_received || 0),
+          discount: Number(p.discount || 0),
+          subtotal: Number(p.subtotal || 0),
+          balanceAfter: Number(p.balance_after || 0),
+          method: p.payment_method || "Efectivo",
+          jobIds: p.job_ids || [],
+          date: p.paid_at ? new Date(p.paid_at).toLocaleString("es") : "",
+          createdAt: p.created_at || p.paid_at || new Date().toISOString()
         }));
       }
 
@@ -447,8 +470,25 @@ async function asyncSaveToSupabase() {
         period_end: end,
         amount: receipt.amount,
         payment_method: receipt.method === 'Efectivo' ? 'cash' : 'transfer',
+        receiver_name: receipt.receiver || receipt.cleaner || null,
         receiver_signature_data: receipt.signature,
         status: receipt.status === 'signed' ? 'signed' : 'draft'
+      });
+    }
+
+    for (const payment of state.clientPayments || []) {
+      await supabaseClient.from('client_payment_receipts').upsert({
+        id: payment.id,
+        organization_id: state.orgId,
+        client_id: payment.clientId,
+        client_name: payment.clientName || null,
+        amount_received: Number(payment.amountReceived || 0),
+        discount: Number(payment.discount || 0),
+        subtotal: Number(payment.subtotal || 0),
+        balance_after: Number(payment.balanceAfter || 0),
+        payment_method: payment.method || 'Efectivo',
+        job_ids: payment.jobIds || [],
+        paid_at: payment.createdAt || new Date().toISOString()
       });
     }
 
@@ -535,6 +575,7 @@ const state = {
     { id: "j3", clientId: "c1", cleanerId: "cl2", date: addDays(1), start: "09:30", end: "11:30", serviceType: "Deep cleaning", rate: 85, status: "Programado", photos: 0, signed: false, checkedIn: false, checkedOut: false, tasks: ["Horno", "Ventanas", "Ducha"] }
   ],
   receipts: JSON.parse(localStorage.getItem("jobvisto-receipts") || "[]"),
+  clientPayments: JSON.parse(localStorage.getItem("jobvisto-client-payments") || "[]"),
   serviceRules: JSON.parse(localStorage.getItem("jobvisto-service-rules") || "null") || {
     "Limpieza normal": 60,
     "Deep cleaning": 95,
@@ -2150,6 +2191,7 @@ function save() {
   localStorage.setItem("jobvisto-cleaners", JSON.stringify(state.cleaners));
   localStorage.setItem("jobvisto-jobs", JSON.stringify(state.jobs));
   localStorage.setItem("jobvisto-receipts", JSON.stringify(state.receipts));
+  localStorage.setItem("jobvisto-client-payments", JSON.stringify(state.clientPayments || []));
   localStorage.setItem("jobvisto-service-rules", JSON.stringify(state.serviceRules));
   localStorage.setItem("jobvisto-client-price-rules", JSON.stringify(state.clientPriceRules));
   localStorage.setItem("jobvisto-cost-rules", JSON.stringify(state.costRules));
@@ -2296,6 +2338,25 @@ function minutesLabel(minutes) {
 function money(value) {
   const amount = Number(value || 0);
   return `${state.currencySymbol || '$'}${amount.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+}
+
+function parseMoneyInput(value) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const normalized = String(value || "")
+    .replace(/[^\d,.-]/g, "")
+    .replace(",", ".");
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function roundMoney(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function syncCurrencyBadges() {
+  $$(".pf-currency-badge").forEach((badge) => {
+    badge.textContent = state.currencySymbol || "$";
+  });
 }
 
 function firstName(value) {
@@ -3194,6 +3255,28 @@ async function persistPortalClientConfirmation(job) {
   });
 }
 
+async function persistPortalClientReview(jobId, rating, text) {
+  if (!supabaseClient) return;
+  if (portalPageVisible("#clientPortalPage")) {
+    const { clientId, clientKey } = clientPortalCredentials();
+    const { error } = await supabaseClient.rpc("portal_client_review_job", {
+      client_id: clientId,
+      client_key: clientKey,
+      job_id: jobId,
+      p_rating: rating,
+      p_review_text: text || ""
+    });
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await supabaseClient
+    .from("jobs")
+    .update({ client_rating: rating, client_review_text: text || "" })
+    .eq("id", jobId);
+  if (error) throw error;
+}
+
 async function persistPortalSiteSignature(job) {
   if (!supabaseClient) return;
   if (portalPageVisible("#cleanerPortalPage") && !portalCleanerAdmin) {
@@ -3245,6 +3328,7 @@ async function persistPortalReceiptSignature(receipt) {
     period_end: end,
     amount: receipt.amount,
     payment_method: receipt.method === "Efectivo" ? "cash" : "transfer",
+    receiver_name: receipt.receiver || receipt.cleaner || null,
     receiver_signature_data: receipt.signature,
     status: "signed"
   });
@@ -3256,6 +3340,21 @@ function toast(message) {
   node.textContent = message;
   node.classList.add("show");
   setTimeout(() => node.classList.remove("show"), 2400);
+}
+
+function resetAuthSubmitButton() {
+  const loginBtn = $("#authForm button[type='submit']");
+  if (!loginBtn) return;
+  loginBtn.disabled = false;
+  loginBtn.textContent = selectedAuthAction === "login" ? "Ingresar" : "Registrarse";
+}
+
+function withTimeout(promise, ms, message = "La operacion tardo demasiado.") {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 function enterApp(mode) {
@@ -3590,6 +3689,7 @@ async function enterCleanerPortalFromUrl(params = new URLSearchParams(location.s
 
         state.receipts = (data.receipts || []).map(r => ({
           id: r.id,
+          organizationId: r.organization_id,
           cleanerId: r.cleaner_id,
           cleaner: state.cleaners.find(c => c.id === r.cleaner_id)?.name || 'Cleaner',
           amount: Number(r.amount),
@@ -3597,6 +3697,7 @@ async function enterCleanerPortalFromUrl(params = new URLSearchParams(location.s
           period: `${r.period_start} - ${r.period_end}`,
           status: r.status === 'draft' ? 'pending_signature' : 'signed',
           signature: r.receiver_signature_data,
+          receiver: r.receiver_name || "",
           date: new Date(r.paid_at).toLocaleDateString('es')
         }));
       }
@@ -3643,7 +3744,7 @@ function renderStandaloneClientPortal(unlocked = true, options = {}) {
   document.querySelector(".portal-header")?.classList.toggle("hidden", !unlocked);
 
   const unpaidJobs = historyJobs.filter(j => j.status.includes("Terminado") && j.clientPaymentStatus !== "paid");
-  let pendingBalance = unpaidJobs.reduce((sum, j) => sum + (estimateJob(j) - (parseFloat(j.clientPaidAmount) || 0)), 0);
+  let pendingBalance = unpaidJobs.reduce((sum, j) => sum + Math.max(0, estimateJob(j) - parseMoneyInput(j.clientPaidAmount)), 0);
   
   // Si hay un trabajo actual con monto pero que no está terminado y no ha sido pagado, lo sumamos.
   if (hasPayableAmount && job && !job.status.includes("Terminado") && job.clientPaymentStatus !== "paid") {
@@ -4672,7 +4773,7 @@ function renderDashboardReminders() {
   const debts = [];
   state.clients.forEach(c => {
     const jobs = state.jobs.filter(j => j.clientId === c.id && j.status.includes("Terminado") && j.clientPaymentStatus !== "paid");
-    const debt = jobs.reduce((sum, j) => sum + (estimateJob(j) - (parseFloat(j.clientPaidAmount) || 0)), 0);
+    const debt = jobs.reduce((sum, j) => sum + Math.max(0, estimateJob(j) - parseMoneyInput(j.clientPaidAmount)), 0);
     if (debt > 0) debts.push({ client: c, debt, jobsCount: jobs.length });
   });
   
@@ -6139,36 +6240,33 @@ window.submitClientReview = async function(event, jobId) {
     submitBtn.textContent = "Enviando...";
   }
   
-  if (supabaseClient) {
-    const { error } = await supabaseClient
-      .from('jobs')
-      .update({ client_rating: rating, client_review_text: text })
-      .eq('id', jobId);
-      
-    if (error) {
-      alert("Error al enviar el review: " + error.message);
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = "Enviar Review";
-      }
-      return;
+  try {
+    if (supabaseClient) {
+      await persistPortalClientReview(jobId, rating, text);
     }
-  }
-  
-  // Optimistically update local state if present
-  const job = state.jobs.find(j => j.id === jobId);
-  if (job) {
-    job.clientRating = rating;
-    job.clientReviewText = text;
-    save();
-  }
-  
-  // Re-render
-  const clientViewId = new URLSearchParams(location.search).get("id");
-  if (clientViewId) {
-    renderClientPortal(clientViewId, true);
-  } else {
-    renderAll();
+
+    const job = state.jobs.find(j => j.id === jobId);
+    if (job) {
+      job.clientRating = rating;
+      job.clientReviewText = text;
+      save();
+    }
+
+    toast("Gracias por tu calificacion.");
+    if (portalPageVisible("#clientPortalPage")) {
+      renderStandaloneClientPortal(true);
+    } else {
+      const clientViewId = new URLSearchParams(location.search).get("id");
+      if (clientViewId) renderClientPortal(clientViewId, true);
+      else renderAll();
+    }
+  } catch (error) {
+    console.error("Error saving client review:", error);
+    alert("Error al enviar el review: " + (error.message || "intenta nuevamente"));
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Enviar Review";
+    }
   }
 };
 
@@ -6606,6 +6704,7 @@ function readServiceRates(form, namePrefix, fallback = 0) {
 }
 
 function renderPayments() {
+  syncCurrencyBadges();
   // Toggle visibility of cleaners tab button based on mode
   const cleanersTabBtn = document.querySelector('[data-finance-tab="cleaners"]');
   const clientsTabBtn = document.querySelector('[data-finance-tab="clients"]');
@@ -6636,6 +6735,7 @@ function renderPayments() {
   syncClientPaymentSelect();
   renderClientPaymentJobPicker();
   renderClientBalances();
+  renderClientPaymentReceipts();
   
   if (!cleanerPaymentsAllowed) {
     $("#paymentReceipts").innerHTML = "<p class='muted'>Los recibos y pagos a cleaners estan disponibles desde el plan Pro.</p>";
@@ -6645,7 +6745,7 @@ function renderPayments() {
   $("#paymentReceipts").innerHTML = state.receipts.length
     ? state.receipts.map((receipt) => `
       <article class="receipt-item ${receipt.status === "pending_signature" ? "pending" : ""}">
-        <strong>${receipt.cleaner} - $${receipt.amount}</strong>
+        <strong>${receipt.cleaner} - ${money(receipt.amount)}</strong>
         <span class="client-meta">${receipt.period || "Periodo no definido"} - ${receipt.method} - ${receipt.date}</span>
         ${receipt.jobIds?.length ? `<span class="client-meta">${receipt.jobIds.length} trabajo${receipt.jobIds.length === 1 ? "" : "s"} incluido${receipt.jobIds.length === 1 ? "" : "s"}</span>` : ""}
         <span class="badge ${receipt.status === "signed" ? "dark" : "gold"}">${receipt.status === "signed" ? localText("paymentSignedReceived") : localText("cleanerPaymentSignaturePending")}</span>
@@ -6724,7 +6824,7 @@ function syncPaymentAmountFromJobs() {
 
 function syncPaymentSummaryCard() {
   const selectedIds = selectedPaymentJobIds();
-  const amountVal = parseFloat($("#paymentAmount")?.value || 0) || 0;
+  const amountVal = parseMoneyInput($("#paymentAmount")?.value);
   const subtotalEl = $("#pscSubtotal");
   const totalEl = $("#pscTotal");
   if (subtotalEl) subtotalEl.textContent = money(amountVal);
@@ -6887,8 +6987,8 @@ function renderClientPaymentJobPicker() {
     <div class="payment-job-list">
       ${unpaidJobs.map(j => {
         const amount = estimateJob(j);
-        const paid = parseFloat(j.clientPaidAmount) || 0;
-        const pending = amount - paid;
+        const paid = parseMoneyInput(j.clientPaidAmount);
+        const pending = Math.max(0, roundMoney(amount - paid));
         const cleaner = state.cleaners.find(c => c.id === j.cleanerId);
         const cleanerName = cleaner ? cleaner.name : "Sin asignar";
         const duration = minutesLabel(billableMinutes(j));
@@ -6919,19 +7019,20 @@ function renderClientPaymentJobPicker() {
 function updateClientPaymentTotal() {
   const checkboxes = document.querySelectorAll(".client-payment-job-checkbox:checked");
   let subtotal = 0;
-  checkboxes.forEach(cb => { subtotal += parseFloat(cb.dataset.amount) || 0; });
+  checkboxes.forEach(cb => { subtotal += parseMoneyInput(cb.dataset.amount); });
+  subtotal = roundMoney(subtotal);
   
   const amountInput = $("#clientPaymentAmount");
   if (amountInput) amountInput.value = subtotal.toFixed(2);
 
   // Set Amount Received to match subtotal if it's currently 0 or empty (helps user auto-fill)
   const amountReceivedInput = $("#clientPaymentAmountReceived");
-  if (amountReceivedInput && (parseFloat(amountReceivedInput.value) === 0 || amountReceivedInput.value === "")) {
+  if (amountReceivedInput && (parseMoneyInput(amountReceivedInput.value) === 0 || amountReceivedInput.value === "")) {
     amountReceivedInput.value = subtotal.toFixed(2);
   }
 
   const discountInput = $("#clientPaymentDiscount");
-  const discount = parseFloat(discountInput?.value || 0) || 0;
+  const discount = roundMoney(parseMoneyInput(discountInput?.value));
 
   // Update summary card values
   const cpscSelectedJobs = $("#cpscSelectedJobs");
@@ -6944,7 +7045,7 @@ function updateClientPaymentTotal() {
   if (cpscDiscount) cpscDiscount.textContent = money(discount);
 
   const cpscTotal = $("#cpscTotal");
-  if (cpscTotal) cpscTotal.textContent = money(subtotal - discount);
+  if (cpscTotal) cpscTotal.textContent = money(Math.max(0, subtotal - discount));
 
   const submitBtn = $("#clientPaymentSubmitBtn");
   if (submitBtn) submitBtn.disabled = checkboxes.length === 0;
@@ -6957,7 +7058,7 @@ function renderClientBalances() {
   const debts = [];
   state.clients.forEach(c => {
     const jobs = state.jobs.filter(j => j.clientId === c.id && j.status.includes("Terminado") && j.clientPaymentStatus !== "paid");
-    const debt = jobs.reduce((sum, j) => sum + (estimateJob(j) - (parseFloat(j.clientPaidAmount) || 0)), 0);
+    const debt = jobs.reduce((sum, j) => sum + Math.max(0, estimateJob(j) - parseMoneyInput(j.clientPaidAmount)), 0);
     if (debt > 0) debts.push({ client: c, debt, count: jobs.length });
   });
   
@@ -6990,6 +7091,36 @@ function renderClientBalances() {
       </div>
     </article>
   `}).join("");
+}
+
+function renderClientPaymentReceipts() {
+  const container = $("#clientPaymentReceipts");
+  if (!container) return;
+  const payments = [...(state.clientPayments || [])].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+  if (!payments.length) {
+    container.innerHTML = "<p class='muted'>Todavia no hay cobros registrados.</p>";
+    return;
+  }
+  container.innerHTML = payments.slice(0, 8).map((payment) => {
+    const client = state.clients.find((item) => item.id === payment.clientId);
+    const balance = roundMoney(payment.balanceAfter || 0);
+    return `
+      <article class="receipt-item ${balance > 0 ? "pending" : ""}">
+        <div class="receipt-item-row">
+          <div class="receipt-avatar">${escapeHtml((client?.name || payment.clientName || "C").charAt(0).toUpperCase())}</div>
+          <div class="receipt-info">
+            <strong>${escapeHtml(payment.clientName || client?.name || "Cliente")} - ${money(payment.amountReceived)}</strong>
+            <small>${escapeHtml(payment.method || "Efectivo")} - ${escapeHtml(payment.date || "")}</small>
+            <small>${payment.jobIds?.length || 0} trabajo${payment.jobIds?.length === 1 ? "" : "s"} incluido${payment.jobIds?.length === 1 ? "" : "s"}</small>
+          </div>
+          <div class="receipt-amount-col">
+            <span class="receipt-amount">${balance > 0 ? money(balance) : money(0)}</span>
+            <span class="${balance > 0 ? "receipt-status-pending" : "receipt-status-done"}">${balance > 0 ? "Saldo" : "Pagado"}</span>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join("");
 }
 
 function selectClientForPayment(clientId) {
@@ -7225,12 +7356,13 @@ function setupEvents() {
           return;
         }
         state.user = authData.user;
-        await loadStateFromSupabase();
+        await withTimeout(loadStateFromSupabase(), 15000, "No se pudo cargar la cuenta. Reintenta en unos segundos.");
         enterApp(selectedAuthMode);
         toast("Bienvenido a JobVisto.");
       } catch (err) {
         console.error("Error during login:", err);
         toast("Error de inicio de sesion: " + err.message);
+        resetAuthSubmitButton();
       }
       return;
     }
@@ -7604,7 +7736,7 @@ function setupEvents() {
     const payload = {
       id: data.id || crypto.randomUUID(),
       cleaner: data.cleaner,
-      amount: jobIds.length ? Number(selectedTotal.toFixed(2)) : Number(data.amount || 0),
+      amount: jobIds.length ? Number(selectedTotal.toFixed(2)) : roundMoney(parseMoneyInput(data.amount)),
       method: data.method,
       period: data.period || currentPeriodLabel(),
       jobIds,
@@ -7672,30 +7804,34 @@ function setupEvents() {
       return;
     }
     
-    const amountReceived = parseFloat(data.amountReceived) || 0;
-    const discount = parseFloat(data.discount) || 0;
-    let remainingToCover = amountReceived + discount;
+    const amountReceived = roundMoney(parseMoneyInput(data.amountReceived));
+    const discount = roundMoney(parseMoneyInput(data.discount));
+    let remainingToCover = roundMoney(amountReceived + discount);
     
     if (remainingToCover <= 0) {
       toast("El monto cobrado debe ser mayor a cero.");
       return;
     }
     
+    let totalSelected = 0;
+    let totalPaidBefore = 0;
     jobIds.forEach(id => {
       const job = state.jobs.find(j => j.id === id);
       if (job) {
-        const jobCost = parseFloat(job.amount) || 0;
-        const alreadyPaid = parseFloat(job.clientPaidAmount) || 0;
-        const owe = jobCost - alreadyPaid;
+        const jobCost = roundMoney(estimateJob(job));
+        const alreadyPaid = roundMoney(parseMoneyInput(job.clientPaidAmount));
+        const owe = Math.max(0, roundMoney(jobCost - alreadyPaid));
+        totalSelected = roundMoney(totalSelected + jobCost);
+        totalPaidBefore = roundMoney(totalPaidBefore + alreadyPaid);
         
         if (remainingToCover >= owe) {
           job.clientPaidAmount = jobCost;
           job.clientPaymentStatus = "paid";
           job.clientPaidDate = new Date().toISOString().split('T')[0];
           job.clientPaymentMethod = data.method;
-          remainingToCover -= owe;
+          remainingToCover = roundMoney(remainingToCover - owe);
         } else if (remainingToCover > 0) {
-          job.clientPaidAmount = alreadyPaid + remainingToCover;
+          job.clientPaidAmount = roundMoney(alreadyPaid + remainingToCover);
           job.clientPaymentStatus = "partial";
           job.clientPaidDate = new Date().toISOString().split('T')[0];
           job.clientPaymentMethod = data.method;
@@ -7704,9 +7840,28 @@ function setupEvents() {
       }
     });
 
+    const client = state.clients.find(c => c.id === data.client);
+    const balanceAfter = Math.max(0, roundMoney(totalSelected - totalPaidBefore - amountReceived - discount));
+    state.clientPayments = [
+      {
+        id: crypto.randomUUID(),
+        clientId: data.client,
+        clientName: client?.name || "Cliente",
+        amountReceived,
+        discount,
+        subtotal: totalSelected,
+        balanceAfter,
+        method: data.method,
+        jobIds,
+        date: new Date().toLocaleString("es"),
+        createdAt: new Date().toISOString()
+      },
+      ...(state.clientPayments || [])
+    ];
+
     save();
     renderAll();
-    toast("Cobro registrado exitosamente.");
+    toast(balanceAfter > 0 ? `Cobro parcial registrado. Saldo pendiente: ${money(balanceAfter)}.` : "Cobro registrado exitosamente.");
     formEl.reset();
   });
 
@@ -7902,19 +8057,27 @@ function setupEvents() {
     if (signingJobId) {
       const job = state.jobs.find((item) => item.id === signingJobId);
       if (!job) return;
+      const previous = {
+        signed: job.signed,
+        siteSignerName: job.siteSignerName,
+        siteSignature: job.siteSignature
+      };
       job.signed = true;
       job.siteSignerName = $("#signatureReceiver").value;
       job.siteSignature = $("#signatureCanvas").toDataURL("image/png");
-      save();
 
       if (supabaseClient) {
         try {
           await persistPortalSiteSignature(job);
         } catch (err) {
           console.error("Error saving site signature in portal mode:", err);
+          Object.assign(job, previous);
+          toast("No se pudo guardar la firma. Intenta nuevamente.");
+          return;
         }
       }
 
+      save();
       renderStandaloneCleanerPortal(true);
       closeSignatureModal();
       toast("Firma de salida guardada.");
@@ -7922,19 +8085,27 @@ function setupEvents() {
     }
     const receipt = state.receipts.find((item) => item.id === signingReceiptId);
     if (!receipt) return;
+    const previous = {
+      receiver: receipt.receiver,
+      signature: receipt.signature,
+      status: receipt.status
+    };
     receipt.receiver = $("#signatureReceiver").value;
     receipt.signature = $("#signatureCanvas").toDataURL("image/png");
     receipt.status = "signed";
-    save();
 
     if (supabaseClient) {
       try {
         await persistPortalReceiptSignature(receipt);
       } catch (err) {
         console.error("Error saving receipt signature in portal mode:", err);
+        Object.assign(receipt, previous);
+        toast("No se pudo guardar la firma del pago. Intenta nuevamente.");
+        return;
       }
     }
 
+    save();
     if (!$("#cleanerPortalPage")?.classList.contains("hidden")) {
       renderStandaloneCleanerPortal(true);
     } else {
@@ -8023,8 +8194,8 @@ if (supabaseClient) {
       state.user = user;
 
       try {
-        await loadStateFromSupabase(user);
-        await applyPaidPlanForCurrentUser();
+        await withTimeout(loadStateFromSupabase(user), 15000, "No se pudo cargar la cuenta.");
+        await withTimeout(applyPaidPlanForCurrentUser(), 10000, "No se pudo validar el plan.");
 
         // If they don't have an organization, they signed up via OAuth (Google/Microsoft) or email verification completed but profile/org weren't created due to RLS
         if (!state.orgId) {
@@ -8073,7 +8244,7 @@ if (supabaseClient) {
         state.cleaners = [];
         state.jobs = [];
         state.receipts = [];
-        localStorage.clear();
+        state.clientPayments = [];
         const __urlParams = new URLSearchParams(location.search);
         const __portalType = __urlParams.get("portal");
         const __path = window.location.pathname.toLowerCase();
@@ -8081,21 +8252,20 @@ if (supabaseClient) {
           $("#appShell").classList.add("hidden");
           $("#authScreen").classList.remove("hidden");
           if (loginBtn) {
-            loginBtn.disabled = false;
-            loginBtn.textContent = selectedAuthAction === "login" ? "Ingresar" : "Registrarse";
+            resetAuthSubmitButton();
           }
         }
 
         try {
-          if (supabaseClient) supabaseClient.auth.signOut();
+          if (supabaseClient) await supabaseClient.auth.signOut();
         } catch (_) {}
+        resetAuthSubmitButton();
       }
     } else {
       // Re-enable form buttons if they are signed out
       const loginBtn = $("#authForm button[type='submit']");
       if (loginBtn) {
-        loginBtn.disabled = false;
-        loginBtn.textContent = selectedAuthAction === "login" ? "Log in" : "Register";
+        resetAuthSubmitButton();
       }
 
       // ✅ Portal pages (cleaner/client) authenticate via URL params, NOT via Supabase session.
@@ -8112,6 +8282,7 @@ if (supabaseClient) {
       state.cleaners = [];
       state.jobs = [];
       state.receipts = [];
+      state.clientPayments = [];
 
       $("#appShell").classList.add("hidden");
       $("#authScreen").classList.remove("hidden");
