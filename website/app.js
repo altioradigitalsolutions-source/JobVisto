@@ -178,6 +178,8 @@ async function loadStateFromSupabase(currentUser = null) {
             clientPaymentStatus: j.client_payment_status || "unpaid",
             clientPaidDate: j.client_paid_date || "",
             clientPaymentMethod: j.client_payment_method || "",
+            cleanerOnWayAt: j.cleaner_on_way_at || "",
+            cleanerLocation: cleanerLocationFromJobRow(j),
             status: appStatusFromDbStatus(j.status),
             tasks: j.checklist || [],
             checkedIn: j.status === 'in_site' || DONE_DB_JOB_STATUSES.includes(j.status),
@@ -424,6 +426,8 @@ async function asyncSaveToSupabase() {
         client_payment_status: job.clientPaymentStatus || 'unpaid',
         client_paid_date: job.clientPaidDate || null,
         client_payment_method: job.clientPaymentMethod || null,
+        cleaner_on_way_at: job.cleanerOnWayAt || null,
+        ...cleanerLocationPayload(job.cleanerLocation),
         status: dbStatus,
         checklist: job.tasks
       });
@@ -2446,6 +2450,84 @@ function mapsUrlForClient(client) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddressForClient(client))}`;
 }
 
+function mapsUrlForLocation(location) {
+  if (!location || !Number.isFinite(Number(location.lat)) || !Number.isFinite(Number(location.lng))) return "";
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${location.lat},${location.lng}`)}`;
+}
+
+function normalizePhoneForWhatsApp(phone) {
+  const digits = String(phone || "").replace(/[^\d]/g, "");
+  if (!digits) return "";
+  return digits.startsWith("0") && state.country === "IL" ? `972${digits.slice(1)}` : digits;
+}
+
+function whatsAppUrl(phone, message) {
+  const normalized = normalizePhoneForWhatsApp(phone);
+  if (!normalized) return "";
+  return `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`;
+}
+
+function cleanerLocationFromJobRow(row) {
+  if (!row || row.cleaner_lat === null || row.cleaner_lat === undefined || row.cleaner_lng === null || row.cleaner_lng === undefined) return null;
+  return {
+    lat: Number(row.cleaner_lat),
+    lng: Number(row.cleaner_lng),
+    accuracy: row.cleaner_location_accuracy ? Number(row.cleaner_location_accuracy) : null,
+    at: row.cleaner_location_at || row.updated_at || ""
+  };
+}
+
+function cleanerLocationPayload(location) {
+  if (!location) {
+    return {
+      cleaner_lat: null,
+      cleaner_lng: null,
+      cleaner_location_accuracy: null,
+      cleaner_location_at: null
+    };
+  }
+  return {
+    cleaner_lat: Number(location.lat),
+    cleaner_lng: Number(location.lng),
+    cleaner_location_accuracy: location.accuracy ? Number(location.accuracy) : null,
+    cleaner_location_at: location.at || new Date().toISOString()
+  };
+}
+
+function captureCleanerLocation() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) {
+      resolve(null);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          at: new Date().toISOString()
+        });
+      },
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+    );
+  });
+}
+
+function cleanerLocationLinksHtml(job, client = null) {
+  const mapsUrl = mapsUrlForLocation(job?.cleanerLocation);
+  if (!mapsUrl) return "";
+  const message = `${client?.name || "Cliente"}, el cleaner registro ubicacion para el servicio ${job.date || ""}: ${mapsUrl}`;
+  const waUrl = client ? whatsAppUrl(client.phone, message) : "";
+  return `
+    <div class="location-actions">
+      <a class="mini-action" href="${mapsUrl}" target="_blank" rel="noopener">Abrir ubicacion en Maps</a>
+      ${waUrl ? `<a class="mini-action" href="${waUrl}" target="_blank" rel="noopener">Enviar ubicacion por WhatsApp</a>` : ""}
+    </div>
+  `;
+}
+
 function addressSuggestions() {
   const examples = [
     "Herzl 42, Tel Aviv, Israel",
@@ -2699,7 +2781,7 @@ function shouldRemindArrival(job) {
 }
 
 function isDone(job) {
-  return Boolean(job.checkedOut || job.cleanerFinished || job.signed || job.status === "Pagado" || job.status === "Confirmado por cliente" || job.status === "Terminado por cliente" || job.status === "Terminado por administrador");
+  return Boolean(job.checkedOut || job.cleanerFinished || job.signed || job.status === "Pagado" || job.status === "Terminado por cleaner" || job.status === "Confirmado por cliente" || job.status === "Terminado por cliente" || job.status === "Terminado por administrador");
 }
 
 function hasFinalTime(job) {
@@ -3259,7 +3341,13 @@ async function persistCleanerJobAction(action, job, extra = {}) {
       job_id: job.id
     };
     if (action === "take") payload.assigned_cleaner_id = extra.assigned_cleaner_id;
-    if (action === "arrived") payload.p_actual_start = extra.actual_start;
+    if (action === "arrived") {
+      payload.p_actual_start = extra.actual_start;
+      payload.p_lat = extra.location?.lat ?? null;
+      payload.p_lng = extra.location?.lng ?? null;
+      payload.p_accuracy = extra.location?.accuracy ?? null;
+      payload.p_location_at = extra.location?.at ?? null;
+    }
     if (action === "finish") payload.p_actual_end = extra.actual_end;
     const { error } = await supabaseClient.rpc(rpcMap[action], payload);
     if (error) throw error;
@@ -3275,7 +3363,8 @@ async function persistCleanerJobAction(action, job, extra = {}) {
   } else if (action === "arrived") {
     const { error } = await supabaseClient.from("jobs").update({
       status: "in_site",
-      actual_start: extra.actual_start
+      actual_start: extra.actual_start,
+      ...cleanerLocationPayload(extra.location || job.cleanerLocation)
     }).eq("id", job.id);
     if (error) throw error;
   } else if (action === "finish") {
@@ -3603,6 +3692,8 @@ async function enterClientPortalFromUrl(params = new URLSearchParams(location.se
             clientPaymentStatus: j.client_payment_status || "unpaid",
             clientPaidDate: j.client_paid_date || "",
             clientPaymentMethod: j.client_payment_method || "",
+            cleanerOnWayAt: j.cleaner_on_way_at || "",
+            cleanerLocation: cleanerLocationFromJobRow(j),
             status: appStatusFromDbStatus(j.status),
             tasks: j.checklist || [],
             checkedIn: j.status === 'in_site' || DONE_DB_JOB_STATUSES.includes(j.status),
@@ -3728,6 +3819,8 @@ async function enterCleanerPortalFromUrl(params = new URLSearchParams(location.s
             clientPaymentStatus: j.client_payment_status || "unpaid",
             clientPaidDate: j.client_paid_date || "",
             clientPaymentMethod: j.client_payment_method || "",
+            cleanerOnWayAt: j.cleaner_on_way_at || "",
+            cleanerLocation: cleanerLocationFromJobRow(j),
             status: appStatusFromDbStatus(j.status),
             tasks: j.checklist || [],
             checkedIn: j.status === 'in_site' || DONE_DB_JOB_STATUSES.includes(j.status),
@@ -3918,6 +4011,9 @@ function renderStandaloneClientPortal(unlocked = true, options = {}) {
     if (!job) {
       activityEl.innerHTML = "<p class='muted'>Sin actividad reciente.</p>";
     } else {
+      const arrivalDetail = job.checkedIn
+        ? `Llegó a las ${job.start}${job.cleanerLocation ? " - ubicación disponible" : ""}`
+        : "El cleaner registrará su entrada al llegar al sitio.";
       const activities = [
         { icon: "👤", color: "cp-act-green", label: t("serviceAssigned") || "Servicio asignado", detail: `${client.name}`, time: job.date, show: true },
         { icon: "📅", color: "cp-act-blue", label: t("scheduledJob") || "Trabajo programado", detail: `${job.date} • ${job.start}–${job.end || '—'}`, time: job.date, show: true },
@@ -3926,12 +4022,18 @@ function renderStandaloneClientPortal(unlocked = true, options = {}) {
         { icon: "✅", color: "cp-act-teal", label: t("clientConfirmation") || "Pendiente de confirmación", detail: job.clientConfirmed ? "Servicio confirmado" : "El cliente deberá confirmar la finalización del servicio.", time: "", show: true },
         { icon: "✍", color: "cp-act-gray", label: t("clientSignature") || "Pendiente de firma", detail: job.clientSignature ? "Firma registrada" : "Se solicitará firma digital en el sitio.", time: "", show: true },
       ];
+      const arrivalActivity = activities.find((item) => item.color === "cp-act-orange");
+      if (arrivalActivity) {
+        arrivalActivity.detail = arrivalDetail;
+        arrivalActivity.html = job.checkedIn ? cleanerLocationLinksHtml(job, client) : "";
+      }
       activityEl.innerHTML = activities.filter(a => a.show).map(a => `
         <div class="cp-act-item">
           <div class="cp-act-icon ${a.color}">${a.icon}</div>
           <div class="cp-act-body">
             <strong>${a.label}</strong>
             <span>${a.detail}</span>
+            ${a.html || ""}
             ${a.time ? `<time>${a.time}</time>` : ''}
           </div>
         </div>
@@ -4157,18 +4259,23 @@ function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
     button.addEventListener("click", async () => {
       const job = state.jobs.find((item) => item.id === button.dataset.takeJob);
       if (!job) return;
+      const previousJob = structuredClone(job);
       job.cleanerId = cleaner.id;
       job.status = "Asignado";
-      save();
 
       if (supabaseClient) {
         try {
           await persistCleanerJobAction("take", job, { assigned_cleaner_id: cleaner.id });
         } catch (err) {
           console.error("Error taking job in portal mode:", err);
+          Object.assign(job, previousJob);
+          renderStandaloneCleanerPortal(true);
+          toast("No se pudo tomar el trabajo. Puede que ya lo haya tomado otro cleaner.");
+          return;
         }
       }
 
+      save();
       renderStandaloneCleanerPortal(true);
       toast("Trabajo asignado a tu portal.");
     });
@@ -4199,22 +4306,30 @@ function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
         toast(`Llegada ya registrada a las ${job.start}.`);
         return;
       }
+      const previousJob = structuredClone(job);
+      toast("Registrando llegada y ubicacion...");
+      const location = await captureCleanerLocation();
       job.checkedIn = true;
       job.start = currentTime();
       job.status = "En sitio";
-      save();
+      if (location) job.cleanerLocation = location;
 
       if (supabaseClient) {
         try {
           const actualStart = `${job.date}T${job.start}:00Z`;
-          await persistCleanerJobAction("arrived", job, { actual_start: actualStart });
+          await persistCleanerJobAction("arrived", job, { actual_start: actualStart, location });
         } catch (err) {
           console.error("Error saving arrival in portal mode:", err);
+          Object.assign(job, previousJob);
+          renderStandaloneCleanerPortal(true);
+          toast("No se pudo guardar la llegada en la base. Revisa internet e intenta otra vez.");
+          return;
         }
       }
 
+      save();
       renderStandaloneCleanerPortal(true);
-      toast("Llegada marcada y visible para el cliente.");
+      toast(location ? "Llegada marcada con ubicacion y visible para el cliente." : "Llegada marcada. El telefono no entrego ubicacion GPS.");
     });
   });
   $$("[data-cleaner-photo]").forEach((button) => {
@@ -4356,11 +4471,11 @@ function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
         job.checkedIn = true;
         job.start = job.start || currentTime();
       }
+      const previousJob = structuredClone(job);
       job.checkedOut = true;
       job.cleanerFinished = true;
       job.actualEnd = currentTime();
       job.status = portalCleanerAdmin ? "Terminado por administrador" : "Terminado por cleaner";
-      save();
 
       if (supabaseClient) {
         try {
@@ -4368,9 +4483,14 @@ function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
           await persistCleanerJobAction("finish", job, { actual_end: actualEnd });
         } catch (err) {
           console.error("Error finishing job in portal mode:", err);
+          Object.assign(job, previousJob);
+          renderStandaloneCleanerPortal(true);
+          toast("No se pudo terminar el trabajo en la base. Revisa internet e intenta otra vez.");
+          return;
         }
       }
 
+      save();
       renderStandaloneCleanerPortal(true);
       openJobSignatureModal(job.id);
       toast(portalCleanerAdmin ? "Trabajo terminado por administrador. Falta firma en sitio." : "Trabajo terminado. Falta firma en sitio.");
@@ -4563,6 +4683,7 @@ function cleanerJobHtml(job) {
   const finishedText = job.checkedOut || job.cleanerFinished ? t("finishedAt").replace("{time}", job.actualEnd || "") : t("finishJob");
   const areaOptions = [...new Set([...(job.tasks || []), ...evidenceFor(job).map((item) => item.section).filter(Boolean)])];
   const areaListId = `areas-${job.id}`;
+  const onWayUrl = whatsAppUrl(client.phone, `Hola ${client.name}, ${cleanerName} va en camino para el servicio de JobVisto (${job.date}, ${job.start}).`);
   return `
     <article class="client-item">
       <strong>${client.name}</strong>
@@ -4593,10 +4714,12 @@ function cleanerJobHtml(job) {
         <p>${t("workBriefInstruction")}</p>
       </div>
       <div class="receipt-actions">
+        ${onWayUrl ? `<a class="mini-action" href="${onWayUrl}" target="_blank" rel="noopener">Voy en camino</a>` : ""}
         <button class="mini-action" type="button" data-cleaner-arrived="${job.id}" ${arrivedDisabled}>${arrivedText}</button>
         <button class="mini-action" type="button" data-cleaner-photo="${job.id}" ${actionDisabled}>${t("addPhoto")}</button>
         <button class="mini-action" type="button" data-cleaner-finish="${job.id}" ${finishedDisabled}>${finishedText}</button>
       </div>
+      ${cleanerLocationLinksHtml(job, client)}
       <form class="evidence-form ${actionsLocked ? "is-locked" : ""}" data-evidence-form="${job.id}">
         <input type="hidden" name="evidenceId">
         <label>${t("areaOrPlace")}
@@ -5976,7 +6099,7 @@ function renderMobile() {
     <h3>${client.name}</h3>
     <p class="muted">${client.address}</p>
     <div class="phone-step"><span>${localText("arrival")}</span><strong>${job.checkedIn ? job.start : localText("amountPending")}</strong></div>
-    <div class="phone-step"><span>GPS</span><strong>${job.checkedIn ? localText("gpsSaved") : localText("gpsNotTaken")}</strong></div>
+    <div class="phone-step"><span>GPS</span><strong>${job.cleanerLocation ? localText("gpsSaved") : localText("gpsNotTaken")}</strong></div>
     <div class="phone-step"><span>${t("photos")}</span><strong>${evidenceCount(job)}</strong></div>
     <div class="phone-step"><span>${localText("departure")}</span><strong>${job.checkedOut ? (job.actualEnd || job.end) : localText("amountPending")}</strong></div>
     <div class="phone-step"><span>${localText("signature")}</span><strong>${job.signed ? localText("ready") : localText("amountPending")}</strong></div>
@@ -6396,10 +6519,10 @@ window.submitClientReview = async function(event, jobId) {
     }
   } catch (error) {
     console.error("Error saving client review:", error);
-    alert("Error al enviar el review: " + (error.message || "intenta nuevamente"));
+    toast("No se pudo guardar el review. Revisa internet e intenta nuevamente.");
     if (submitBtn) {
       submitBtn.disabled = false;
-      submitBtn.textContent = "Enviar Review";
+      submitBtn.textContent = "Enviar Calificacion";
     }
   }
 };
@@ -7683,28 +7806,60 @@ function setupEvents() {
   $("#jobServiceType").addEventListener("change", applyServiceRuleToJobForm);
   $("#jobClientSelect").addEventListener("change", updateJobClientAddressHint);
   $("#jobCleanerSelect").addEventListener("change", syncJobStatusWithCleaner);
-  $("#checkInButton").addEventListener("click", () => {
+  $("#checkInButton").addEventListener("click", async () => {
     const job = activeJob();
+    if (!job) return;
+    const previousJob = structuredClone(job);
+    toast("Registrando llegada y ubicacion...");
+    const location = await captureCleanerLocation();
     job.checkedIn = true;
     job.status = "En progreso";
-    save();
+    job.start = job.start || currentTime();
+    if (location) job.cleanerLocation = location;
+    try {
+      if (supabaseClient) {
+        await persistCleanerJobAction("arrived", job, {
+          actual_start: `${job.date}T${job.start}:00Z`,
+          location
+        });
+      }
+      save();
+    } catch (err) {
+      console.error("Error saving admin arrival:", err);
+      Object.assign(job, previousJob);
+      toast("No se pudo guardar la llegada en la base. Intenta otra vez.");
+      renderAll();
+      return;
+    }
     renderAll();
-    toast("Llegada marcada. GPS guardado y cliente notificado.");
+    toast(location ? "Llegada marcada con GPS y visible para el cliente." : "Llegada marcada. El navegador no entrego GPS.");
   });
   $("#uploadPhotoButton").addEventListener("click", () => {
     toast("Para agregar evidencia real entra al portal del cleaner y usa Camara o biblioteca.");
   });
-  $("#finishButton").addEventListener("click", () => {
+  $("#finishButton").addEventListener("click", async () => {
     const job = activeJob();
     if (!job.checkedIn) {
       toast("Primero marca llegada para poder terminar el trabajo.");
       return;
     }
+    const previousJob = structuredClone(job);
     job.checkedOut = true;
     job.cleanerFinished = true;
     job.actualEnd = job.actualEnd || currentTime();
     job.status = "Terminado por cleaner";
-    save();
+    try {
+      if (supabaseClient) {
+        await persistCleanerJobAction("finish", job, { actual_end: `${job.date}T${job.actualEnd}:00Z` });
+      }
+      save();
+    } catch (err) {
+      console.error("Error saving admin finish:", err);
+      Object.assign(job, previousJob);
+      renderAll();
+      toast("No se pudo guardar el cierre en la base. Intenta otra vez.");
+      return;
+    }
     renderAll();
     toast("Trabajo terminado. Resumen listo para el cliente.");
   });
@@ -7839,10 +7994,10 @@ function setupEvents() {
       toast("El cliente solo puede confirmar cuando el servicio tenga entrada y salida reales.");
       return;
     }
+    const previousJob = structuredClone(job);
     job.clientConfirmed = true;
     job.clientSignature = true;
     job.status = "Confirmado por cliente";
-    save();
 
     // Direct Supabase Write for portal-based confirm
     if (supabaseClient) {
@@ -7850,9 +8005,14 @@ function setupEvents() {
         await persistPortalClientConfirmation(job);
       } catch (err) {
         console.error("Error saving client confirmation in portal mode:", err);
+        Object.assign(job, previousJob);
+        renderStandaloneClientPortal(true);
+        toast("No se pudo guardar la confirmacion. Revisa internet e intenta otra vez.");
+        return;
       }
     }
 
+    save();
     renderStandaloneClientPortal(true);
     toast("Cliente confirmo el servicio.");
   });
@@ -8509,7 +8669,8 @@ async function forceLogOut() {
       await supabaseClient.auth.signOut();
     } catch (e) {}
   }
-  localStorage.clear();
+  state.user = null;
+  state.orgId = null;
   window.location.reload();
 }
 

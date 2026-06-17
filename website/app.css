@@ -6087,6 +6087,12 @@ button:disabled {
 .cp-act-body strong { font-size: .88rem; color: #07302d; font-weight: 700; }
 .cp-act-body span { font-size: .8rem; color: #557067; line-height: 1.4; }
 .cp-act-body time { font-size: .75rem; color: #aab8b0; margin-top: 2px; }
+.location-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
 .cp-footer-bar {
   display: flex; gap: 24px; align-items: stretch;
   margin-top: 28px; padding: 20px 24px;
