@@ -29,9 +29,9 @@ function appStatusFromDbStatus(status) {
 }
 
 function dbStatusFromAppStatus(status, cleanerId = "") {
+  if (status === "Programado") return cleanerId ? "assigned" : "scheduled";
+  if (status === "Asignado") return "assigned";
   const map = {
-    "Programado": "scheduled",
-    "Asignado": "scheduled",
     "Disponible para tomar": "open",
     "En progreso": "in_site",
     "En sitio": "in_site",
@@ -44,7 +44,7 @@ function dbStatusFromAppStatus(status, cleanerId = "") {
     "Terminado por administrador": "admin_closed",
     "Cancelado": "cancelled"
   };
-  return map[status] || (cleanerId ? "scheduled" : "open");
+  return map[status] || (cleanerId ? "assigned" : "open");
 }
 
 // Supabase Data Integration Helpers
@@ -95,7 +95,9 @@ async function loadStateFromSupabase(currentUser = null) {
           paymentMethod: c.default_payment_method === 'cash' ? 'Efectivo' : 'Transferencia',
           notes: c.notes || "",
           portalPasscode: c.portal_passcode || null,
-          portalActive: c.portal_active !== false
+          portalActive: c.portal_active !== false,
+          archived: Boolean(c.archived),
+          archivedAt: c.archived_at || ""
         }));
       }
 
@@ -122,7 +124,9 @@ async function loadStateFromSupabase(currentUser = null) {
           status: c.status === 'available' ? 'Disponible' : 'Ocupada',
           key: c.access_key,
           country: c.country || state.country || "IL",
-          city: c.city || "Zona principal"
+          city: c.city || "Zona principal",
+          archived: Boolean(c.archived),
+          archivedAt: c.archived_at || ""
         }));
       }
 
@@ -204,7 +208,8 @@ async function loadStateFromSupabase(currentUser = null) {
           status: r.status === 'draft' ? 'pending_signature' : 'signed',
           signature: r.receiver_signature_data,
           receiver: r.receiver_name || "",
-          date: new Date(r.paid_at).toLocaleDateString('es')
+          date: new Date(r.paid_at).toLocaleDateString('es'),
+          createdAt: r.created_at || r.paid_at || new Date().toISOString()
         }));
       }
 
@@ -358,7 +363,9 @@ async function asyncSaveToSupabase() {
         default_payment_method: client.paymentMethod === 'Efectivo' ? 'cash' : 'transfer',
         notes: client.notes,
         portal_passcode: client.portalPasscode || null,
-        portal_active: client.portalActive !== false
+        portal_active: client.portalActive !== false,
+        archived: Boolean(client.archived),
+        archived_at: client.archivedAt || null
       });
 
       if (client.address) {
@@ -383,7 +390,9 @@ async function asyncSaveToSupabase() {
         status: cleaner.status === 'Disponible' ? 'available' : 'busy',
         country: cleaner.country || state.country || 'IL',
         city: cleaner.city || 'Zona principal',
-        language: state.language || 'es'
+        language: state.language || 'es',
+        archived: Boolean(cleaner.archived),
+        archived_at: cleaner.archivedAt || null
       });
     }
 
@@ -461,7 +470,7 @@ async function asyncSaveToSupabase() {
 
     // 7. Sync receipts
     for (const receipt of state.receipts) {
-      const [start, end] = receipt.period ? receipt.period.split(" - ") : [today(), today()];
+      const [start, end] = receiptPeriodDates(receipt.period, receipt.createdAt || receipt.date);
       await supabaseClient.from('payment_receipts').upsert({
         id: receipt.id,
         organization_id: state.orgId,
@@ -520,6 +529,7 @@ async function asyncSaveToSupabase() {
     }, { onConflict: 'organization_id,key' });
   } catch (e) {
     console.error("Error saving state to Supabase: ", e);
+    throw e;
   }
 }
 
@@ -2126,6 +2136,20 @@ function currentPeriodLabel(date = new Date()) {
   return date.toLocaleDateString("es", { month: "long", year: "numeric" });
 }
 
+function receiptPeriodDates(period = "", fallbackDate = new Date()) {
+  if (String(period).includes(" - ")) {
+    const [start, end] = String(period).split(" - ");
+    if (/^\d{4}-\d{2}-\d{2}$/.test(start) && /^\d{4}-\d{2}-\d{2}$/.test(end)) {
+      return [start, end];
+    }
+  }
+  const base = fallbackDate instanceof Date ? fallbackDate : new Date(fallbackDate);
+  const safeBase = Number.isNaN(base.getTime()) ? new Date() : base;
+  const startDate = new Date(safeBase.getFullYear(), safeBase.getMonth(), 1);
+  const endDate = new Date(safeBase.getFullYear(), safeBase.getMonth() + 1, 0);
+  return [startDate.toISOString().slice(0, 10), endDate.toISOString().slice(0, 10)];
+}
+
 function isFutureJob(job) {
   return Boolean(job?.date && job.date > today());
 }
@@ -2200,7 +2224,14 @@ function save() {
   localStorage.setItem("jobvisto-currency-symbol", state.currencySymbol);
   
   if (supabaseClient && state.orgId && state.user) {
-    asyncSaveToSupabase();
+    asyncSaveToSupabase().catch((error) => console.error("Background Supabase save failed:", error));
+  }
+}
+
+async function saveAndSyncCritical() {
+  save();
+  if (supabaseClient && state.orgId && state.user) {
+    await asyncSaveToSupabase();
   }
 }
 
@@ -2593,7 +2624,13 @@ function statusValueForJob(job) {
 }
 
 function applyJobStatusControl(payload, previousJob = {}) {
-  const status = payload.status || (payload.cleanerId ? "Asignado" : "Disponible para tomar");
+  let status = payload.status || (payload.cleanerId ? "Asignado" : "Disponible para tomar");
+  if (payload.cleanerId && (status === "Disponible para tomar" || status === "Programado")) {
+    status = "Asignado";
+  }
+  if (!payload.cleanerId && status === "Asignado") {
+    status = "Disponible para tomar";
+  }
   payload.status = status;
 
   if (status === "Disponible para tomar") {
@@ -3099,21 +3136,40 @@ function readFileAsDataUrl(file) {
   });
 }
 
-async function compressImageFile(file, maxSize = 960, quality = 0.58) {
+function dataUrlByteSize(dataUrl) {
+  const base64 = String(dataUrl || "").split(",")[1] || "";
+  return Math.round((base64.length * 3) / 4);
+}
+
+async function compressImageFile(file, maxSize = 1280, quality = 0.72, targetBytes = 260 * 1024) {
   const original = await readFileAsDataUrl(file);
   if (!file.type.startsWith("image/")) return original;
   return new Promise((resolve) => {
     const image = new Image();
     image.onload = () => {
-      const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
-      const width = Math.max(1, Math.round(image.width * scale));
-      const height = Math.max(1, Math.round(image.height * scale));
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const context = canvas.getContext("2d");
-      context.drawImage(image, 0, 0, width, height);
-      resolve(canvas.toDataURL("image/jpeg", quality));
+      let size = maxSize;
+      let output = original;
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const scale = Math.min(1, size / Math.max(image.width, image.height));
+        const width = Math.max(1, Math.round(image.width * scale));
+        const height = Math.max(1, Math.round(image.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d");
+        context.fillStyle = "#fff";
+        context.fillRect(0, 0, width, height);
+        context.drawImage(image, 0, 0, width, height);
+        for (let q = quality; q >= 0.42; q -= 0.1) {
+          output = canvas.toDataURL("image/jpeg", q);
+          if (dataUrlByteSize(output) <= targetBytes) {
+            resolve(output);
+            return;
+          }
+        }
+        size = Math.round(size * 0.72);
+      }
+      resolve(output);
     };
     image.onerror = () => resolve(original);
     image.src = original;
@@ -3213,7 +3269,7 @@ async function persistCleanerJobAction(action, job, extra = {}) {
   if (action === "take") {
     const { error } = await supabaseClient.from("jobs").update({
       assigned_cleaner_id: extra.assigned_cleaner_id,
-      status: "scheduled"
+      status: "assigned"
     }).eq("id", job.id);
     if (error) throw error;
   } else if (action === "arrived") {
@@ -3319,7 +3375,7 @@ async function persistPortalReceiptSignature(receipt) {
     return;
   }
 
-  const [start, end] = receipt.period ? receipt.period.split(" - ") : [today(), today()];
+  const [start, end] = receiptPeriodDates(receipt.period, receipt.createdAt || receipt.date);
   const { error } = await supabaseClient.from("payment_receipts").upsert({
     id: receipt.id,
     organization_id: receipt.organizationId || state.orgId,
@@ -3886,7 +3942,7 @@ function renderStandaloneClientPortal(unlocked = true, options = {}) {
   // Photos (Evidence)
   const photosEl = $("#clientPortalPhotos");
   if (photosEl) {
-    if (job && job.photos > 0) {
+    if (job && evidenceCount(job) > 0) {
       photosEl.innerHTML = photoSectionsHtml(job);
     } else {
       photosEl.innerHTML = `
@@ -4200,6 +4256,7 @@ function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
       if (evidenceId) {
         const photo = evidenceFor(job).find((item) => item.id === evidenceId);
         if (!photo) return;
+        const previousPhoto = { ...photo };
         photo.section = section;
         photo.phase = phase;
         photo.comment = comment;
@@ -4207,14 +4264,15 @@ function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
           photo.url = await compressImageFile(files[0]);
           photo.fileName = files[0].name;
         }
-        save();
-
-        if (supabaseClient) {
-          try {
-            await persistPortalEvidence(job, photo);
-          } catch (err) {
-            console.error("Error updating evidence in portal mode:", err);
-          }
+        try {
+          if (supabaseClient) await persistPortalEvidence(job, photo);
+          save();
+        } catch (err) {
+          Object.assign(photo, previousPhoto);
+          console.error("Error updating evidence in portal mode:", err);
+          toast("No se pudo guardar la evidencia en la base.");
+          renderStandaloneCleanerPortal(true);
+          return;
         }
 
         renderStandaloneCleanerPortal(true);
@@ -4226,6 +4284,7 @@ function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
         return;
       }
       const createdAt = new Date().toISOString();
+      const createdEvidence = [];
       for (const file of files) {
         const compressedUrl = await compressImageFile(file);
         const newEv = {
@@ -4237,20 +4296,22 @@ function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
           fileName: file.name,
           createdAt
         };
-        evidenceFor(job).push(newEv);
-
-        if (supabaseClient) {
-          try {
-            await persistPortalEvidence(job, newEv);
-          } catch (err) {
-            console.error("Error inserting evidence in portal mode:", err);
-          }
+        try {
+          if (supabaseClient) await persistPortalEvidence(job, newEv);
+          evidenceFor(job).push(newEv);
+          createdEvidence.push(newEv);
+        } catch (err) {
+          console.error("Error inserting evidence in portal mode:", err);
+          toast("No se pudo guardar una foto en la base. Intenta con menos fotos.");
+          break;
         }
       }
       job.photos = evidenceCount(job);
       save();
       renderStandaloneCleanerPortal(true);
-      toast(`${files.length} foto${files.length === 1 ? "" : "s"} guardada${files.length === 1 ? "" : "s"} y visible${files.length === 1 ? "" : "s"} para el cliente.`);
+      if (createdEvidence.length) {
+        toast(`${createdEvidence.length} foto${createdEvidence.length === 1 ? "" : "s"} guardada${createdEvidence.length === 1 ? "" : "s"} y visible${createdEvidence.length === 1 ? "" : "s"} para el cliente.`);
+      }
     });
   });
   $$("[data-edit-photo]").forEach((button) => {
@@ -4391,6 +4452,7 @@ async function handleCleanerHistoryEvidenceSubmit(event) {
   const phase = data.get("phase") || "Antes";
   const comment = data.get("comment") || "Foto historica agregada con permiso admin.";
   const createdAt = new Date().toISOString();
+  const createdEvidence = [];
   for (const file of files) {
     const compressedUrl = await compressImageFile(file);
     const newEv = {
@@ -4403,21 +4465,23 @@ async function handleCleanerHistoryEvidenceSubmit(event) {
       createdAt,
       source: "admin-history"
     };
-    evidenceFor(job).push(newEv);
-
-    if (supabaseClient) {
-      try {
-        await persistPortalEvidence(job, newEv);
-      } catch (err) {
-        console.error("Error inserting historical evidence in portal mode:", err);
-      }
+    try {
+      if (supabaseClient) await persistPortalEvidence(job, newEv);
+      evidenceFor(job).push(newEv);
+      createdEvidence.push(newEv);
+    } catch (err) {
+      console.error("Error inserting historical evidence in portal mode:", err);
+      toast("No se pudo guardar una foto historica en la base.");
+      break;
     }
   }
   job.photos = evidenceCount(job);
   save();
   renderStandaloneCleanerPortal(true);
   setCleanerTab("jobs");
-  toast(`${files.length} foto${files.length === 1 ? "" : "s"} agregada${files.length === 1 ? "" : "s"} al historial.`);
+  if (createdEvidence.length) {
+    toast(`${createdEvidence.length} foto${createdEvidence.length === 1 ? "" : "s"} agregada${createdEvidence.length === 1 ? "" : "s"} al historial.`);
+  }
 }
 
 function closeJobByAdmin(job, start, end) {
@@ -5092,27 +5156,27 @@ function renderRecentActivity() {
   const items = [
     {
       icon: "✓",
-      title: recentJob ? `${cleanerFor(recentJob)?.name || "John D."} ${t("completed")} ${clientFor(recentJob).name}` : t("completedJobs"),
+      title: recentJob ? `${cleanerFor(recentJob)?.name || "Cleaner"} ${t("completed")} ${clientFor(recentJob).name}` : t("completedJobs"),
       copy: recentJob ? clientFor(recentJob).address : t("noLiveAgenda"),
-      time: "2 min ago"
+      time: recentJob?.date || ""
     },
     {
       icon: "▣",
-      title: `${recentCleaner?.name || "Sarah M."} ${t("uploadedPhotos")}`,
+      title: `${recentCleaner?.name || "Cleaner"} ${t("uploadedPhotos")}`,
       copy: recentJob?.serviceType || t("evidence"),
-      time: "5 min ago"
+      time: recentJob?.date || ""
     },
     {
       icon: "$",
       title: t("paymentReceived"),
       copy: `${money(320)} ${recentClient ? `from ${recentClient.name}` : ""}`,
-      time: "12 min ago"
+      time: ""
     },
     {
       icon: "+",
       title: t("newClientRegistered"),
-      copy: recentClient?.name || "David Wilson",
-      time: "25 min ago"
+      copy: recentClient?.name || "Cliente",
+      time: ""
     }
   ];
   target.innerHTML = items.map((item) => `
@@ -5123,6 +5187,71 @@ function renderRecentActivity() {
         <p>${escapeHtml(item.copy)}</p>
       </div>
       <time>${item.time}</time>
+    </article>
+  `).join("");
+}
+
+function renderRecentActivity() {
+  const target = $("#recentActivityList");
+  if (!target) return;
+  const dateLabel = (value) => {
+    if (!value) return "";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return parsed.toLocaleDateString("es", { day: "2-digit", month: "short", year: "numeric" });
+  };
+  const items = [];
+  state.jobs.filter(isDone).forEach((job) => {
+    items.push({
+      icon: "OK",
+      title: `${cleanerFor(job)?.name || "Cleaner"} ${t("completed")} ${clientFor(job).name}`,
+      copy: job.serviceType || clientFor(job).address || "",
+      time: dateLabel(job.date),
+      sort: `${job.date || ""} ${job.actualEnd || job.end || ""}`
+    });
+  });
+  state.jobs.forEach((job) => {
+    evidenceFor(job).forEach((photo) => {
+      items.push({
+        icon: "IMG",
+        title: `${cleanerFor(job)?.name || "Cleaner"} ${t("uploadedPhotos")}`,
+        copy: `${clientFor(job).name} - ${photo.section || t("evidence")}`,
+        time: dateLabel(photo.createdAt || job.date),
+        sort: photo.createdAt || job.date || ""
+      });
+    });
+  });
+  (state.receipts || []).forEach((receipt) => {
+    items.push({
+      icon: "$",
+      title: "Pago a cleaner registrado",
+      copy: `${receipt.cleaner || "Cleaner"} - ${money(receipt.amount || 0)}`,
+      time: dateLabel(receipt.createdAt || receipt.date),
+      sort: receipt.createdAt || receipt.date || ""
+    });
+  });
+  (state.clientPayments || []).forEach((payment) => {
+    items.push({
+      icon: "$",
+      title: t("paymentReceived"),
+      copy: `${money(payment.amountReceived || 0)} from ${payment.clientName || "Cliente"}`,
+      time: dateLabel(payment.createdAt || payment.date),
+      sort: payment.createdAt || payment.date || ""
+    });
+  });
+  items.sort((a, b) => String(b.sort || "").localeCompare(String(a.sort || "")));
+  if (!items.length) {
+    target.innerHTML = `<p class="muted">Aun no hay actividad real registrada.</p>`;
+    return;
+  }
+  target.innerHTML = items.slice(0, 6).map((item) => `
+    <article class="recent-item">
+      <span>${escapeHtml(item.icon)}</span>
+      <div>
+        <strong>${escapeHtml(item.title)}</strong>
+        <p>${escapeHtml(item.copy)}</p>
+      </div>
+      <time>${escapeHtml(item.time)}</time>
     </article>
   `).join("");
 }
@@ -5276,9 +5405,14 @@ async function handleAdminEvidenceSubmit(event) {
     });
   }
   job.photos = evidenceCount(job);
-  save();
-  renderAll();
-  toast(`${files.length} foto${files.length === 1 ? "" : "s"} agregada${files.length === 1 ? "" : "s"} por administracion.`);
+  try {
+    await saveAndSyncCritical();
+    renderAll();
+    toast(`${files.length} foto${files.length === 1 ? "" : "s"} agregada${files.length === 1 ? "" : "s"} por administracion.`);
+  } catch (error) {
+    console.error("Error saving admin evidence:", error);
+    toast("No se pudo guardar la evidencia administrativa en la base.");
+  }
 }
 
 function startJobEdit(jobId) {
@@ -6851,6 +6985,7 @@ function renderPaymentJobPicker(selectedJobIds = []) {
     return;
   }
   const selected = new Set(selectedJobIds);
+  const shouldAutoSelect = !receiptId && !selected.size;
   picker.innerHTML = `
     <div class="payment-job-picker-head">
       <strong>Trabajos realizados a pagar</strong>
@@ -6860,7 +6995,7 @@ function renderPaymentJobPicker(selectedJobIds = []) {
       ${jobs.map((job) => {
         const client = clientFor(job);
         const cost = cleanerCostForJob(job);
-        const checked = selected.size ? selected.has(job.id) : false;
+        const checked = shouldAutoSelect || selected.has(job.id);
         return `
           <label class="payment-job-option">
             <input type="checkbox" value="${job.id}" data-payment-job ${checked ? "checked" : ""}>
@@ -7459,7 +7594,7 @@ function setupEvents() {
       followUpNote: data.followUpNote || ""
     };
     const index = state.clients.findIndex((client) => client.id === data.id);
-    if (index >= 0) state.clients[index] = payload;
+    if (index >= 0) state.clients[index] = { ...state.clients[index], ...payload };
     else state.clients.push(payload);
     resetClientForm();
     save();
@@ -7481,7 +7616,9 @@ function setupEvents() {
       country: data.country || state.country || "IL",
       city: data.city || "Zona principal",
       status: existingCleaner?.status || "Disponible",
-      key: data.key || existingCleaner?.key || generateCleanerPasscode(data.name)
+      key: data.key || existingCleaner?.key || generateCleanerPasscode(data.name),
+      archived: Boolean(existingCleaner?.archived),
+      archivedAt: existingCleaner?.archivedAt || ""
     };
     if (index >= 0) state.cleaners[index] = { ...state.cleaners[index], ...payload };
     else state.cleaners.push(payload);
@@ -7720,7 +7857,7 @@ function setupEvents() {
     toast("Cliente confirmo el servicio.");
   });
 
-  $("#paymentForm").addEventListener("submit", (event) => {
+  $("#paymentForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!enforcePlanAction("cleanerPayments")) return;
     const data = Object.fromEntries(new FormData(event.currentTarget));
@@ -7736,20 +7873,34 @@ function setupEvents() {
     const payload = {
       id: data.id || crypto.randomUUID(),
       cleaner: data.cleaner,
+      cleanerId: paymentCleanerRecord(data.cleaner)?.id || "",
       amount: jobIds.length ? Number(selectedTotal.toFixed(2)) : roundMoney(parseMoneyInput(data.amount)),
       method: data.method,
       period: data.period || currentPeriodLabel(),
       jobIds,
       status: "pending_signature",
-      date: new Date().toLocaleString("es")
+      date: new Date().toLocaleString("es"),
+      createdAt: new Date().toISOString()
     };
+    if (payload.amount <= 0) {
+      toast("El pago debe tener monto mayor a cero.");
+      return;
+    }
+    const previousReceipts = structuredClone(state.receipts);
     const index = state.receipts.findIndex((receipt) => receipt.id === data.id);
     if (index >= 0) state.receipts[index] = { ...state.receipts[index], ...payload };
     else state.receipts.unshift(payload);
-    resetPaymentForm();
-    save();
-    renderAll();
-    toast(index >= 0 ? "Pago actualizado. Firma pendiente." : "Pago registrado. Falta firma del cleaner.");
+    try {
+      await saveAndSyncCritical();
+      resetPaymentForm();
+      renderAll();
+      toast(index >= 0 ? "Pago actualizado. Firma pendiente." : "Pago registrado. Falta firma del cleaner.");
+    } catch (error) {
+      console.error("Error saving cleaner payment:", error);
+      state.receipts = previousReceipts;
+      renderPayments();
+      toast("No se pudo guardar el pago en la base. Intenta otra vez.");
+    }
   });
   $("#paymentCleanerSelect").addEventListener("change", () => {
     $("#paymentId").value = "";
@@ -7791,7 +7942,7 @@ function setupEvents() {
   });
 
 
-  $("#clientPaymentForm")?.addEventListener("submit", (event) => {
+  $("#clientPaymentForm")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
     const formEl = event.currentTarget;
@@ -7813,6 +7964,8 @@ function setupEvents() {
       return;
     }
     
+    const previousJobs = structuredClone(state.jobs);
+    const previousClientPayments = structuredClone(state.clientPayments || []);
     let totalSelected = 0;
     let totalPaidBefore = 0;
     jobIds.forEach(id => {
@@ -7859,10 +8012,18 @@ function setupEvents() {
       ...(state.clientPayments || [])
     ];
 
-    save();
-    renderAll();
-    toast(balanceAfter > 0 ? `Cobro parcial registrado. Saldo pendiente: ${money(balanceAfter)}.` : "Cobro registrado exitosamente.");
-    formEl.reset();
+    try {
+      await saveAndSyncCritical();
+      renderAll();
+      toast(balanceAfter > 0 ? `Cobro parcial registrado. Saldo pendiente: ${money(balanceAfter)}.` : "Cobro registrado exitosamente.");
+      formEl.reset();
+    } catch (error) {
+      console.error("Error saving client payment:", error);
+      state.jobs = previousJobs;
+      state.clientPayments = previousClientPayments;
+      renderPayments();
+      toast("No se pudo guardar el cobro en la base. Intenta otra vez.");
+    }
   });
 
   $("#cancelPaymentEdit").addEventListener("click", resetPaymentForm);
