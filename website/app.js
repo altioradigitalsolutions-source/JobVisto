@@ -210,6 +210,7 @@ async function loadStateFromSupabase(currentUser = null) {
           status: r.status === 'draft' ? 'pending_signature' : 'signed',
           signature: r.receiver_signature_data,
           receiver: r.receiver_name || "",
+          jobIds: r.job_ids || [],
           date: new Date(r.paid_at).toLocaleDateString('es'),
           createdAt: r.created_at || r.paid_at || new Date().toISOString()
         }));
@@ -491,6 +492,7 @@ async function asyncSaveToSupabase() {
         payment_method: receipt.method === 'Efectivo' ? 'cash' : 'transfer',
         receiver_name: receipt.receiver || receipt.cleaner || null,
         receiver_signature_data: receipt.signature,
+        job_ids: receipt.jobIds || [],
         status: receipt.status === 'signed' ? 'signed' : 'draft'
       });
       if (receiptSaveError) throw receiptSaveError;
@@ -3483,6 +3485,7 @@ async function persistPortalReceiptSignature(receipt) {
     payment_method: receipt.method === "Efectivo" ? "cash" : "transfer",
     receiver_name: receipt.receiver || receipt.cleaner || null,
     receiver_signature_data: receipt.signature,
+    job_ids: receipt.jobIds || [],
     status: "signed"
   });
   if (error) throw error;
