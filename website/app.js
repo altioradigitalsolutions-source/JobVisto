@@ -407,7 +407,7 @@ async function asyncSaveToSupabase() {
       
       const dbStatus = dbStatusFromAppStatus(job.status, job.cleanerId);
 
-      await supabaseClient.from('jobs').upsert({
+      const { error: jobSaveError } = await supabaseClient.from('jobs').upsert({
         id: job.id,
         organization_id: state.orgId,
         client_id: job.clientId,
@@ -431,35 +431,40 @@ async function asyncSaveToSupabase() {
         status: dbStatus,
         checklist: job.tasks
       });
+      if (jobSaveError) throw jobSaveError;
 
       // Sync signatures
       if (job.siteSignature) {
-        await supabaseClient.from('client_signatures').delete().eq('job_id', job.id).eq('signed_from', 'cleaner_device');
-        await supabaseClient.from('client_signatures').insert({
+        const { error: siteDeleteError } = await supabaseClient.from('client_signatures').delete().eq('job_id', job.id).eq('signed_from', 'cleaner_device');
+        if (siteDeleteError) throw siteDeleteError;
+        const { error: siteInsertError } = await supabaseClient.from('client_signatures').insert({
           organization_id: state.orgId,
           job_id: job.id,
           signer_name: job.siteSignerName || 'Persona en sitio',
           signature_data: job.siteSignature,
           signed_from: 'cleaner_device'
         });
+        if (siteInsertError) throw siteInsertError;
       }
 
       if (job.clientSignature) {
-        await supabaseClient.from('client_signatures').delete().eq('job_id', job.id).eq('signed_from', 'private_link');
-        await supabaseClient.from('client_signatures').insert({
+        const { error: clientDeleteError } = await supabaseClient.from('client_signatures').delete().eq('job_id', job.id).eq('signed_from', 'private_link');
+        if (clientDeleteError) throw clientDeleteError;
+        const { error: clientInsertError } = await supabaseClient.from('client_signatures').insert({
           organization_id: state.orgId,
           job_id: job.id,
           signer_name: 'Cliente',
           signature_data: job.clientSignature,
           signed_from: 'private_link'
         });
+        if (clientInsertError) throw clientInsertError;
       }
 
       // Sync job evidence
       if (Array.isArray(job.evidence)) {
         for (const ev of job.evidence) {
           const dbPhase = ev.phase === 'Antes' ? 'before' : 'after';
-          await supabaseClient.from('job_evidence').upsert({
+          const { error: evidenceSaveError } = await supabaseClient.from('job_evidence').upsert({
             id: ev.id,
             organization_id: state.orgId,
             job_id: job.id,
@@ -468,6 +473,7 @@ async function asyncSaveToSupabase() {
             file_path: ev.url,
             caption: ev.comment || ''
           });
+          if (evidenceSaveError) throw evidenceSaveError;
         }
       }
     }
@@ -475,7 +481,7 @@ async function asyncSaveToSupabase() {
     // 7. Sync receipts
     for (const receipt of state.receipts) {
       const [start, end] = receiptPeriodDates(receipt.period, receipt.createdAt || receipt.date);
-      await supabaseClient.from('payment_receipts').upsert({
+      const { error: receiptSaveError } = await supabaseClient.from('payment_receipts').upsert({
         id: receipt.id,
         organization_id: state.orgId,
         cleaner_id: receipt.cleanerId || state.cleaners.find(c => c.name === receipt.cleaner)?.id,
@@ -487,10 +493,11 @@ async function asyncSaveToSupabase() {
         receiver_signature_data: receipt.signature,
         status: receipt.status === 'signed' ? 'signed' : 'draft'
       });
+      if (receiptSaveError) throw receiptSaveError;
     }
 
     for (const payment of state.clientPayments || []) {
-      await supabaseClient.from('client_payment_receipts').upsert({
+      const { error: clientPaymentSaveError } = await supabaseClient.from('client_payment_receipts').upsert({
         id: payment.id,
         organization_id: state.orgId,
         client_id: payment.clientId,
@@ -503,6 +510,7 @@ async function asyncSaveToSupabase() {
         job_ids: payment.jobIds || [],
         paid_at: payment.createdAt || new Date().toISOString()
       });
+      if (clientPaymentSaveError) throw clientPaymentSaveError;
     }
 
     // 8. Sync organization settings (vat_rate and currency_symbol)
