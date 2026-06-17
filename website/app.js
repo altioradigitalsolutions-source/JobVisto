@@ -3233,7 +3233,7 @@ function dataUrlByteSize(dataUrl) {
   return Math.round((base64.length * 3) / 4);
 }
 
-async function compressImageFile(file, maxSize = 1280, quality = 0.72, targetBytes = 260 * 1024) {
+async function compressImageFile(file, maxSize = 1024, quality = 0.68, targetBytes = 180 * 1024) {
   const original = await readFileAsDataUrl(file);
   if (!file.type.startsWith("image/")) return original;
   return new Promise((resolve) => {
