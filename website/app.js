@@ -9,6 +9,12 @@ const supabaseClient = window.supabase ? window.supabase.createClient(
   JOBVISTO_SUPABASE_ANON_KEY
 ) : null;
 
+async function supabaseData(query, label = "Supabase") {
+  const { data, error } = await query;
+  if (error) throw new Error(`${label}: ${error.message}`);
+  return data;
+}
+
 const DONE_DB_JOB_STATUSES = ["cleaner_finished", "client_confirmed", "signed", "admin_closed"];
 
 function appStatusFromDbStatus(status) {
@@ -60,7 +66,10 @@ async function loadStateFromSupabase(currentUser = null) {
     state.user = user;
 
     // Fetch profile
-    const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', user.id).maybeSingle();
+    const profile = await supabaseData(
+      supabaseClient.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+      "Cargar perfil"
+    );
     if (profile) {
       state.companyProfile.ownerName = profile.full_name || state.companyProfile.ownerName;
       state.companyProfile.email = profile.email || state.companyProfile.email;
@@ -68,13 +77,19 @@ async function loadStateFromSupabase(currentUser = null) {
     }
 
     // Fetch membership
-    const { data: memberships } = await supabaseClient.from('organization_members').select('*').eq('user_id', user.id).eq('status', 'active');
+    const memberships = await supabaseData(
+      supabaseClient.from('organization_members').select('*').eq('user_id', user.id).eq('status', 'active'),
+      "Cargar empresa"
+    );
     if (memberships && memberships.length > 0) {
       const orgId = memberships[0].organization_id;
       state.orgId = orgId;
 
       // Fetch organization details
-      const { data: org } = await supabaseClient.from('organizations').select('*').eq('id', orgId).maybeSingle();
+      const org = await supabaseData(
+        supabaseClient.from('organizations').select('*').eq('id', orgId).maybeSingle(),
+        "Cargar datos de empresa"
+      );
       if (org) {
         state.mode = org.type;
         state.country = org.country;
@@ -83,7 +98,10 @@ async function loadStateFromSupabase(currentUser = null) {
       }
 
       // Fetch clients
-      const { data: clients } = await supabaseClient.from('clients').select('*').eq('organization_id', orgId);
+      const clients = await supabaseData(
+        supabaseClient.from('clients').select('*').eq('organization_id', orgId),
+        "Cargar clientes"
+      );
       if (clients) {
         state.clients = clients.map(c => ({
           id: c.id,
@@ -102,7 +120,10 @@ async function loadStateFromSupabase(currentUser = null) {
       }
 
       // Fetch client addresses
-      const { data: addresses } = await supabaseClient.from('client_addresses').select('*').eq('organization_id', orgId);
+      const addresses = await supabaseData(
+        supabaseClient.from('client_addresses').select('*').eq('organization_id', orgId),
+        "Cargar direcciones"
+      );
       if (addresses) {
         state.clients.forEach(c => {
           const addr = addresses.find(a => a.client_id === c.id);
@@ -114,7 +135,10 @@ async function loadStateFromSupabase(currentUser = null) {
       }
 
       // Fetch cleaners
-      const { data: cleaners } = await supabaseClient.from('cleaners').select('*').eq('organization_id', orgId);
+      const cleaners = await supabaseData(
+        supabaseClient.from('cleaners').select('*').eq('organization_id', orgId),
+        "Cargar cleaners"
+      );
       if (cleaners) {
         state.cleaners = cleaners.map(c => ({
           id: c.id,
@@ -131,13 +155,22 @@ async function loadStateFromSupabase(currentUser = null) {
       }
 
       // Fetch job evidence
-      const { data: evidence } = await supabaseClient.from('job_evidence').select('*').eq('organization_id', orgId);
+      const evidence = await supabaseData(
+        supabaseClient.from('job_evidence').select('*').eq('organization_id', orgId),
+        "Cargar evidencias"
+      );
 
       // Fetch client signatures
-      const { data: signatures } = await supabaseClient.from('client_signatures').select('*').eq('organization_id', orgId);
+      const signatures = await supabaseData(
+        supabaseClient.from('client_signatures').select('*').eq('organization_id', orgId),
+        "Cargar firmas"
+      );
 
       // Fetch jobs
-      const { data: jobs } = await supabaseClient.from('jobs').select('*').eq('organization_id', orgId);
+      const jobs = await supabaseData(
+        supabaseClient.from('jobs').select('*').eq('organization_id', orgId),
+        "Cargar trabajos"
+      );
       if (jobs) {
         state.jobs = jobs.map(j => {
           const dateStr = j.scheduled_start ? j.scheduled_start.slice(0, 10) : today();
@@ -197,7 +230,10 @@ async function loadStateFromSupabase(currentUser = null) {
       }
 
       // Fetch receipts
-      const { data: receipts } = await supabaseClient.from('payment_receipts').select('*').eq('organization_id', orgId);
+      const receipts = await supabaseData(
+        supabaseClient.from('payment_receipts').select('*').eq('organization_id', orgId),
+        "Cargar pagos a cleaners"
+      );
       if (receipts) {
         state.receipts = receipts.map(r => ({
           id: r.id,
@@ -216,10 +252,13 @@ async function loadStateFromSupabase(currentUser = null) {
         }));
       }
 
-      const { data: clientPayments } = await supabaseClient
-        .from('client_payment_receipts')
-        .select('*')
-        .eq('organization_id', orgId);
+      const clientPayments = await supabaseData(
+        supabaseClient
+          .from('client_payment_receipts')
+          .select('*')
+          .eq('organization_id', orgId),
+        "Cargar cobros a clientes"
+      );
       if (clientPayments) {
         state.clientPayments = clientPayments.map(p => ({
           id: p.id,
@@ -238,7 +277,10 @@ async function loadStateFromSupabase(currentUser = null) {
       }
 
       // Fetch organization settings
-      const { data: settings } = await supabaseClient.from('organization_settings').select('*').eq('organization_id', orgId);
+      const settings = await supabaseData(
+        supabaseClient.from('organization_settings').select('*').eq('organization_id', orgId),
+        "Cargar ajustes"
+      );
       if (settings) {
         const greetingSetting = settings.find(s => s.key === 'greeting_name');
         if (greetingSetting && greetingSetting.value?.name) {
@@ -3903,11 +3945,11 @@ function renderStandaloneClientPortal(unlocked = true, options = {}) {
   $("#clientPortalContent").classList.toggle("hidden", !unlocked);
   document.querySelector(".portal-header")?.classList.toggle("hidden", !unlocked);
 
-  const unpaidJobs = historyJobs.filter(j => j.status.includes("Terminado") && j.clientPaymentStatus !== "paid");
+  const unpaidJobs = historyJobs.filter(j => isBillableDone(j) && j.clientPaymentStatus !== "paid");
   let pendingBalance = unpaidJobs.reduce((sum, j) => sum + Math.max(0, estimateJob(j) - parseMoneyInput(j.clientPaidAmount)), 0);
   
   // Si hay un trabajo actual con monto pero que no está terminado y no ha sido pagado, lo sumamos.
-  if (hasPayableAmount && job && !job.status.includes("Terminado") && job.clientPaymentStatus !== "paid") {
+  if (hasPayableAmount && job && !isBillableDone(job) && job.clientPaymentStatus !== "paid") {
     pendingBalance += estimateJob(job);
   }
   
@@ -4970,7 +5012,7 @@ function renderDashboardReminders() {
   // Calculate debts
   const debts = [];
   state.clients.forEach(c => {
-    const jobs = state.jobs.filter(j => j.clientId === c.id && j.status.includes("Terminado") && j.clientPaymentStatus !== "paid");
+    const jobs = state.jobs.filter(j => j.clientId === c.id && isBillableDone(j) && j.clientPaymentStatus !== "paid");
     const debt = jobs.reduce((sum, j) => sum + Math.max(0, estimateJob(j) - parseMoneyInput(j.clientPaidAmount)), 0);
     if (debt > 0) debts.push({ client: c, debt, jobsCount: jobs.length });
   });
@@ -6510,7 +6552,7 @@ window.submitClientReview = async function(event, jobId) {
   
   try {
     if (supabaseClient) {
-      await persistPortalClientReview(jobId, rating, text);
+      await withTimeout(persistPortalClientReview(jobId, rating, text), 15000, "No se pudo guardar el review.");
     }
 
     const job = state.jobs.find(j => j.id === jobId);
@@ -7219,7 +7261,7 @@ function renderClientPaymentJobPicker() {
   // Jobs that are finished and not fully paid for this client
   const unpaidJobs = state.jobs.filter(j =>
     j.clientId === clientId &&
-    j.status.includes("Terminado") &&
+    isBillableDone(j) &&
     j.clientPaymentStatus !== "paid"
   );
 
@@ -7326,7 +7368,7 @@ function renderClientBalances() {
 
   const debts = [];
   state.clients.forEach(c => {
-    const jobs = state.jobs.filter(j => j.clientId === c.id && j.status.includes("Terminado") && j.clientPaymentStatus !== "paid");
+    const jobs = state.jobs.filter(j => j.clientId === c.id && isBillableDone(j) && j.clientPaymentStatus !== "paid");
     const debt = jobs.reduce((sum, j) => sum + Math.max(0, estimateJob(j) - parseMoneyInput(j.clientPaidAmount)), 0);
     if (debt > 0) debts.push({ client: c, debt, count: jobs.length });
   });
@@ -8053,8 +8095,8 @@ function setupEvents() {
       date: new Date().toLocaleString("es"),
       createdAt: new Date().toISOString()
     };
-    if (payload.amount <= 0) {
-      toast("El pago debe tener monto mayor a cero.");
+    if (payload.amount < 0 || (payload.amount === 0 && !jobIds.length)) {
+      toast("Selecciona un trabajo o pon un monto mayor a cero.");
       return;
     }
     const previousReceipts = structuredClone(state.receipts);
@@ -8129,8 +8171,10 @@ function setupEvents() {
     const amountReceived = roundMoney(parseMoneyInput(data.amountReceived));
     const discount = roundMoney(parseMoneyInput(data.discount));
     let remainingToCover = roundMoney(amountReceived + discount);
+    const selectedPendingTotal = roundMoney(Array.from(document.querySelectorAll(".client-payment-job-checkbox:checked")).reduce((sum, el) => sum + parseMoneyInput(el.dataset.amount), 0));
+    const isZeroValueTestCollection = jobIds.length > 0 && selectedPendingTotal === 0 && amountReceived === 0 && discount === 0;
     
-    if (remainingToCover <= 0) {
+    if (remainingToCover <= 0 && !isZeroValueTestCollection) {
       toast("El monto cobrado debe ser mayor a cero.");
       return;
     }
@@ -8568,15 +8612,8 @@ if (supabaseClient) {
         enterApp(state.mode);
       } catch (err) {
         console.error("Error during session load or profile setup:", err);
-        toast("Error de sesión. Restableciendo...");
+        toast("No se pudo cargar la cuenta. Revisa internet y presiona Ingresar otra vez.");
 
-        state.user = null;
-        state.orgId = null;
-        state.clients = [];
-        state.cleaners = [];
-        state.jobs = [];
-        state.receipts = [];
-        state.clientPayments = [];
         const __urlParams = new URLSearchParams(location.search);
         const __portalType = __urlParams.get("portal");
         const __path = window.location.pathname.toLowerCase();
@@ -8588,9 +8625,6 @@ if (supabaseClient) {
           }
         }
 
-        try {
-          if (supabaseClient) await supabaseClient.auth.signOut();
-        } catch (_) {}
         resetAuthSubmitButton();
       }
     } else {
@@ -8635,9 +8669,9 @@ let countdownInterval;
 let countdownValue = 60;
 const MAX_IDLE_MINUTES = 30; // 30 minutes of inactivity allowed
 
-function resetIdleTime() {
+function resetIdleTime(keepSession = false) {
   idleTime = 0;
-  if ($("#idleTimeoutModal") && !$("#idleTimeoutModal").classList.contains("hidden")) {
+  if (keepSession && $("#idleTimeoutModal") && !$("#idleTimeoutModal").classList.contains("hidden")) {
     $("#idleTimeoutModal").classList.add("hidden");
     clearInterval(countdownInterval);
   }
@@ -8687,14 +8721,18 @@ async function forceLogOut() {
 
 // Attach idle listeners
 ["mousemove", "keydown", "touchstart", "scroll"].forEach(event => {
-  window.addEventListener(event, resetIdleTime, { passive: true });
+  window.addEventListener(event, () => {
+    const idleModal = $("#idleTimeoutModal");
+    if (idleModal && !idleModal.classList.contains("hidden")) return;
+    resetIdleTime();
+  }, { passive: true });
 });
 
 // Check every minute
 idleInterval = setInterval(checkIdleTime, 60000);
 
 if ($("#stayLoggedInButton")) {
-  $("#stayLoggedInButton").addEventListener("click", resetIdleTime);
+  $("#stayLoggedInButton").addEventListener("click", () => resetIdleTime(true));
 }
 if ($("#logOutNowButton")) {
   $("#logOutNowButton").addEventListener("click", forceLogOut);
