@@ -1993,6 +1993,12 @@ body.social-login-disabled .social-row {
   background: #eef2ec;
   font-size: .82rem;
 }
+.mini-action.is-active {
+  color: #fff;
+  background: var(--green);
+  border-color: var(--green);
+  box-shadow: 0 10px 24px rgba(15, 143, 99, .18);
+}
 .mini-action.danger {
   color: #9b2020;
   background: #f7e4e4;
@@ -4091,6 +4097,13 @@ body.social-login-disabled .social-row {
 #jobsView .job-status-board {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
+}
+
+#jobsView .job-month-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
 }
 
 .app-shell:has(#jobsView.active) .topbar {

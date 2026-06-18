@@ -312,6 +312,14 @@ async function loadStateFromSupabase(currentUser = null) {
         if (costRulesSetting?.value) {
           state.costRules = { ...state.costRules, ...costRulesSetting.value };
         }
+        const receiptsBackupSetting = settings.find(s => s.key === 'payment_receipts_backup');
+        if ((!state.receipts || !state.receipts.length) && Array.isArray(receiptsBackupSetting?.value?.receipts)) {
+          state.receipts = receiptsBackupSetting.value.receipts;
+        }
+        const clientPaymentsBackupSetting = settings.find(s => s.key === 'client_payment_receipts_backup');
+        if ((!state.clientPayments || !state.clientPayments.length) && Array.isArray(clientPaymentsBackupSetting?.value?.payments)) {
+          state.clientPayments = clientPaymentsBackupSetting.value.payments;
+        }
       }
     }
   } catch (e) {
@@ -537,7 +545,9 @@ async function asyncSaveToSupabase() {
         job_ids: receipt.jobIds || [],
         status: receipt.status === 'signed' ? 'signed' : 'draft'
       });
-      if (receiptSaveError) throw receiptSaveError;
+      if (receiptSaveError) {
+        console.warn("Cleaner receipt table sync skipped; backup settings will keep it visible:", receiptSaveError);
+      }
     }
 
     for (const payment of state.clientPayments || []) {
@@ -554,7 +564,9 @@ async function asyncSaveToSupabase() {
         job_ids: payment.jobIds || [],
         paid_at: payment.createdAt || new Date().toISOString()
       });
-      if (clientPaymentSaveError) throw clientPaymentSaveError;
+      if (clientPaymentSaveError) {
+        console.warn("Client payment receipt table sync skipped; backup settings will keep it visible:", clientPaymentSaveError);
+      }
     }
 
     // 8. Sync organization settings (vat_rate and currency_symbol)
@@ -582,6 +594,16 @@ async function asyncSaveToSupabase() {
       organization_id: state.orgId,
       key: 'cost_rules',
       value: state.costRules || {}
+    }, { onConflict: 'organization_id,key' });
+    await supabaseClient.from('organization_settings').upsert({
+      organization_id: state.orgId,
+      key: 'payment_receipts_backup',
+      value: { receipts: state.receipts || [] }
+    }, { onConflict: 'organization_id,key' });
+    await supabaseClient.from('organization_settings').upsert({
+      organization_id: state.orgId,
+      key: 'client_payment_receipts_backup',
+      value: { payments: state.clientPayments || [] }
     }, { onConflict: 'organization_id,key' });
   } catch (e) {
     console.error("Error saving state to Supabase: ", e);
@@ -692,6 +714,8 @@ let cleanerHistoryAdminUnlocked = false;
 let cleanerHistoryAdminExpiresAt = 0;
 let cleanerHistoryAdminTimer = null;
 let cleanerReportMonth = "";
+let selectedJobsMonth = "all";
+let recentActivityExpanded = false;
 let cleanerActiveTab = "summary";
 let pendingSignupData = null;
 let planChoiceContext = "signup";
@@ -2598,6 +2622,12 @@ function normalizeCostRules() {
       ])
     )
   }));
+  const activeCleanerIds = new Set((state.cleaners || []).filter((cleaner) => !cleaner.archived).map((cleaner) => cleaner.id));
+  const activeCleanerNames = new Set((state.cleaners || []).filter((cleaner) => !cleaner.archived).map((cleaner) => cleaner.name));
+  state.costRules.specialRules = state.costRules.specialRules.filter((rule) => {
+    if (rule.cleanerId) return activeCleanerIds.has(rule.cleanerId);
+    return activeCleanerNames.has(rule.cleanerName);
+  });
 }
 
 function specialCostRuleForCleaner(cleaner) {
@@ -3479,12 +3509,12 @@ function jobCategoryKey(job) {
   return "assigned";
 }
 
-function jobsByCategory() {
+function jobsByCategory(jobs = state.jobs) {
   const order = ["overdueLive", "live", "expired", "assigned", "open", "cleanerDone", "clientDone", "adminDone"];
   return order.map((key) => ({
     key,
     config: localizedJobCategory(key),
-    jobs: state.jobs.filter((job) => jobCategoryKey(job) === key)
+    jobs: jobs.filter((job) => jobCategoryKey(job) === key)
   }));
 }
 
@@ -5289,7 +5319,7 @@ function renderDashboardReminders() {
         <p>El cliente tiene un saldo pendiente de <strong>${money(d.debt)}</strong> por ${d.jobsCount} trabajo(s) terminado(s) y no pagado(s).</p>
       </div>
       <div class="reminder-alert-actions">
-        <button type="button" onclick="setView('pagos'); document.querySelector('[data-finance-tab=\'clients\']')?.click();" style="color: var(--danger); border-color: var(--danger);">Ver deuda en Pagos</button>
+        <button type="button" data-open-debt-client="${d.client.id}" style="color: var(--danger); border-color: var(--danger);">Ver deuda en Pagos</button>
       </div>
     </div>
   `).join("");
@@ -5308,6 +5338,9 @@ function renderDashboardReminders() {
   `).join("");
   
   container.innerHTML = html;
+  $$("[data-open-debt-client]").forEach((button) => {
+    button.addEventListener("click", () => openClientDebtPayment(button.dataset.openDebtClient));
+  });
 }
 
 function renderMetrics() {
@@ -5568,6 +5601,14 @@ function renderDashboardMap(jobs = state.jobs.filter((job) => job.date === today
   const firstClient = mappedJobs[0] ? clientFor(mappedJobs[0]) : activeClients()[0];
   const query = firstClient ? fullAddressForClient(firstClient) : state.companyProfile?.address || "Tel Aviv, Israel";
   frame.src = `https://maps.google.com/maps?q=${encodeURIComponent(query)}&z=13&output=embed`;
+  const statValues = [
+    state.jobs.length,
+    state.jobs.filter(isLiveJob).length,
+    state.jobs.filter(isDone).length
+  ];
+  document.querySelectorAll(".map-stats strong").forEach((node, index) => {
+    node.textContent = statValues[index] ?? node.textContent;
+  });
   list.innerHTML = mappedJobs.slice(0, 4).map((job, index) => {
     const client = clientFor(job);
     return `
@@ -5677,7 +5718,8 @@ function renderRecentActivity() {
     target.innerHTML = `<p class="muted">Aun no hay actividad real registrada.</p>`;
     return;
   }
-  target.innerHTML = items.slice(0, 6).map((item) => `
+  const visibleItems = recentActivityExpanded ? items.slice(0, 30) : items.slice(0, 6);
+  target.innerHTML = visibleItems.map((item) => `
     <article class="recent-item">
       <span>${escapeHtml(item.icon)}</span>
       <div>
@@ -5746,7 +5788,18 @@ function renderDashboardSearch() {
 }
 
 function renderJobDashboard() {
-  const groups = jobsByCategory();
+  const monthKeys = monthOptionsForJobs(state.jobs);
+  const monthOptions = ["all", monthKeyOffset(1), monthKeyOffset(0), monthKeyOffset(-1), ...monthKeys]
+    .filter((value, index, values) => value && values.indexOf(value) === index);
+  if (selectedJobsMonth !== "all" && !monthOptions.includes(selectedJobsMonth)) selectedJobsMonth = "all";
+  const visibleJobs = selectedJobsMonth === "all"
+    ? state.jobs
+    : state.jobs.filter((job) => String(job.date || "").slice(0, 7) === selectedJobsMonth);
+  const groups = jobsByCategory(visibleJobs);
+  const monthFilters = monthOptions.map((monthKey) => {
+    const label = monthKey === "all" ? "Todos" : monthLabelFromKey(monthKey);
+    return `<button class="mini-action ${selectedJobsMonth === monthKey ? "is-active" : ""}" type="button" data-job-month="${monthKey}">${escapeHtml(label)}</button>`;
+  }).join("");
   const cards = groups.map((group) => `
     <button class="job-status-card ${group.config.className}" type="button" data-job-group="${group.key}">
       <i aria-hidden="true">${jobGroupIcon(group.key)}</i>
@@ -5770,6 +5823,9 @@ function renderJobDashboard() {
       </section>
     `).join("");
   return `
+    <div class="job-month-filter" aria-label="Filtrar trabajos por mes">
+      ${monthFilters}
+    </div>
     <div class="job-status-board">${cards}</div>
     <div class="job-group-list">${lists || "<p class='muted'>No hay trabajos registrados.</p>"}</div>
   `;
@@ -5787,6 +5843,12 @@ function renderJobs() {
   $$("[data-job-group]").forEach((button) => {
     button.addEventListener("click", () => {
       document.getElementById(`jobGroup-${button.dataset.jobGroup}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+  $$("[data-job-month]").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedJobsMonth = button.dataset.jobMonth || "all";
+      renderJobs();
     });
   });
   $$("[data-edit-job]").forEach((button) => {
@@ -6236,6 +6298,9 @@ function archivePendingCleaner() {
   }
   cleaner.archived = true;
   cleaner.archivedAt = new Date().toISOString();
+  if (state.costRules?.specialRules) {
+    state.costRules.specialRules = state.costRules.specialRules.filter((rule) => rule.cleanerId !== cleaner.id && rule.cleanerName !== cleaner.name);
+  }
   if ($("#cleanerId").value === cleaner.id) resetCleanerForm();
   save();
   renderAll();
@@ -6429,7 +6494,7 @@ function renderClientLinks() {
     const loc = locationMeta(client.address || "");
     return { client, activeCount, historyCount, portalUrl, portalPassword, loc };
   });
-  const connectedCount = rows.filter((row) => row.activeCount > 0).length;
+  const clientsWithActiveServices = rows.filter((row) => row.activeCount > 0).length;
   const historyCountTotal = rows.reduce((sum, row) => sum + row.historyCount, 0);
   $("#clientLinkKpis").innerHTML = `
     <article>
@@ -6438,7 +6503,7 @@ function renderClientLinks() {
     </article>
     <article>
       <span class="client-link-kpi-icon">👥</span>
-      <div><p>Clientes conectados</p><strong>${connectedCount}</strong><small>Acceso a portal</small></div>
+      <div><p>Con servicio activo</p><strong>${clientsWithActiveServices}</strong><small>Clientes con trabajos activos/proximos</small></div>
     </article>
     <article>
       <span class="client-link-kpi-icon">◇</span>
@@ -6525,14 +6590,14 @@ function renderClientLinks() {
     const loc = locationMeta(client.address || "");
     return { client, activeCount, historyCount, portalUrl, portalPassword, loc };
   });
-  const connectedCount = rows.filter((row) => row.activeCount > 0).length;
+  const clientsWithActiveServices = rows.filter((row) => row.activeCount > 0).length;
   const historyCountTotal = rows.reduce((sum, row) => sum + row.historyCount, 0);
   const currentCountry = countryInfo(state.country);
   const countryPill = $("#clientLinksCountryPill");
   if (countryPill) countryPill.textContent = `${currentCountry.name} - ${currentCountry.dial}`;
   $("#clientLinkKpis").innerHTML = [
     { icon: "↗", label: "Total de links", value: rows.length, copy: "Portales activos" },
-    { icon: "☷", label: "Clientes conectados", value: connectedCount, copy: "Acceso a portal" },
+    { icon: "☷", label: "Con servicio activo", value: clientsWithActiveServices, copy: "Clientes con trabajos activos/proximos" },
     { icon: "◇", label: "Seguridad", value: "100%", copy: "Enlaces seguros" },
     { icon: "▣", label: "En historial", value: historyCountTotal, copy: "Links utilizados" }
   ].map((item) => `
@@ -7711,6 +7776,15 @@ function selectClientForPayment(clientId) {
 }
 window.selectClientForPayment = selectClientForPayment;
 
+function openClientDebtPayment(clientId) {
+  setView("payments");
+  selectClientForPayment(clientId);
+  setTimeout(() => {
+    document.getElementById("clientPaymentForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, 50);
+}
+window.openClientDebtPayment = openClientDebtPayment;
+
 function processPaymentForm(event) {
   $("#paymentForm").reset();
   $("#paymentId").value = "";
@@ -8001,6 +8075,24 @@ function setupEvents() {
   $$(".sidebar nav button").forEach((button) => button.addEventListener("click", () => setView(button.dataset.view)));
   $$("[data-view-target]").forEach((button) => button.addEventListener("click", () => setView(button.dataset.viewTarget)));
   $$("[data-open-job]").forEach((button) => button.addEventListener("click", () => setView("jobs")));
+  $$(".notification-button").forEach((button) => {
+    button.addEventListener("click", () => {
+      setView("dashboard");
+      recentActivityExpanded = true;
+      renderRecentActivity();
+      document.querySelector(".recent-panel")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      toast("Actividad reciente abierta.");
+    });
+  });
+  document.querySelector(".recent-panel .text-link")?.addEventListener("click", () => {
+    recentActivityExpanded = true;
+    renderRecentActivity();
+    toast("Mostrando mas actividad.");
+  });
+  document.querySelector(".growth-banner .primary")?.addEventListener("click", () => {
+    setView("reports");
+    document.getElementById("reportsView")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
   $("#logoutButton").addEventListener("click", async () => {
     if (supabaseClient) await supabaseClient.auth.signOut();
     state.user = null;
