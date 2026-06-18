@@ -886,6 +886,7 @@ const i18n = {
     cleanerPerformance: "View performance",
     cleanerWelcomeCopy: "Here is a summary of your activity today.",
     cleanerOnline: "Online",
+    cleanerRole: "Cleaner",
     cleanerAccessBadge: "Private cleaner access",
     cleanerAccessEyebrow: "Secure cleaner portal",
     cleanerAccessTitle: "Team access",
@@ -1116,6 +1117,16 @@ const i18n = {
     noActiveJobs: "no active jobs",
     portalHistoryAvailable: "This portal remains available to review service history.",
     noActiveService: "No active service",
+    serviceLockedCopy: "This service becomes available for real-hour registration at check-in and check-out.",
+    noRecentServiceActivity: "No recent activity.",
+    serviceAssigned: "Service assigned",
+    scheduledJob: "Scheduled job",
+    arrivedAt: "Arrived at {time}",
+    arrivedAtWithLocation: "Arrived at {time} - location available",
+    cleanerWillRegisterArrival: "The cleaner will register arrival when they reach the site.",
+    clientMustConfirmService: "The client must confirm when the service is completed.",
+    signatureRegistered: "Signature registered",
+    digitalSignatureRequested: "A digital signature will be requested on site.",
     serviceConfirmed: "Service confirmed",
     confirmServiceCompleted: "Confirm service completed",
     serviceHistory: "Service history",
@@ -1123,6 +1134,79 @@ const i18n = {
     noEvidenceYet: "No real photos have been uploaded for this job yet.",
     noClosedJobsHistory: "There are no closed jobs in the history yet.",
     noComment: "No comment",
+    upcomingService: "Upcoming service",
+    viewDetails: "View details >",
+    viewAllServices: "View all services >",
+    showingFullHistory: "Showing the full history.",
+    statusLabel: "Status",
+    noEvidenceLoaded: "No evidence uploaded.",
+    emptyEvidenceTitle: "No photos uploaded yet",
+    emptyEvidenceCopy: "Photos and evidence will appear here once they are uploaded.",
+    evidenceHistory: "View evidence history >",
+    photosUploaded: "photos uploaded",
+    photosUploadAfterChecklist: "Photos will be uploaded when each checklist area is finished.",
+    rateThisService: "Rate this service:",
+    reviewPlaceholder: "Write a comment here (optional)...",
+    sendRating: "Send rating",
+    sendReview: "Send review",
+    reviewThanks: "Thank you for your review!",
+    reviewQuestion: "How was our service on {date}?",
+    reviewCopy: "Your opinion matters to us. Please rate this service:",
+    sending: "Sending...",
+    reviewSavedToast: "Thanks for your rating.",
+    reviewSaveError: "Could not save the review. Check internet and try again.",
+    clientAccessNotFound: "Client access not found. Use the updated link.",
+    cleanerAccessNotFound: "Cleaner access not found. Copy the updated link from Cleaners.",
+    takeJobError: "Could not take the job. Another cleaner may have taken it.",
+    takeJobSuccess: "Job assigned to your portal.",
+    futureJobToast: "This job is scheduled for the future. Actions activate on the service day.",
+    alreadyArrivedToast: "Arrival already registered at {time}.",
+    registeringArrival: "Registering arrival and location...",
+    arrivalSaveError: "Could not save the arrival. Check internet and try again.",
+    arrivalWithLocation: "Arrival marked with location and visible to the client.",
+    arrivalWithoutLocation: "Arrival marked. The phone did not provide GPS location.",
+    photosAvailableServiceDay: "You can add photos on the service day.",
+    markArrivalForClientTime: "First mark your arrival so the client can see the real time.",
+    evidenceAvailableServiceDay: "Evidence is enabled on the service day.",
+    markArrivalBeforePhotos: "First mark your arrival before uploading photos.",
+    evidenceSaveError: "Could not save the evidence.",
+    choosePhotos: "Choose one or more photos from the camera or library.",
+    photoSaveError: "Could not save a photo. Try with fewer photos.",
+    evidenceCorrected: "Evidence updated.",
+    evidenceSavedVisible: "{count} photo(s) saved and visible to the client.",
+    finishOnlyServiceDay: "This job can only be finished on the service day.",
+    markArrivalBeforeFinish: "You cannot finish before marking arrival.",
+    finishWithoutPhotosConfirm: "You have not uploaded photos yet. You can finish, but the client will not see evidence. Continue?",
+    finishSaveError: "Could not finish the job. Check internet and try again.",
+    finishNeedsSignature: "Job finished. On-site signature is still needed.",
+    adminFinishNeedsSignature: "Job finished by administrator. On-site signature is still needed.",
+    pendingJobsToast: "{count} pending job(s) in your portal.",
+    noPendingJobsToast: "You have no pending jobs right now.",
+    performanceReportOpen: "Performance report opened.",
+    adminPhotoPermissionNeeded: "You need admin permission to edit historical photos.",
+    chooseHistoryPhotos: "Choose one or more photos to add to the history.",
+    historicalPhotoComment: "Historical photo added with admin permission.",
+    historicalPhotoSaveError: "Could not save a historical photo.",
+    adminJobClosed: "Job closed as finished by administrator.",
+    adminHoursSavedClosed: "Hours saved and job closed by administrator.",
+    adminArrivalCorrected: "Arrival corrected by administrator.",
+    portalSessionClosed: "Session closed. Enter the password to return to the portal.",
+    adminPermissionExpired: "Admin permission expired. Enter the key to edit historical photos again.",
+    masterAccessActiveCopy: "Master access active. You can add photos to closed jobs.",
+    adminPermissionActiveCopy: "Permission active for {time}. You can add photos to closed jobs.",
+    wrongKey: "Incorrect key.",
+    wrongAdminKey: "Incorrect admin key.",
+    masterAccessActivated: "Master access activated.",
+    adminPermissionActivated: "Admin permission active for 1 hour for historical photos.",
+    realEvidencePortalInstruction: "To add real evidence, enter the cleaner portal and use Camera or library.",
+    adminFinishSaveError: "Could not save the close in the database. Try again.",
+    adminFinishReadyForClient: "Job finished. Summary ready for the client.",
+    clientSignatureSaved: "Client signature saved.",
+    cleanerLocationMessage: "{client}, the cleaner registered location for the JobVisto service {date}: {url}",
+    openLocationMaps: "Open location in Maps",
+    sendLocationWhatsapp: "Send location by WhatsApp",
+    chooseAdminEvidencePhotos: "Choose one or more photos to save as administrative evidence.",
+    adminEvidenceSaveError: "Could not save the administrative evidence.",
     viewLarge: "view large",
     correct: "Correct",
     before: "Before",
@@ -1223,6 +1307,7 @@ const i18n = {
     cleanerPerformance: "Ver rendimiento",
     cleanerWelcomeCopy: "Aqui tienes un resumen de tu actividad del dia.",
     cleanerOnline: "En linea",
+    cleanerRole: "Cleaner",
     cleanerAccessBadge: "Acceso privado cleaner",
     cleanerAccessEyebrow: "Portal seguro del cleaner",
     cleanerAccessTitle: "Acceso del equipo",
@@ -1453,6 +1538,16 @@ const i18n = {
     noActiveJobs: "sin trabajos activos",
     portalHistoryAvailable: "Este portal queda disponible para consultar el historial de servicios.",
     noActiveService: "Sin servicio activo",
+    serviceLockedCopy: "Este servicio estara disponible para registrar horas reales al momento de entrada y salida.",
+    noRecentServiceActivity: "Sin actividad reciente.",
+    serviceAssigned: "Servicio asignado",
+    scheduledJob: "Trabajo programado",
+    arrivedAt: "Llego a las {time}",
+    arrivedAtWithLocation: "Llego a las {time} - ubicacion disponible",
+    cleanerWillRegisterArrival: "El cleaner registrara su entrada al llegar al sitio.",
+    clientMustConfirmService: "El cliente debera confirmar la finalizacion del servicio.",
+    signatureRegistered: "Firma registrada",
+    digitalSignatureRequested: "Se solicitara firma digital en el sitio.",
     serviceConfirmed: "Servicio confirmado",
     confirmServiceCompleted: "Confirmo servicio completado",
     serviceHistory: "Historial de servicios",
@@ -1460,6 +1555,79 @@ const i18n = {
     noEvidenceYet: "Todavia no hay fotos reales cargadas para este trabajo.",
     noClosedJobsHistory: "Todavia no hay trabajos cerrados en el historial.",
     noComment: "Sin comentario",
+    upcomingService: "Proximo servicio",
+    viewDetails: "Ver detalles >",
+    viewAllServices: "Ver todos los servicios >",
+    showingFullHistory: "Mostrando todo el historial.",
+    statusLabel: "Estado",
+    noEvidenceLoaded: "Sin evidencias cargadas.",
+    emptyEvidenceTitle: "Aun no hay fotos cargadas",
+    emptyEvidenceCopy: "Las fotos y evidencias seran visibles aqui una vez que se carguen.",
+    evidenceHistory: "Ver historial de evidencias >",
+    photosUploaded: "fotos subidas",
+    photosUploadAfterChecklist: "Las fotos se cargaran al finalizar cada area del checklist.",
+    rateThisService: "Calificar este servicio:",
+    reviewPlaceholder: "Escribe un comentario aqui (opcional)...",
+    sendRating: "Enviar calificacion",
+    sendReview: "Enviar review",
+    reviewThanks: "Gracias por tu review!",
+    reviewQuestion: "Como fue nuestro servicio el {date}?",
+    reviewCopy: "Nos importa mucho tu opinion. Por favor califica este servicio:",
+    sending: "Enviando...",
+    reviewSavedToast: "Gracias por tu calificacion.",
+    reviewSaveError: "No se pudo guardar el review. Revisa internet e intenta nuevamente.",
+    clientAccessNotFound: "Acceso de cliente no encontrado. Usa el link actualizado.",
+    cleanerAccessNotFound: "Acceso de cleaner no encontrado. Copia el link actualizado desde Cleaners.",
+    takeJobError: "No se pudo tomar el trabajo. Puede que ya lo haya tomado otro cleaner.",
+    takeJobSuccess: "Trabajo asignado a tu portal.",
+    futureJobToast: "Este trabajo es futuro. Los botones se activan el dia del servicio.",
+    alreadyArrivedToast: "Llegada ya registrada a las {time}.",
+    registeringArrival: "Registrando llegada y ubicacion...",
+    arrivalSaveError: "No se pudo guardar la llegada en la base. Revisa internet e intenta otra vez.",
+    arrivalWithLocation: "Llegada marcada con ubicacion y visible para el cliente.",
+    arrivalWithoutLocation: "Llegada marcada. El telefono no entrego ubicacion GPS.",
+    photosAvailableServiceDay: "Podras agregar fotos el dia del servicio.",
+    markArrivalForClientTime: "Primero marca tu llegada para que el cliente vea la hora real.",
+    evidenceAvailableServiceDay: "La evidencia se habilita el dia del servicio.",
+    markArrivalBeforePhotos: "Primero marca tu llegada antes de subir fotos.",
+    evidenceSaveError: "No se pudo guardar la evidencia en la base.",
+    choosePhotos: "Elige una o varias fotos de la camara o biblioteca.",
+    photoSaveError: "No se pudo guardar una foto en la base. Intenta con menos fotos.",
+    evidenceCorrected: "Evidencia corregida.",
+    evidenceSavedVisible: "{count} foto(s) guardada(s) y visible(s) para el cliente.",
+    finishOnlyServiceDay: "Este trabajo se puede terminar solo el dia del servicio.",
+    markArrivalBeforeFinish: "No puedes terminar sin marcar llegada primero.",
+    finishWithoutPhotosConfirm: "Todavia no subiste fotos. Puedes terminar, pero el cliente no vera evidencia. Deseas continuar?",
+    finishSaveError: "No se pudo terminar el trabajo en la base. Revisa internet e intenta otra vez.",
+    finishNeedsSignature: "Trabajo terminado. Falta firma en sitio.",
+    adminFinishNeedsSignature: "Trabajo terminado por administrador. Falta firma en sitio.",
+    pendingJobsToast: "{count} trabajo(s) pendiente(s) en tu portal.",
+    noPendingJobsToast: "No tienes trabajos pendientes ahora.",
+    performanceReportOpen: "Reporte de rendimiento abierto.",
+    adminPhotoPermissionNeeded: "Necesitas activar permiso admin para editar fotos historicas.",
+    chooseHistoryPhotos: "Elige una o varias fotos para agregar al historial.",
+    historicalPhotoComment: "Foto historica agregada con permiso admin.",
+    historicalPhotoSaveError: "No se pudo guardar una foto historica en la base.",
+    adminJobClosed: "Trabajo cerrado como terminado por administrador.",
+    adminHoursSavedClosed: "Horas guardadas y trabajo cerrado por administrador.",
+    adminArrivalCorrected: "Llegada corregida por administrador.",
+    portalSessionClosed: "Sesion cerrada. Ingresa la clave para volver al portal.",
+    adminPermissionExpired: "Permiso admin caducado. Ingresa la clave para volver a editar fotos historicas.",
+    masterAccessActiveCopy: "Acceso maestro activo. Puedes agregar fotos a trabajos cerrados.",
+    adminPermissionActiveCopy: "Permiso activo por {time}. Puedes agregar fotos a trabajos cerrados.",
+    wrongKey: "Clave incorrecta.",
+    wrongAdminKey: "Clave admin incorrecta.",
+    masterAccessActivated: "Acceso maestro activado.",
+    adminPermissionActivated: "Permiso admin activado por 1 hora para fotos historicas.",
+    realEvidencePortalInstruction: "Para agregar evidencia real entra al portal del cleaner y usa Camara o biblioteca.",
+    adminFinishSaveError: "No se pudo guardar el cierre en la base. Intenta otra vez.",
+    adminFinishReadyForClient: "Trabajo terminado. Resumen listo para el cliente.",
+    clientSignatureSaved: "Firma del cliente guardada.",
+    cleanerLocationMessage: "{client}, el cleaner registro ubicacion para el servicio JobVisto {date}: {url}",
+    openLocationMaps: "Abrir ubicacion en Maps",
+    sendLocationWhatsapp: "Enviar ubicacion por WhatsApp",
+    chooseAdminEvidencePhotos: "Elige una o varias fotos para guardar como evidencia administrativa.",
+    adminEvidenceSaveError: "No se pudo guardar la evidencia administrativa en la base.",
     viewLarge: "ver grande",
     correct: "Corregir",
     before: "Antes",
@@ -1560,6 +1728,7 @@ const i18n = {
     cleanerPerformance: "Посмотреть результат",
     cleanerWelcomeCopy: "Здесь сводка вашей активности за сегодня.",
     cleanerOnline: "Онлайн",
+    cleanerRole: "Клинер",
     cleanerAccessBadge: "Личный доступ клинера",
     cleanerAccessEyebrow: "Безопасный портал клинера",
     cleanerAccessTitle: "Доступ команды",
@@ -1790,6 +1959,16 @@ const i18n = {
     noActiveJobs: "нет активных работ",
     portalHistoryAvailable: "Этот портал остается доступным для просмотра истории услуг.",
     noActiveService: "Нет активной услуги",
+    serviceLockedCopy: "Эта услуга станет доступна для регистрации реального времени при входе и выходе.",
+    noRecentServiceActivity: "Нет недавней активности.",
+    serviceAssigned: "Услуга назначена",
+    scheduledJob: "Работа запланирована",
+    arrivedAt: "Прибыл в {time}",
+    arrivedAtWithLocation: "Прибыл в {time} - геолокация доступна",
+    cleanerWillRegisterArrival: "Клинер отметит прибытие, когда будет на месте.",
+    clientMustConfirmService: "Клиент должен подтвердить завершение услуги.",
+    signatureRegistered: "Подпись сохранена",
+    digitalSignatureRequested: "На месте будет запрошена цифровая подпись.",
     serviceConfirmed: "Услуга подтверждена",
     confirmServiceCompleted: "Подтвердить завершение услуги",
     serviceHistory: "История услуг",
@@ -1797,6 +1976,79 @@ const i18n = {
     noEvidenceYet: "Для этой работы пока нет реальных загруженных фото.",
     noClosedJobsHistory: "В истории пока нет закрытых работ.",
     noComment: "Без комментария",
+    upcomingService: "Ближайшая услуга",
+    viewDetails: "Подробнее >",
+    viewAllServices: "Посмотреть все услуги >",
+    showingFullHistory: "Показана вся история.",
+    statusLabel: "Статус",
+    noEvidenceLoaded: "Доказательства не загружены.",
+    emptyEvidenceTitle: "Фото пока не загружены",
+    emptyEvidenceCopy: "Фото и доказательства появятся здесь после загрузки.",
+    evidenceHistory: "Посмотреть историю доказательств >",
+    photosUploaded: "фото загружено",
+    photosUploadAfterChecklist: "Фото будут загружены после завершения каждого раздела чеклиста.",
+    rateThisService: "Оцените эту услугу:",
+    reviewPlaceholder: "Напишите комментарий здесь (необязательно)...",
+    sendRating: "Отправить оценку",
+    sendReview: "Отправить отзыв",
+    reviewThanks: "Спасибо за отзыв!",
+    reviewQuestion: "Как прошла наша услуга {date}?",
+    reviewCopy: "Ваше мнение важно для нас. Пожалуйста, оцените эту услугу:",
+    sending: "Отправка...",
+    reviewSavedToast: "Спасибо за вашу оценку.",
+    reviewSaveError: "Не удалось сохранить отзыв. Проверьте интернет и попробуйте снова.",
+    clientAccessNotFound: "Доступ клиента не найден. Используйте обновленную ссылку.",
+    cleanerAccessNotFound: "Доступ клинера не найден. Скопируйте обновленную ссылку из Cleaners.",
+    takeJobError: "Не удалось взять работу. Возможно, ее уже взял другой клинер.",
+    takeJobSuccess: "Работа назначена в ваш портал.",
+    futureJobToast: "Эта работа запланирована на будущее. Кнопки включатся в день услуги.",
+    alreadyArrivedToast: "Прибытие уже отмечено в {time}.",
+    registeringArrival: "Регистрируем прибытие и местоположение...",
+    arrivalSaveError: "Не удалось сохранить прибытие. Проверьте интернет и попробуйте снова.",
+    arrivalWithLocation: "Прибытие отмечено с местоположением и видно клиенту.",
+    arrivalWithoutLocation: "Прибытие отмечено. Телефон не передал GPS.",
+    photosAvailableServiceDay: "Фото можно добавить в день услуги.",
+    markArrivalForClientTime: "Сначала отметьте прибытие, чтобы клиент видел реальное время.",
+    evidenceAvailableServiceDay: "Фотоотчет доступен в день услуги.",
+    markArrivalBeforePhotos: "Сначала отметьте прибытие перед загрузкой фото.",
+    evidenceSaveError: "Не удалось сохранить фотоотчет.",
+    choosePhotos: "Выберите одно или несколько фото из камеры или галереи.",
+    photoSaveError: "Не удалось сохранить фото. Попробуйте меньше фото.",
+    evidenceCorrected: "Фотоотчет обновлен.",
+    evidenceSavedVisible: "Сохранено фото: {count}. Клиент может их видеть.",
+    finishOnlyServiceDay: "Эту работу можно завершить только в день услуги.",
+    markArrivalBeforeFinish: "Нельзя завершить работу без отметки прибытия.",
+    finishWithoutPhotosConfirm: "Вы еще не загрузили фото. Можно завершить, но клиент не увидит доказательства. Продолжить?",
+    finishSaveError: "Не удалось завершить работу. Проверьте интернет и попробуйте снова.",
+    finishNeedsSignature: "Работа завершена. Нужна подпись на месте.",
+    adminFinishNeedsSignature: "Работа завершена администратором. Нужна подпись на месте.",
+    pendingJobsToast: "В вашем портале ожидающих работ: {count}.",
+    noPendingJobsToast: "Сейчас нет ожидающих работ.",
+    performanceReportOpen: "Отчет по результатам открыт.",
+    adminPhotoPermissionNeeded: "Нужно разрешение администратора для редактирования исторических фото.",
+    chooseHistoryPhotos: "Выберите одно или несколько фото для добавления в историю.",
+    historicalPhotoComment: "Историческое фото добавлено с разрешением администратора.",
+    historicalPhotoSaveError: "Не удалось сохранить историческое фото.",
+    adminJobClosed: "Работа закрыта как завершенная администратором.",
+    adminHoursSavedClosed: "Часы сохранены, работа закрыта администратором.",
+    adminArrivalCorrected: "Прибытие исправлено администратором.",
+    portalSessionClosed: "Сессия закрыта. Введите пароль, чтобы вернуться в портал.",
+    adminPermissionExpired: "Разрешение администратора истекло. Введите ключ, чтобы снова редактировать исторические фото.",
+    masterAccessActiveCopy: "Мастер-доступ активен. Можно добавлять фото к закрытым работам.",
+    adminPermissionActiveCopy: "Разрешение активно еще {time}. Можно добавлять фото к закрытым работам.",
+    wrongKey: "Неверный ключ.",
+    wrongAdminKey: "Неверный ключ администратора.",
+    masterAccessActivated: "Мастер-доступ активирован.",
+    adminPermissionActivated: "Разрешение администратора активно на 1 час для исторических фото.",
+    realEvidencePortalInstruction: "Чтобы добавить реальные доказательства, войдите в портал клинера и используйте камеру или галерею.",
+    adminFinishSaveError: "Не удалось сохранить закрытие в базе. Попробуйте снова.",
+    adminFinishReadyForClient: "Работа завершена. Сводка готова для клиента.",
+    clientSignatureSaved: "Подпись клиента сохранена.",
+    cleanerLocationMessage: "{client}, клинер отметил местоположение для услуги JobVisto {date}: {url}",
+    openLocationMaps: "Открыть местоположение в Maps",
+    sendLocationWhatsapp: "Отправить местоположение в WhatsApp",
+    chooseAdminEvidencePhotos: "Выберите одно или несколько фото для административного доказательства.",
+    adminEvidenceSaveError: "Не удалось сохранить административное доказательство.",
     viewLarge: "открыть крупно",
     correct: "Исправить",
     before: "До",
@@ -2243,7 +2495,7 @@ function activateCleanerHistoryAdminPermission() {
     if (!$("#cleanerPortalPage")?.classList.contains("hidden")) {
       renderStandaloneCleanerPortal(true);
       setCleanerTab("jobs");
-      toast("Permiso admin caducado. Ingresa la clave para volver a editar fotos historicas.");
+      toast(t("adminPermissionExpired"));
     }
   }, HISTORY_ADMIN_PERMISSION_MS);
 }
@@ -2570,12 +2822,15 @@ function captureCleanerLocation() {
 function cleanerLocationLinksHtml(job, client = null) {
   const mapsUrl = mapsUrlForLocation(job?.cleanerLocation);
   if (!mapsUrl) return "";
-  const message = `${client?.name || "Cliente"}, el cleaner registro ubicacion para el servicio ${job.date || ""}: ${mapsUrl}`;
+  const message = t("cleanerLocationMessage")
+    .replace("{client}", client?.name || t("clientLabel"))
+    .replace("{date}", job.date || "")
+    .replace("{url}", mapsUrl);
   const waUrl = client ? whatsAppUrl(client.phone, message) : "";
   return `
     <div class="location-actions">
-      <a class="mini-action" href="${mapsUrl}" target="_blank" rel="noopener">Abrir ubicacion en Maps</a>
-      ${waUrl ? `<a class="mini-action" href="${waUrl}" target="_blank" rel="noopener">Enviar ubicacion por WhatsApp</a>` : ""}
+      <a class="mini-action" href="${mapsUrl}" target="_blank" rel="noopener">${t("openLocationMaps")}</a>
+      ${waUrl ? `<a class="mini-action" href="${waUrl}" target="_blank" rel="noopener">${t("sendLocationWhatsapp")}</a>` : ""}
     </div>
   `;
 }
@@ -3051,29 +3306,30 @@ function clientHistoryTimelineHtml(historyJobs, currentJob) {
         const client = clientFor(job);
         const isCurrent = job.isCurrent;
         const badgeClass = isCurrent ? 'cp-status-assigned' : 'cp-status-done';
-        const badgeLabel = isCurrent ? (job.status || 'Programado') : 'Terminado por cleaner';
+        const badgeLabel = isCurrent ? jobStatusLabel(job) : localizedJobStatus("Terminado por cleaner");
         const hasPayableAmount = hasRealBillingTimes(job);
-        const formattedDate = new Date(job.date + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+        const dateLocale = state.language === "ru" ? "ru-RU" : state.language === "en" ? "en-US" : "es-ES";
+        const formattedDate = new Date(job.date + 'T00:00:00').toLocaleDateString(dateLocale, { day: '2-digit', month: 'short', year: 'numeric' });
         
         return `
           <div class="cp-history-item-new ${isCurrent ? 'current' : 'past'}">
             <div class="cp-history-header-row">
-              <strong>${formattedDate} &bull; ${isCurrent ? 'Próximo servicio' : escapeHtml(client.name)}</strong>
+              <strong>${formattedDate} &bull; ${isCurrent ? t("upcomingService") : escapeHtml(client.name)}</strong>
               <span class="cp-job-status-badge ${badgeClass}" style="padding: 2px 8px; border-radius: 99px;">${badgeLabel}</span>
             </div>
             <div class="cp-history-details-row">
-              <span class="cp-history-detail-line">${escapeHtml(job.serviceType)} &bull; ${job.start}–${job.actualEnd || job.end || '—'}</span>
+              <span class="cp-history-detail-line">${escapeHtml(job.serviceType)} &bull; ${job.start}-${job.actualEnd || job.end || '-'}</span>
               ${!isCurrent ? `
-                <span class="cp-history-sub-line">${evidenceCount(job)} fotos &bull; ${job.clientConfirmed ? t("confirmedByClient") : t("noClientConfirmation")} &bull; ${hasPayableAmount ? money(estimateJob(job)) : localText("amountPendingLower")}</span>
+                <span class="cp-history-sub-line">${evidenceCount(job)} ${evidenceCount(job) === 1 ? t("photoSingular") : t("photoPlural")} &bull; ${job.clientConfirmed ? t("confirmedByClient") : t("noClientConfirmation")} &bull; ${hasPayableAmount ? money(estimateJob(job)) : localText("amountPendingLower")}</span>
               ` : `
-                <span class="cp-history-sub-line">Estado: ${escapeHtml(job.status)}</span>
+                <span class="cp-history-sub-line">${t("statusLabel")}: ${jobStatusLabel(job)}</span>
               `}
             </div>
             <button class="text-link cp-history-expand-btn" type="button" onclick="toggleHistoryJobDetails('${job.id}')">
-              Ver detalles &gt;
+              ${t("viewDetails")}
             </button>
             <div class="cp-history-job-expanded hidden" id="history-details-${job.id}">
-              ${evidenceCount(job) ? photoBoardHtml(job, true) : `<p class="muted" style="margin: 8px 0 0 16px; font-size: 0.8rem;">Sin evidencias cargadas.</p>`}
+              ${evidenceCount(job) ? photoBoardHtml(job, true) : `<p class="muted" style="margin: 8px 0 0 16px; font-size: 0.8rem;">${t("noEvidenceLoaded")}</p>`}
               ${!isCurrent ? `
                 <div class="cp-history-review-section" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2ebe4; text-align: left;">
                   ${job.clientRating ? `
@@ -3081,11 +3337,11 @@ function clientHistoryTimelineHtml(historyJobs, currentJob) {
                       <div style="color: var(--gold); font-size: 1.1rem; margin-bottom: 4px;">
                         ${"★".repeat(job.clientRating)}${"☆".repeat(5 - job.clientRating)}
                       </div>
-                      <p style="margin: 0; font-size: 0.85rem; color: #557067; font-style: italic;">"${escapeHtml(job.clientReviewText || 'Sin comentario')}"</p>
+                      <p style="margin: 0; font-size: 0.85rem; color: #557067; font-style: italic;">"${escapeHtml(job.clientReviewText || t("noComment"))}"</p>
                     </div>
                   ` : `
                     <div style="background: #f8faf9; border: 1px solid #dce6e2; border-radius: 8px; padding: 12px; margin-top: 8px;" id="historyReviewForm_${job.id}">
-                      <strong style="font-size: 0.85rem; color: #07302d; display: block; margin-bottom: 6px;">Calificar este servicio:</strong>
+                      <strong style="font-size: 0.85rem; color: #07302d; display: block; margin-bottom: 6px;">${t("rateThisService")}</strong>
                       <form onsubmit="submitClientReview(event, '${job.id}')" style="display: flex; flex-direction: column; gap: 8px;">
                         <div class="star-rating-input" style="font-size: 1.8rem; color: #ccc; cursor: pointer; display: flex; gap: 6px; justify-content: flex-start;">
                           <span onclick="setReviewRating('${job.id}', 1)" id="star_${job.id}_1" style="transition: color 0.2s;">★</span>
@@ -3095,8 +3351,8 @@ function clientHistoryTimelineHtml(historyJobs, currentJob) {
                           <span onclick="setReviewRating('${job.id}', 5)" id="star_${job.id}_5" style="transition: color 0.2s;">★</span>
                         </div>
                         <input type="hidden" name="rating" id="reviewRating_${job.id}" value="0" required>
-                        <textarea name="reviewText" placeholder="Escribe un comentario aquí (opcional)..." rows="2" style="width: 100%; border-radius: 6px; border: 1px solid var(--border-color); padding: 8px; font-size: 0.8rem; font-family: inherit; resize: vertical;"></textarea>
-                        <button type="submit" class="primary" style="background: #35d17f; border: none; color: #07302d; font-size: 0.8rem; font-weight: bold; padding: 6px 12px; border-radius: 6px; align-self: flex-start; margin-top: 4px; cursor: pointer;">Enviar Calificación</button>
+                        <textarea name="reviewText" placeholder="${t("reviewPlaceholder")}" rows="2" style="width: 100%; border-radius: 6px; border: 1px solid var(--border-color); padding: 8px; font-size: 0.8rem; font-family: inherit; resize: vertical;"></textarea>
+                        <button type="submit" class="primary" style="background: #35d17f; border: none; color: #07302d; font-size: 0.8rem; font-weight: bold; padding: 6px 12px; border-radius: 6px; align-self: flex-start; margin-top: 4px; cursor: pointer;">${t("sendRating")}</button>
                       </form>
                     </div>
                   `}
@@ -3108,8 +3364,8 @@ function clientHistoryTimelineHtml(historyJobs, currentJob) {
       }).join("")}
     </div>
     <div style="margin-top: 16px; text-align: center;">
-      <button class="ghost" type="button" style="font-size: 0.85rem; font-weight: 600; padding: 8px 16px; border-radius: 8px; border: 1px solid #e2ebe4; color: #07302d;" onclick="toast('Mostrando todo el historial.')">
-        Ver todos los servicios &gt;
+      <button class="ghost" type="button" style="font-size: 0.85rem; font-weight: 600; padding: 8px 16px; border-radius: 8px; border: 1px solid #e2ebe4; color: #07302d;" onclick="toast(t('showingFullHistory'))">
+        ${t("viewAllServices")}
       </button>
     </div>
   `;
@@ -3935,7 +4191,7 @@ function renderStandaloneClientPortal(unlocked = true, options = {}) {
     $("#clientPortalContent").classList.add("hidden");
     $("#clientPortalPassword").value = "";
     if (options.showMissingToast) {
-      toast("Acceso de cliente no encontrado. Copia el link actualizado desde Links clientes.");
+      toast(t("clientAccessNotFound"));
     }
     return;
   }
@@ -3958,14 +4214,14 @@ function renderStandaloneClientPortal(unlocked = true, options = {}) {
 
   // Build the left summary card
   const statusMap = {
-    "Asignado": { label: "Asignado", cls: "cp-status-assigned" },
-    "En progreso": { label: "En sitio / en proceso", cls: "cp-status-inprogress" },
-    "En sitio": { label: "En sitio / en proceso", cls: "cp-status-inprogress" },
-    "Terminado por cleaner": { label: "Terminado por cleaner", cls: "cp-status-done" },
-    "Terminado por cliente": { label: "Terminado por cliente", cls: "cp-status-done" },
-    "Terminado por administrador": { label: "Terminado por administrador", cls: "cp-status-done" },
+    "Asignado": { label: localizedJobStatus("Asignado"), cls: "cp-status-assigned" },
+    "En progreso": { label: localizedJobStatus("En progreso"), cls: "cp-status-inprogress" },
+    "En sitio": { label: localizedJobStatus("En sitio"), cls: "cp-status-inprogress" },
+    "Terminado por cleaner": { label: localizedJobStatus("Terminado por cleaner"), cls: "cp-status-done" },
+    "Terminado por cliente": { label: localizedJobStatus("Terminado por cliente"), cls: "cp-status-done" },
+    "Terminado por administrador": { label: localizedJobStatus("Terminado por administrador"), cls: "cp-status-done" },
   };
-  const jobStatus = job ? (statusMap[job.status] || { label: job.status, cls: "cp-status-assigned" }) : null;
+  const jobStatus = job ? (statusMap[job.status] || { label: localizedJobStatus(job.status), cls: "cp-status-assigned" }) : null;
 
   const mkRow = (iconName, label, value, valueCls = "") => `
     <div class="cp-info-row-redesign">
@@ -3982,21 +4238,21 @@ function renderStandaloneClientPortal(unlocked = true, options = {}) {
   const initials = String(client.name || "JV").split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
 
   $("#clientPortalSummary").innerHTML = job ? `
-    <span class="cp-summary-eyebrow-redesign">Cliente</span>
+    <span class="cp-summary-eyebrow-redesign">${t("clientLabel")}</span>
     <h2 class="cp-summary-title-redesign">${t("privateServiceSummary")}</h2>
     
     <div class="cp-summary-meta-redesign">
       <div class="cp-meta-row-redesign">
         <i data-lucide="user" class="cp-meta-icon-redesign"></i>
-        <span><strong>Cliente:</strong> ${client.name}</span>
+        <span><strong>${t("clientLabel")}:</strong> ${client.name}</span>
       </div>
       <div class="cp-meta-row-redesign">
         <i data-lucide="briefcase" class="cp-meta-icon-redesign"></i>
-        <span><strong>Servicio actual/próximo:</strong> ${job.serviceType}</span>
+        <span><strong>${t("currentService")}:</strong> ${job.serviceType}</span>
       </div>
       <div class="cp-meta-row-redesign">
         <i data-lucide="calendar" class="cp-meta-icon-redesign"></i>
-        <span><strong>Fecha y hora:</strong> ${job.date} &bull; ${job.start}–${job.end || t("undefinedTime")}</span>
+        <span><strong>${localText("dateAndTime")}:</strong> ${job.date} &bull; ${job.start}-${job.end || t("undefinedTime")}</span>
       </div>
     </div>
 
@@ -4012,15 +4268,15 @@ function renderStandaloneClientPortal(unlocked = true, options = {}) {
     </div>
 
     <div class="cp-checklist-rows-redesign">
-      ${mkRow("file-text", t("serviceStatus") || "Estado del servicio", `<span class="cp-job-status-badge ${jobStatus?.cls || ''}" style="padding: 2px 8px; border-radius: 99px;">${jobStatus?.label || job.status}</span>`)}
+      ${mkRow("file-text", t("serviceStatus"), `<span class="cp-job-status-badge ${jobStatus?.cls || ''}" style="padding: 2px 8px; border-radius: 99px;">${jobStatus?.label || localizedJobStatus(job.status)}</span>`)}
       ${mkRow("clock", t("cleanerArrival") || "Llegada del cleaner", job.checkedIn ? job.start : pendingText)}
       ${mkRow("clock", t("cleanerDeparture") || "Salida del cleaner", job.checkedOut ? (job.actualEnd || job.end) : pendingText)}
-      ${mkRow("camera", t("visiblePhotos") || "Fotos visibles", `<strong>${evidenceCount(job)}</strong>`)}
-      ${mkRow("help-circle", t("cleanerFinished") || "Cleaner marco terminado", (job.cleanerFinished || job.checkedOut) ? doneText : pendingText)}
-      ${mkRow("check-circle", t("clientConfirmation") || "Confirmacion del cliente", job.clientConfirmed ? doneText : pendingText)}
-      ${mkRow("edit-3", t("clientSignature") || "Firma del cliente", job.clientSignature ? doneText : pendingText)}
-      ${mkRow("edit-3", t("onsiteSignature") || "Firma en sitio", job.siteSignature ? `${doneText} ${job.siteSignerName || ''}` : pendingText)}
-      ${mkRow("clipboard-list", t("checklist") || "Checklist", `<span class="cp-tasks">${(job.tasks || []).join(", ") || '—'}</span>`)}
+      ${mkRow("camera", t("visiblePhotos"), `<strong>${evidenceCount(job)}</strong>`)}
+      ${mkRow("help-circle", t("cleanerFinished"), (job.cleanerFinished || job.checkedOut) ? doneText : pendingText)}
+      ${mkRow("check-circle", t("clientConfirmation"), job.clientConfirmed ? doneText : pendingText)}
+      ${mkRow("edit-3", t("clientSignature"), job.clientSignature ? doneText : pendingText)}
+      ${mkRow("edit-3", t("onsiteSignature"), job.siteSignature ? `${doneText} ${job.siteSignerName || ''}` : pendingText)}
+      ${mkRow("clipboard-list", t("checklist"), `<span class="cp-tasks">${(job.tasks || []).join(", ") || "-"}</span>`)}
     </div>
 
     ${!hasPayableAmount ? `
@@ -4029,8 +4285,8 @@ function renderStandaloneClientPortal(unlocked = true, options = {}) {
           <i data-lucide="lock"></i>
         </div>
         <div class="cp-blocked-text">
-          <strong>${t("serviceLocked") || "Servicio bloqueado"}</strong>
-          <p>Este servicio estará disponible para registro de horas reales al momento de entrada y salida.</p>
+          <strong>${localText("serviceLocked")}</strong>
+          <p>${t("serviceLockedCopy")}</p>
         </div>
       </div>
     ` : ''}
@@ -4039,7 +4295,7 @@ function renderStandaloneClientPortal(unlocked = true, options = {}) {
       ${job.clientConfirmed ? t("serviceConfirmed") : hasPayableAmount ? t("confirmServiceCompleted") : blockedText}
     </button>
   ` : `
-    <span class="cp-summary-eyebrow-redesign">Cliente</span>
+    <span class="cp-summary-eyebrow-redesign">${t("clientLabel")}</span>
     <h2 class="cp-summary-title-redesign">${t("privateServiceSummary")}</h2>
     <div class="cp-client-info-empty" style="margin-top: 16px; display: flex; align-items: center; gap: 12px;">
       <div class="cp-client-avatar">${initials}</div>
@@ -4063,18 +4319,18 @@ function renderStandaloneClientPortal(unlocked = true, options = {}) {
   const activityEl = $("#clientPortalActivity");
   if (activityEl) {
     if (!job) {
-      activityEl.innerHTML = "<p class='muted'>Sin actividad reciente.</p>";
+      activityEl.innerHTML = `<p class='muted'>${t("noRecentServiceActivity")}</p>`;
     } else {
       const arrivalDetail = job.checkedIn
-        ? `Llegó a las ${job.start}${job.cleanerLocation ? " - ubicación disponible" : ""}`
-        : "El cleaner registrará su entrada al llegar al sitio.";
+        ? t(job.cleanerLocation ? "arrivedAtWithLocation" : "arrivedAt").replace("{time}", job.start)
+        : t("cleanerWillRegisterArrival");
       const activities = [
-        { icon: "👤", color: "cp-act-green", label: t("serviceAssigned") || "Servicio asignado", detail: `${client.name}`, time: job.date, show: true },
-        { icon: "📅", color: "cp-act-blue", label: t("scheduledJob") || "Trabajo programado", detail: `${job.date} • ${job.start}–${job.end || '—'}`, time: job.date, show: true },
-        { icon: "🔔", color: "cp-act-orange", label: t("cleanerArrival") || "Pendiente de llegada", detail: job.checkedIn ? `Llegó a las ${job.start}` : "El cleaner registrará su entrada al llegar al sitio.", time: "", show: true },
-        { icon: "📷", color: "cp-act-purple", label: t("visiblePhotos") || "Pendiente de fotos", detail: evidenceCount(job) > 0 ? `${evidenceCount(job)} fotos subidas` : "Las fotos se cargarán al finalizar cada área del checklist.", time: "", show: true },
-        { icon: "✅", color: "cp-act-teal", label: t("clientConfirmation") || "Pendiente de confirmación", detail: job.clientConfirmed ? "Servicio confirmado" : "El cliente deberá confirmar la finalización del servicio.", time: "", show: true },
-        { icon: "✍", color: "cp-act-gray", label: t("clientSignature") || "Pendiente de firma", detail: job.clientSignature ? "Firma registrada" : "Se solicitará firma digital en el sitio.", time: "", show: true },
+        { icon: "👤", color: "cp-act-green", label: t("serviceAssigned"), detail: `${client.name}`, time: job.date, show: true },
+        { icon: "📅", color: "cp-act-blue", label: t("scheduledJob"), detail: `${job.date} - ${job.start}-${job.end || t("undefinedTime")}`, time: job.date, show: true },
+        { icon: "🔔", color: "cp-act-orange", label: t("cleanerArrival"), detail: job.checkedIn ? t("arrivedAt").replace("{time}", job.start) : t("cleanerWillRegisterArrival"), time: "", show: true },
+        { icon: "📷", color: "cp-act-purple", label: t("visiblePhotos"), detail: evidenceCount(job) > 0 ? `${evidenceCount(job)} ${t("photosUploaded")}` : t("photosUploadAfterChecklist"), time: "", show: true },
+        { icon: "✅", color: "cp-act-teal", label: t("clientConfirmation"), detail: job.clientConfirmed ? t("serviceConfirmed") : t("clientMustConfirmService"), time: "", show: true },
+        { icon: "✍", color: "cp-act-gray", label: t("clientSignature"), detail: job.clientSignature ? t("signatureRegistered") : t("digitalSignatureRequested"), time: "", show: true },
       ];
       const arrivalActivity = activities.find((item) => item.color === "cp-act-orange");
       if (arrivalActivity) {
@@ -4106,11 +4362,11 @@ function renderStandaloneClientPortal(unlocked = true, options = {}) {
           <div class="cp-empty-image-wrap">
             <i data-lucide="image" class="cp-empty-image-icon"></i>
           </div>
-          <strong>Aún no hay fotos cargadas</strong>
-          <p>Las fotos y evidencias serán visibles aquí una vez que se carguen.</p>
+          <strong>${t("emptyEvidenceTitle")}</strong>
+          <p>${t("emptyEvidenceCopy")}</p>
           <button class="ghost cp-history-btn" type="button" onclick="document.querySelector('.cp-history-panel-separate').scrollIntoView({ behavior: 'smooth' })">
             <i data-lucide="folder-open"></i>
-            Ver historial de evidencias &gt;
+            ${t("evidenceHistory")}
           </button>
         </div>
       `;
@@ -4138,7 +4394,7 @@ function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
     $("#cleanerPortalContent").classList.add("hidden");
     $("#cleanerPortalPage").classList.remove("is-unlocked");
     if (options.showMissingToast) {
-      toast("Acceso de cleaner no encontrado. Copia el link actualizado desde Cleaners.");
+      toast(t("cleanerAccessNotFound"));
     }
     return;
   }
@@ -4177,9 +4433,9 @@ function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
   $("#cleanerHistoryAdminBox").classList.toggle("is-unlocked", historyAdminActive || portalCleanerAdmin);
   $("#cleanerHistoryAdminBox").querySelector("p").textContent = (historyAdminActive || portalCleanerAdmin)
     ? portalCleanerAdmin
-      ? "Acceso maestro activo. Puedes agregar fotos a trabajos cerrados."
-      : `Permiso activo por ${cleanerHistoryAdminTimeLeftLabel()}. Puedes agregar fotos a trabajos cerrados.`
-    : "Para agregar fotos a trabajos cerrados, ingresa la clave administrativa.";
+      ? t("masterAccessActiveCopy")
+      : t("adminPermissionActiveCopy").replace("{time}", cleanerHistoryAdminTimeLeftLabel())
+    : t("cleanerAdminCorrectionCopy");
   const todayStr = today();
   const urgentJobs = activeAssignedJobs.filter(j => j.date <= todayStr);
   const hasPriority = urgentJobs.length > 0;
@@ -4324,14 +4580,14 @@ function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
           console.error("Error taking job in portal mode:", err);
           Object.assign(job, previousJob);
           renderStandaloneCleanerPortal(true);
-          toast("No se pudo tomar el trabajo. Puede que ya lo haya tomado otro cleaner.");
+          toast(t("takeJobError"));
           return;
         }
       }
 
       save();
       renderStandaloneCleanerPortal(true);
-      toast("Trabajo asignado a tu portal.");
+      toast(t("takeJobSuccess"));
     });
   });
   $$("[data-cleaner-tab]").forEach((button) => {
@@ -4353,15 +4609,15 @@ function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
       const job = state.jobs.find((item) => item.id === button.dataset.cleanerArrived);
       if (!job) return;
       if (cleanerActionsLocked(job)) {
-        toast("Este trabajo es futuro. Los botones se activan el dia del servicio.");
+        toast(t("futureJobToast"));
         return;
       }
       if (job.checkedIn && !portalCleanerAdmin) {
-        toast(`Llegada ya registrada a las ${job.start}.`);
+        toast(t("alreadyArrivedToast").replace("{time}", job.start || ""));
         return;
       }
       const previousJob = structuredClone(job);
-      toast("Registrando llegada y ubicacion...");
+      toast(t("registeringArrival"));
       const location = await captureCleanerLocation();
       job.checkedIn = true;
       job.start = currentTime();
@@ -4376,14 +4632,14 @@ function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
           console.error("Error saving arrival in portal mode:", err);
           Object.assign(job, previousJob);
           renderStandaloneCleanerPortal(true);
-          toast("No se pudo guardar la llegada en la base. Revisa internet e intenta otra vez.");
+          toast(t("arrivalSaveError"));
           return;
         }
       }
 
       save();
       renderStandaloneCleanerPortal(true);
-      toast(location ? "Llegada marcada con ubicacion y visible para el cliente." : "Llegada marcada. El telefono no entrego ubicacion GPS.");
+      toast(location ? t("arrivalWithLocation") : t("arrivalWithoutLocation"));
     });
   });
   $$("[data-cleaner-photo]").forEach((button) => {
@@ -4391,11 +4647,11 @@ function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
       const job = state.jobs.find((item) => item.id === button.dataset.cleanerPhoto);
       if (!job) return;
       if (cleanerActionsLocked(job)) {
-        toast("Podras agregar fotos el dia del servicio.");
+        toast(t("photosAvailableServiceDay"));
         return;
       }
       if (!job.checkedIn && !portalCleanerAdmin) {
-        toast("Primero marca tu llegada para que el cliente vea la hora real.");
+        toast(t("markArrivalForClientTime"));
         return;
       }
       const form = document.querySelector(`[data-evidence-form="${job.id}"]`);
@@ -4409,11 +4665,11 @@ function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
       const job = state.jobs.find((item) => item.id === form.dataset.evidenceForm);
       if (!job) return;
       if (cleanerActionsLocked(job)) {
-        toast("La evidencia se habilita el dia del servicio.");
+        toast(t("evidenceAvailableServiceDay"));
         return;
       }
       if (!job.checkedIn && !portalCleanerAdmin) {
-        toast("Primero marca tu llegada antes de subir fotos.");
+        toast(t("markArrivalBeforePhotos"));
         return;
       }
       const data = new FormData(form);
@@ -4439,17 +4695,17 @@ function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
         } catch (err) {
           Object.assign(photo, previousPhoto);
           console.error("Error updating evidence in portal mode:", err);
-          toast("No se pudo guardar la evidencia en la base.");
+          toast(t("evidenceSaveError"));
           renderStandaloneCleanerPortal(true);
           return;
         }
 
         renderStandaloneCleanerPortal(true);
-        toast("Evidencia corregida.");
+        toast(t("evidenceCorrected"));
         return;
       }
       if (!files.length) {
-        toast("Elige una o varias fotos de la camara o biblioteca.");
+        toast(t("choosePhotos"));
         return;
       }
       const createdAt = new Date().toISOString();
@@ -4471,7 +4727,7 @@ function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
           createdEvidence.push(newEv);
         } catch (err) {
           console.error("Error inserting evidence in portal mode:", err);
-          toast("No se pudo guardar una foto en la base. Intenta con menos fotos.");
+          toast(t("photoSaveError"));
           break;
         }
       }
@@ -4479,7 +4735,7 @@ function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
       save();
       renderStandaloneCleanerPortal(true);
       if (createdEvidence.length) {
-        toast(`${createdEvidence.length} foto${createdEvidence.length === 1 ? "" : "s"} guardada${createdEvidence.length === 1 ? "" : "s"} y visible${createdEvidence.length === 1 ? "" : "s"} para el cliente.`);
+        toast(t("evidenceSavedVisible").replace("{count}", createdEvidence.length));
       }
     });
   });
@@ -4513,14 +4769,14 @@ function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
       const job = state.jobs.find((item) => item.id === button.dataset.cleanerFinish);
       if (!job) return;
       if (cleanerActionsLocked(job)) {
-        toast("Este trabajo se puede terminar solo el dia del servicio.");
+        toast(t("finishOnlyServiceDay"));
         return;
       }
       if (!job.checkedIn && !portalCleanerAdmin) {
-        toast("No puedes terminar sin marcar llegada primero.");
+        toast(t("markArrivalBeforeFinish"));
         return;
       }
-      if (!evidenceCount(job) && !confirm("Todavia no subiste fotos. Puedes terminar, pero el cliente no vera evidencia. Deseas continuar?")) return;
+      if (!evidenceCount(job) && !confirm(t("finishWithoutPhotosConfirm"))) return;
       if (portalCleanerAdmin && !job.checkedIn) {
         job.checkedIn = true;
         job.start = job.start || currentTime();
@@ -4539,7 +4795,7 @@ function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
           console.error("Error finishing job in portal mode:", err);
           Object.assign(job, previousJob);
           renderStandaloneCleanerPortal(true);
-          toast("No se pudo terminar el trabajo en la base. Revisa internet e intenta otra vez.");
+          toast(t("finishSaveError"));
           return;
         }
       }
@@ -4547,7 +4803,7 @@ function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
       save();
       renderStandaloneCleanerPortal(true);
       openJobSignatureModal(job.id);
-      toast(portalCleanerAdmin ? "Trabajo terminado por administrador. Falta firma en sitio." : "Trabajo terminado. Falta firma en sitio.");
+      toast(portalCleanerAdmin ? t("adminFinishNeedsSignature") : t("finishNeedsSignature"));
     });
   });
   bindCleanerAdminCorrections();
@@ -4592,15 +4848,15 @@ function bindCleanerPortalChrome(cleaner) {
     notificationBtn.onclick = () => {
       setCleanerTab("jobs");
       toast(pendingCount
-        ? `${pendingCount} trabajo${pendingCount === 1 ? "" : "s"} pendiente${pendingCount === 1 ? "" : "s"} en tu portal.`
-        : "No tienes trabajos pendientes ahora.");
+        ? t("pendingJobsToast").replace("{count}", pendingCount)
+        : t("noPendingJobsToast"));
     };
   }
   const performanceBtn = $("#cleanerPerformanceBtn");
   if (performanceBtn) {
     performanceBtn.onclick = () => {
       setCleanerTab("report");
-      toast("Reporte de rendimiento abierto.");
+      toast(t("performanceReportOpen"));
     };
   }
 }
@@ -4608,7 +4864,7 @@ function bindCleanerPortalChrome(cleaner) {
 async function handleCleanerHistoryEvidenceSubmit(event) {
   event.preventDefault();
   if (!isCleanerHistoryAdminActive() && !portalCleanerAdmin) {
-    toast("Necesitas activar permiso admin para editar fotos historicas.");
+    toast(t("adminPhotoPermissionNeeded"));
     renderStandaloneCleanerPortal(true);
     setCleanerTab("jobs");
     return;
@@ -4619,12 +4875,12 @@ async function handleCleanerHistoryEvidenceSubmit(event) {
   const data = new FormData(form);
   const files = data.getAll("photo").filter((file) => file instanceof File && file.size);
   if (!files.length) {
-    toast("Elige una o varias fotos para agregar al historial.");
+    toast(t("chooseHistoryPhotos"));
     return;
   }
   const section = data.get("section") || "General";
   const phase = data.get("phase") || "Antes";
-  const comment = data.get("comment") || "Foto historica agregada con permiso admin.";
+  const comment = data.get("comment") || t("historicalPhotoComment");
   const createdAt = new Date().toISOString();
   const createdEvidence = [];
   for (const file of files) {
@@ -4645,7 +4901,7 @@ async function handleCleanerHistoryEvidenceSubmit(event) {
       createdEvidence.push(newEv);
     } catch (err) {
       console.error("Error inserting historical evidence in portal mode:", err);
-      toast("No se pudo guardar una foto historica en la base.");
+      toast(t("historicalPhotoSaveError"));
       break;
     }
   }
@@ -4684,7 +4940,7 @@ async function completeJobByAdmin(jobId) {
   }
   renderAll();
   if (!$("#cleanerPortalPage")?.classList.contains("hidden")) renderStandaloneCleanerPortal(true);
-  toast("Trabajo cerrado como terminado por administrador.");
+  toast(t("adminJobClosed"));
 }
 
 function bindCleanerAdminCorrections() {
@@ -4717,7 +4973,7 @@ function bindCleanerAdminCorrections() {
       }
       renderAll();
       renderStandaloneCleanerPortal(true);
-      toast(end ? "Horas guardadas y trabajo cerrado por administrador." : "Llegada corregida por administrador.");
+      toast(end ? t("adminHoursSavedClosed") : t("adminArrivalCorrected"));
     });
   });
   $$("[data-admin-finish-job]").forEach((button) => {
@@ -4742,7 +4998,7 @@ function cleanerJobHtml(job) {
     <article class="client-item">
       <strong>${client.name}</strong>
       <span class="client-meta">${job.date} - ${job.start}-${job.actualEnd || job.end || t("timeUndefined")} - ${jobStatusLabel(job)}</span>
-      ${portalCleanerAdmin ? `<span class="client-meta">Cleaner: ${cleanerName}</span>` : ""}
+      ${portalCleanerAdmin ? `<span class="client-meta">${t("cleanerRole")}: ${cleanerName}</span>` : ""}
       <span class="client-meta">${client.address}</span>
       ${portalCleanerAdmin ? `
         <div class="admin-correction-box">
@@ -5562,7 +5818,7 @@ async function handleAdminEvidenceSubmit(event) {
   const data = new FormData(form);
   const files = data.getAll("photo").filter((file) => file instanceof File && file.size);
   if (!files.length) {
-    toast("Elige una o varias fotos para guardar como evidencia administrativa.");
+    toast(t("chooseAdminEvidencePhotos"));
     return;
   }
   const section = data.get("section") || "General";
@@ -5588,7 +5844,7 @@ async function handleAdminEvidenceSubmit(event) {
     toast(`${files.length} foto${files.length === 1 ? "" : "s"} agregada${files.length === 1 ? "" : "s"} por administracion.`);
   } catch (error) {
     console.error("Error saving admin evidence:", error);
-    toast("No se pudo guardar la evidencia administrativa en la base.");
+    toast(t("adminEvidenceSaveError"));
   }
 }
 
@@ -6495,7 +6751,7 @@ function clientReviewHtml(job) {
   if (job.clientRating) {
     return `
       <section class="panel client-history-panel" style="border: 2px solid var(--gold); margin-bottom: 24px;">
-        <h2 style="color: var(--gold);">¡Gracias por tu review!</h2>
+        <h2 style="color: var(--gold);">${t("reviewThanks")}</h2>
         <div style="color: var(--gold); font-size: 1.5rem; margin-bottom: 8px;">${"⭐".repeat(job.clientRating)}${"☆".repeat(5 - job.clientRating)}</div>
         <p style="margin:0;"><em>"${escapeHtml(job.clientReviewText || '')}"</em></p>
       </section>
@@ -6504,8 +6760,8 @@ function clientReviewHtml(job) {
 
   return `
     <section class="panel client-history-panel" style="border: 2px solid var(--gold); margin-bottom: 24px;" id="reviewSection_${job.id}">
-      <h2 style="color: var(--gold);">¿Cómo fue nuestro servicio el ${job.date}?</h2>
-      <p>Nos importa mucho tu opinión. Por favor califica este servicio:</p>
+      <h2 style="color: var(--gold);">${t("reviewQuestion").replace("{date}", job.date)}</h2>
+      <p>${t("reviewCopy")}</p>
       <form onsubmit="submitClientReview(event, '${job.id}')" style="display: flex; flex-direction: column; gap: 10px; margin-top: 12px;">
         <div class="star-rating-input" style="font-size: 2.5rem; color: #ccc; cursor: pointer; display: flex; gap: 8px; justify-content: center;">
           <span onclick="setReviewRating('${job.id}', 1)" id="star_${job.id}_1">★</span>
@@ -6515,8 +6771,8 @@ function clientReviewHtml(job) {
           <span onclick="setReviewRating('${job.id}', 5)" id="star_${job.id}_5">★</span>
         </div>
         <input type="hidden" name="rating" id="reviewRating_${job.id}" value="0" required>
-        <textarea name="reviewText" placeholder="Escribe tu comentario aquí (opcional)..." rows="3" style="width: 100%; border-radius: 6px; border: 1px solid var(--border-color); padding: 8px; font-family: inherit; resize: vertical;"></textarea>
-        <button type="submit" class="primary" style="background: var(--gold); border: none; color: black; font-weight: bold; margin-top: 8px;">Enviar Review</button>
+        <textarea name="reviewText" placeholder="${t("reviewPlaceholder")}" rows="3" style="width: 100%; border-radius: 6px; border: 1px solid var(--border-color); padding: 8px; font-family: inherit; resize: vertical;"></textarea>
+        <button type="submit" class="primary" style="background: var(--gold); border: none; color: black; font-weight: bold; margin-top: 8px;">${t("sendReview")}</button>
       </form>
     </section>
   `;
@@ -6548,12 +6804,12 @@ window.submitClientReview = async function(event, jobId) {
   const submitBtn = form.querySelector("button[type='submit']");
   if (submitBtn) {
     submitBtn.disabled = true;
-    submitBtn.textContent = "Enviando...";
+    submitBtn.textContent = t("sending");
   }
   
   try {
     if (supabaseClient) {
-      await withTimeout(persistPortalClientReview(jobId, rating, text), 15000, "No se pudo guardar el review.");
+      await withTimeout(persistPortalClientReview(jobId, rating, text), 15000, t("reviewSaveError"));
     }
 
     const job = state.jobs.find(j => j.id === jobId);
@@ -6563,7 +6819,7 @@ window.submitClientReview = async function(event, jobId) {
       save();
     }
 
-    toast("Gracias por tu calificacion.");
+    toast(t("reviewSavedToast"));
     if (portalPageVisible("#clientPortalPage")) {
       renderStandaloneClientPortal(true);
     } else {
@@ -6573,10 +6829,10 @@ window.submitClientReview = async function(event, jobId) {
     }
   } catch (error) {
     console.error("Error saving client review:", error);
-    toast("No se pudo guardar el review. Revisa internet e intenta nuevamente.");
+    toast(t("reviewSaveError"));
     if (submitBtn) {
       submitBtn.disabled = false;
-      submitBtn.textContent = "Enviar Calificacion";
+      submitBtn.textContent = t("sendRating");
     }
   }
 };
@@ -7864,7 +8120,7 @@ function setupEvents() {
     const job = activeJob();
     if (!job) return;
     const previousJob = structuredClone(job);
-    toast("Registrando llegada y ubicacion...");
+    toast(t("registeringArrival"));
     const location = await captureCleanerLocation();
     job.checkedIn = true;
     job.status = "En progreso";
@@ -7881,20 +8137,20 @@ function setupEvents() {
     } catch (err) {
       console.error("Error saving admin arrival:", err);
       Object.assign(job, previousJob);
-      toast("No se pudo guardar la llegada en la base. Intenta otra vez.");
+      toast(t("arrivalSaveError"));
       renderAll();
       return;
     }
     renderAll();
-    toast(location ? "Llegada marcada con GPS y visible para el cliente." : "Llegada marcada. El navegador no entrego GPS.");
+    toast(location ? t("arrivalWithLocation") : t("arrivalWithoutLocation"));
   });
   $("#uploadPhotoButton").addEventListener("click", () => {
-    toast("Para agregar evidencia real entra al portal del cleaner y usa Camara o biblioteca.");
+    toast(t("realEvidencePortalInstruction"));
   });
   $("#finishButton").addEventListener("click", async () => {
     const job = activeJob();
     if (!job.checkedIn) {
-      toast("Primero marca llegada para poder terminar el trabajo.");
+      toast(t("markArrivalBeforeFinish"));
       return;
     }
     const previousJob = structuredClone(job);
@@ -7911,11 +8167,11 @@ function setupEvents() {
       console.error("Error saving admin finish:", err);
       Object.assign(job, previousJob);
       renderAll();
-      toast("No se pudo guardar el cierre en la base. Intenta otra vez.");
+      toast(t("adminFinishSaveError"));
       return;
     }
     renderAll();
-    toast("Trabajo terminado. Resumen listo para el cliente.");
+    toast(t("adminFinishReadyForClient"));
   });
   $("#signatureButton").addEventListener("click", () => {
     const job = activeJob();
@@ -7923,7 +8179,7 @@ function setupEvents() {
     job.status = "Firmado";
     save();
     renderAll();
-    toast("Firma del cliente guardada.");
+    toast(t("clientSignatureSaved"));
   });
   $("#unlockClientPortal").addEventListener("click", async () => {
     const entered = $("#clientPortalPassword").value.trim();
@@ -7941,11 +8197,11 @@ function setupEvents() {
       }
     }
     if (!client) {
-      toast("Acceso de cliente no encontrado. Usa el link actualizado.");
+      toast(t("clientAccessNotFound"));
       return;
     }
   if (!clientPortalKeyMatches(client, entered)) {
-    toast("Clave incorrecta.");
+    toast(t("wrongKey"));
     return;
   }
     portalClientId = client.id;
@@ -7954,7 +8210,7 @@ function setupEvents() {
   $("#clientPortalLogout").addEventListener("click", () => {
     $("#clientPortalPassword").value = "";
     renderStandaloneClientPortal(false);
-    toast("Sesion cerrada. Ingresa la clave para volver al portal.");
+    toast(t("portalSessionClosed"));
   });
   $("#unlockCleanerPortal").addEventListener("click", async () => {
     let cleaner = state.cleaners.find((item) => item.id === portalCleanerId);
@@ -7963,7 +8219,7 @@ function setupEvents() {
       portalCleanerAdmin = true;
       portalCleanerId = state.cleaners[0]?.id || null;
       renderStandaloneCleanerPortal(true);
-      toast("Acceso maestro activado.");
+      toast(t("masterAccessActivated"));
       return;
     }
     const cleanerByKey = cleanerFromPortalAccess(portalCleanerId, entered);
@@ -7986,7 +8242,7 @@ function setupEvents() {
       }
     }
     if (!cleaner || entered !== normalizeKey(cleanerPortalPassword(cleaner))) {
-      toast("Clave incorrecta.");
+      toast(t("wrongKey"));
       return;
     }
     portalCleanerAdmin = false;
@@ -7996,21 +8252,21 @@ function setupEvents() {
   $("#unlockCleanerHistoryAdmin").addEventListener("click", () => {
     const entered = normalizeKey($("#cleanerHistoryAdminKey").value);
     if (entered !== normalizeKey(ADMIN_CLEANER_KEY)) {
-      toast("Clave admin incorrecta.");
+      toast(t("wrongAdminKey"));
       return;
     }
     activateCleanerHistoryAdminPermission();
     $("#cleanerHistoryAdminKey").value = "";
     renderStandaloneCleanerPortal(true);
     setCleanerTab("jobs");
-    toast("Permiso admin activado por 1 hora para fotos historicas.");
+    toast(t("adminPermissionActivated"));
   });
   $("#cleanerPortalLogout").addEventListener("click", () => {
     portalCleanerAdmin = false;
     clearCleanerHistoryAdminPermission();
     $("#cleanerPortalPassword").value = "";
     renderStandaloneCleanerPortal(false);
-    toast("Sesion cerrada. Ingresa la clave para volver al portal.");
+    toast(t("portalSessionClosed"));
   });
   $("#closePhotoModal").addEventListener("click", () => $("#photoModal").classList.add("hidden"));
   $("#closeDeleteJobModal").addEventListener("click", closeDeleteJobModal);
