@@ -36,7 +36,7 @@ function appStatusFromDbStatus(status) {
     assigned: "Asignado",
     open: "Disponible para tomar",
     in_site: "En progreso",
-    cleaner_finished: "Terminado por cleaner",
+    cleaner_finished: "Terminado por limpiador",
     client_confirmed: "Confirmado por cliente",
     signed: "Firmado",
     admin_closed: "Terminado por administrador",
@@ -56,6 +56,7 @@ function dbStatusFromAppStatus(status, cleanerId = "") {
     "En sitio vencido": "in_site",
     "Vencido / no iniciado": "scheduled",
     "Terminado por cleaner": "cleaner_finished",
+    "Terminado por limpiador": "cleaner_finished",
     "Confirmado por cliente": "client_confirmed",
     "Terminado por cliente": "client_confirmed",
     "Firmado": "signed",
@@ -244,7 +245,7 @@ async function loadStateFromSupabase(currentUser = null) {
       // Fetch receipts
       const receipts = await supabaseData(
         supabaseClient.from('payment_receipts').select('*').eq('organization_id', orgId),
-        "Cargar pagos a cleaners"
+        "Cargar pagos a limpiadores"
       );
       if (receipts) {
         state.receipts = receipts.map(r => ({
@@ -840,21 +841,21 @@ const PLAN_CHOICE_CARDS = {
     price: "$0",
     note: "Para probar JobVisto",
     action: "Empezar gratis",
-    features: ["1 cleaner", "3 clientes", "5 trabajos por mes", "Portal del cliente"]
+    features: ["1 limpiador", "3 clientes", "5 trabajos por mes", "Portal del cliente"]
   },
   independent: {
     name: "Independent",
     price: "$9.99",
-    note: "Para cleaners independientes",
+    note: "Para limpiadores independientes",
     action: "Pagar Independent",
-    features: ["1 cleaner", "20 clientes", "Trabajos ilimitados", "Calendario completo"]
+    features: ["1 limpiador", "20 clientes", "Trabajos ilimitados", "Calendario completo"]
   },
   company: {
     name: "Company",
     price: "$29.99",
     note: "Para equipos en crecimiento",
     action: "Pagar Company",
-    features: ["5 cleaners", "Clientes ilimitados", "Portal cliente y cleaner", "Reportes operativos"]
+    features: ["5 limpiadores", "Clientes ilimitados", "Portal cliente y limpiador", "Reportes operativos"]
   },
   pro: {
     name: "Pro",
@@ -862,7 +863,7 @@ const PLAN_CHOICE_CARDS = {
     note: "Para empresas establecidas",
     action: "Pagar Pro",
     featured: true,
-    features: ["20 cleaners", "Pagos a cleaners", "Reportes avanzados", "Avisos al cliente"]
+    features: ["20 limpiadores", "Pagos a limpiadores", "Reportes avanzados", "Avisos al cliente"]
   }
 };
 
@@ -1345,10 +1346,10 @@ const i18n = {
     paymentReturnCopy: "Completa los datos de tu cuenta para activar JobVisto con el plan que acabas de pagar.",
     createAccount: "Crear cuenta y activar",
     fineprint: "El pago real se conectara con Stripe. Esta pantalla deja armado el flujo de registro, verificacion y activacion.",
-    cleanerArrived: "Cleaner llego",
+    cleanerArrived: "El limpiador llego",
     cleanerArrivedCopy: "Cliente notificado, GPS guardado y trabajo en progreso.",
-    cleanerPrivatePortal: "Portal privado cleaner",
-    cleanerPortalLogo: "Portal de cleaner",
+    cleanerPrivatePortal: "Portal privado del limpiador",
+    cleanerPortalLogo: "Portal del limpiador",
     cleanerSummaryTab: "Resumen",
     cleanerJobsTab: "Trabajos",
     cleanerCalendarTab: "Calendario",
@@ -1360,12 +1361,12 @@ const i18n = {
     cleanerPerformance: "Ver rendimiento",
     cleanerWelcomeCopy: "Aqui tienes un resumen de tu actividad del dia.",
     cleanerOnline: "En linea",
-    cleanerRole: "Cleaner",
-    cleanerAccessBadge: "Acceso privado cleaner",
-    cleanerAccessEyebrow: "Portal seguro del cleaner",
+    cleanerRole: "Limpiador",
+    cleanerAccessBadge: "Acceso privado del limpiador",
+    cleanerAccessEyebrow: "Portal seguro del limpiador",
     cleanerAccessTitle: "Acceso del equipo",
     cleanerAccessCopy: "Entra para ver tus trabajos asignados, tomar trabajos abiertos y registrar llegada, fotos y salida.",
-    cleanerAccessTrust1: "Link privado",
+    cleanerAccessTrust1: "Enlace privado",
     cleanerAccessTrust2: "Subida de evidencia",
     cleanerAccessTrust3: "Registro de horas",
     cleanerAccessPassword: "Clave de acceso",
@@ -1388,7 +1389,7 @@ const i18n = {
     cleanerCurrentMonth: "Mes actual",
     cleanerGeneratedPayments: "Pagos generados",
     cleanerSignatureRequired: "Firma requerida",
-    cleanerReportTitle: "Reporte del cleaner",
+    cleanerReportTitle: "Reporte del limpiador",
     cleanerMonth: "Mes",
     cleanerRemember: "Recuerda",
     cleanerFooterCopy: "Sigue los pasos del checklist y sube fotos claras. Asi garantizas pagos rapidos y buenas resenas.",
@@ -1400,7 +1401,7 @@ const i18n = {
     cleanerStep3Text: "Sube fotos",
     cleanerStep4: "Paso 4",
     cleanerStep4Text: "Termina trabajo",
-    cleanerAdminView: "Vista administrador de cleaners",
+    cleanerAdminView: "Vista administrador de limpiadores",
     helloCleaner: "Hola, {name}",
     helloCleanerWave: "Hola, {name} \u{1F44B}",
     pendingJobs: "Pendientes",
@@ -1415,7 +1416,7 @@ const i18n = {
     readyToConfirm: "listos para confirmar",
     noCompleted: "Sin completados",
     masterAccess: "Acceso maestro",
-    visibleCleaners: "cleaners visibles",
+    visibleCleaners: "limpiadores visibles",
     noRecentActivity: "Sin actividad reciente.",
     jobAssigned: "Trabajo asignado",
     jobCompleted: "Trabajo completado",
@@ -1455,7 +1456,7 @@ const i18n = {
     tomorrowJobs: "3 trabajos manana",
     authPlatformKicker: "Todo en una sola plataforma",
     authVisualTitle: "Control total de tu empresa de limpieza, en tiempo real.",
-    authVisualPoint1: "Clientes, cleaners y trabajos organizados",
+    authVisualPoint1: "Clientes, limpiadores y trabajos organizados",
     authVisualPoint2: "Evidencia fotografica y firmas digitales",
     authVisualPoint3: "Reportes y metricas en tiempo real",
     authVisualPoint4: "Accede desde cualquier dispositivo",
@@ -1473,14 +1474,14 @@ const i18n = {
     forgotPassword: "Olvidaste tu contrasena?",
     dashboard: "Panel",
     clients: "Clientes",
-    cleaners: "Cleaners",
+    cleaners: "Limpiadores",
     calendar: "Calendario",
     jobs: "Trabajos",
-    clientLinks: "Links clientes",
+    clientLinks: "Enlaces clientes",
     reports: "Reportes",
     payments: "Pagos",
     finances: "Finanzas",
-    cleanerPayments: "Pagos a cleaners",
+    cleanerPayments: "Pagos a limpiadores",
     clientPayments: "Cobros a clientes",
     paymentsSubtitle: "Gestiona y registra cobros y pagos de trabajos realizados.",
     clientPaymentSubtitle: "Registra cobros de clientes y manten saldos pendientes al dia.",
@@ -1503,7 +1504,7 @@ const i18n = {
     completedHours: "Horas realizadas",
     estimatedRevenue: "Ganancia real",
     activeClients: "Clientes activos",
-    activeCleaners: "Cleaners activos",
+    activeCleaners: "Limpiadores activos",
     pendingSignatures: "Firmas pendientes",
     thisWeek: "esta semana",
     thisMonth: "este mes",
@@ -1527,7 +1528,7 @@ const i18n = {
     newClientRegistered: "Nuevo cliente registrado",
     unassigned: "Sin asignar",
     createClient: "Crear cliente",
-    registerCleaner: "Registrar cleaner",
+    registerCleaner: "Registrar limpiador",
     createJob: "Crear trabajo",
     viewJobProgress: "Ver progreso de trabajos",
     viewConsolidated: "Ver consolidado",
@@ -1563,11 +1564,11 @@ const i18n = {
     signaturePending: "firma pendiente",
     clientPrivatePortal: "Portal privado cliente",
     clientAccessEyebrow: "Portal seguro del cliente",
-    clientAccessTrust1: "Link privado",
+    clientAccessTrust1: "Enlace privado",
     clientAccessTrust2: "Evidencia del servicio",
     clientAccessTrust3: "Confirmacion del cliente",
     clientAccessTitle: "Acceso del cliente",
-    clientAccessCopy: "Ingresa la clave que te envio la empresa o el cleaner para ver trabajos, fotos y confirmaciones.",
+    clientAccessCopy: "Ingresa la clave que te envio la empresa o el limpiador para ver trabajos, fotos y confirmaciones.",
     portalPassword: "Clave del portal",
     portalPasswordPlaceholder: "Ejemplo: JV-CAS-c1",
     clientPortalEnter: "Entrar al portal",
@@ -1575,10 +1576,10 @@ const i18n = {
     privateServiceSummary: "Resumen privado del servicio",
     currentService: "Servicio actual/proximo",
     serviceStatus: "Estado del servicio",
-    cleanerArrival: "Llegada del cleaner",
-    cleanerDeparture: "Salida del cleaner",
+    cleanerArrival: "Llegada del limpiador",
+    cleanerDeparture: "Salida del limpiador",
     visiblePhotos: "Fotos visibles",
-    cleanerFinished: "Cleaner marco terminado",
+    cleanerFinished: "El limpiador marco terminado",
     clientConfirmation: "Confirmacion del cliente",
     clientSignature: "Firma del cliente",
     onsiteSignature: "Firma en sitio",
@@ -1597,7 +1598,7 @@ const i18n = {
     scheduledJob: "Trabajo programado",
     arrivedAt: "Llego a las {time}",
     arrivedAtWithLocation: "Llego a las {time} - ubicacion disponible",
-    cleanerWillRegisterArrival: "El cleaner registrara su entrada al llegar al sitio.",
+    cleanerWillRegisterArrival: "El limpiador registrara su entrada al llegar al sitio.",
     clientMustConfirmService: "El cliente debera confirmar la finalizacion del servicio.",
     signatureRegistered: "Firma registrada",
     digitalSignatureRequested: "Se solicitara firma digital en el sitio.",
@@ -1622,16 +1623,16 @@ const i18n = {
     rateThisService: "Calificar este servicio:",
     reviewPlaceholder: "Escribe un comentario aqui (opcional)...",
     sendRating: "Enviar calificacion",
-    sendReview: "Enviar review",
-    reviewThanks: "Gracias por tu review!",
+    sendReview: "Enviar resena",
+    reviewThanks: "Gracias por tu resena!",
     reviewQuestion: "Como fue nuestro servicio el {date}?",
     reviewCopy: "Nos importa mucho tu opinion. Por favor califica este servicio:",
     sending: "Enviando...",
     reviewSavedToast: "Gracias por tu calificacion.",
-    reviewSaveError: "No se pudo guardar el review. Revisa internet e intenta nuevamente.",
-    clientAccessNotFound: "Acceso de cliente no encontrado. Usa el link actualizado.",
-    cleanerAccessNotFound: "Acceso de cleaner no encontrado. Copia el link actualizado desde Cleaners.",
-    takeJobError: "No se pudo tomar el trabajo. Puede que ya lo haya tomado otro cleaner.",
+    reviewSaveError: "No se pudo guardar la resena. Revisa internet e intenta nuevamente.",
+    clientAccessNotFound: "Acceso de cliente no encontrado. Usa el enlace actualizado.",
+    cleanerAccessNotFound: "Acceso de limpiador no encontrado. Copia el enlace actualizado desde Limpiadores.",
+    takeJobError: "No se pudo tomar el trabajo. Puede que ya lo haya tomado otro limpiador.",
     takeJobSuccess: "Trabajo asignado a tu portal.",
     futureJobToast: "Este trabajo es futuro. Los botones se activan el dia del servicio.",
     alreadyArrivedToast: "Llegada ya registrada a las {time}.",
@@ -1672,11 +1673,11 @@ const i18n = {
     wrongAdminKey: "Clave admin incorrecta.",
     masterAccessActivated: "Acceso maestro activado.",
     adminPermissionActivated: "Permiso admin activado por 1 hora para fotos historicas.",
-    realEvidencePortalInstruction: "Para agregar evidencia real entra al portal del cleaner y usa Camara o biblioteca.",
+    realEvidencePortalInstruction: "Para agregar evidencia real entra al portal del limpiador y usa Camara o biblioteca.",
     adminFinishSaveError: "No se pudo guardar el cierre en la base. Intenta otra vez.",
     adminFinishReadyForClient: "Trabajo terminado. Resumen listo para el cliente.",
     clientSignatureSaved: "Firma del cliente guardada.",
-    cleanerLocationMessage: "{client}, el cleaner registro ubicacion para el servicio JobVisto {date}: {url}",
+    cleanerLocationMessage: "{client}, el limpiador registro ubicacion para el servicio JobVisto {date}: {url}",
     openLocationMaps: "Abrir ubicacion en Maps",
     sendLocationWhatsapp: "Enviar ubicacion por WhatsApp",
     chooseAdminEvidencePhotos: "Elige una o varias fotos para guardar como evidencia administrativa.",
@@ -1695,7 +1696,7 @@ const i18n = {
     readOnly: "solo lectura",
     status: "Estado",
     photos: "Fotos",
-    cleanerCompleted: "Cleaner termino",
+    cleanerCompleted: "El limpiador termino",
     clientConfirmationShort: "Confirmacion cliente",
     onsiteSignatureReceived: "recibida de",
     completedJobsHistoryBelow: "Los trabajos realizados quedan abajo en historial.",
@@ -1707,10 +1708,10 @@ const i18n = {
     contactAdminPanel: "Contacta al administrador desde tu panel.",
     contact: "Contactar",
     paymentSignatureTitle: "Firma de pago recibido",
-    paymentSignatureCopy: "El cleaner firma con dedo o mouse para confirmar que recibio el pago externo.",
+    paymentSignatureCopy: "El limpiador firma con dedo o mouse para confirmar que recibio el pago externo.",
     paymentSignatureCleanerPortalCopy: "Firma con dedo o mouse para confirmar el pago generado por administracion y solicitar que se realice el pago.",
     serviceSignatureTitle: "Firma de salida del servicio",
-    serviceSignatureCopy: "La persona en sitio firma con dedo o mouse para confirmar que el cleaner termino.",
+    serviceSignatureCopy: "La persona en sitio firma con dedo o mouse para confirmar que el limpiador termino.",
     signerName: "Nombre de quien firma",
     clearSignature: "Limpiar firma",
     saveSignature: "Guardar firma",
@@ -1720,10 +1721,10 @@ const i18n = {
     deleteSelectedJobCopy: "Se eliminara solo el trabajo seleccionado.",
     relatedJobsSafeCopy: "Si existen otros trabajos del mismo cliente, quedan guardados porque son registros separados.",
     deleteThisJob: "Eliminar este trabajo",
-    archiveCleanerTitle: "Archivar cleaner",
-    archiveCleanerCopy: "El cleaner sale del equipo activo, pero su historial queda guardado.",
+    archiveCleanerTitle: "Archivar limpiador",
+    archiveCleanerCopy: "El limpiador sale del equipo activo, pero su historial queda guardado.",
     archiveCleanerHistoryCopy: "Sus trabajos, pagos, fotos y firmas anteriores se mantienen para reportes e historial.",
-    archiveCleanerAction: "Archivar cleaner",
+    archiveCleanerAction: "Archivar limpiador",
     archiveClientTitle: "Archivar cliente",
     archiveClientCopy: "El cliente sale de la lista activa, pero su historial queda guardado.",
     archiveClientHistoryCopy: "Sus trabajos, fotos y firmas anteriores se mantienen para reportes e historial.",
@@ -3229,7 +3230,8 @@ function localizedJobStatus(status) {
     "En sitio vencido": { en: "On-site overdue", es: "En sitio vencido", ru: "На месте, просрочено" },
     "Vencido / no iniciado": { en: "Overdue / not started", es: "Vencido / no iniciado", ru: "Просрочено / не начато" },
     "Terminado": { en: "Finished", es: "Terminado", ru: "Завершено" },
-    "Terminado por cleaner": { en: "Finished by cleaner", es: "Terminado por cleaner", ru: "Завершено клинером" },
+    "Terminado por cleaner": { en: "Finished by cleaner", es: "Terminado por limpiador", ru: "Завершено клинером" },
+    "Terminado por limpiador": { en: "Finished by cleaner", es: "Terminado por limpiador", ru: "Завершено клинером" },
     "Terminado por cliente": { en: "Finished by client", es: "Terminado por cliente", ru: "Завершено клиентом" },
     "Confirmado por cliente": { en: "Finished by client", es: "Terminado por cliente", ru: "Завершено клиентом" },
     "Terminado por administrador": { en: "Finished by administrator", es: "Terminado por administrador", ru: "Завершено администратором" },
@@ -3293,7 +3295,7 @@ function applyJobStatusControl(payload, previousJob = {}) {
     return payload;
   }
 
-  if (status === "Terminado por cleaner") {
+  if (status === "Terminado por cleaner" || status === "Terminado por limpiador") {
     payload.checkedIn = true;
     payload.checkedOut = true;
     payload.cleanerFinished = true;
@@ -3328,7 +3330,7 @@ function shouldRemindArrival(job) {
 }
 
 function isDone(job) {
-  return Boolean(job.checkedOut || job.cleanerFinished || job.signed || job.status === "Pagado" || job.status === "Terminado por cleaner" || job.status === "Confirmado por cliente" || job.status === "Terminado por cliente" || job.status === "Terminado por administrador");
+  return Boolean(job.checkedOut || job.cleanerFinished || job.signed || job.status === "Pagado" || job.status === "Terminado por cleaner" || job.status === "Terminado por limpiador" || job.status === "Confirmado por cliente" || job.status === "Terminado por cliente" || job.status === "Terminado por administrador");
 }
 
 function hasFinalTime(job) {
@@ -3424,7 +3426,7 @@ function enforcePlanAction(action, details = {}) {
     return false;
   }
   if (action === "cleanerPayments" && !entitlements.cleanerPayments) {
-    openPlanChoiceModal("limit", planUpgradeMessage("Los recibos y pagos a cleaners son una funcion Pro."));
+    openPlanChoiceModal("limit", planUpgradeMessage("Los recibos y pagos a limpiadores son una funcion Pro."));
     return false;
   }
   if (action === "advancedReports" && !entitlements.advancedReports) {
@@ -3546,7 +3548,7 @@ function clientHistoryTimelineHtml(historyJobs, currentJob) {
         const client = clientFor(job);
         const isCurrent = job.isCurrent;
         const badgeClass = isCurrent ? 'cp-status-assigned' : 'cp-status-done';
-        const badgeLabel = isCurrent ? jobStatusLabel(job) : localizedJobStatus("Terminado por cleaner");
+        const badgeLabel = isCurrent ? jobStatusLabel(job) : localizedJobStatus("Terminado por limpiador");
         const hasPayableAmount = hasRealBillingTimes(job);
         const dateLocale = state.language === "ru" ? "ru-RU" : state.language === "en" ? "en-US" : "es-ES";
         const formattedDate = new Date(job.date + 'T00:00:00').toLocaleDateString(dateLocale, { day: '2-digit', month: 'short', year: 'numeric' });
@@ -3656,8 +3658,8 @@ const jobCategoryConfig = {
   live: { label: "En proceso", helper: "Trabajo abierto ahora.", className: "live" },
   expired: { label: "Vencido / no iniciado", helper: "Fechas pasadas sin llegada registrada.", className: "danger" },
   assigned: { label: "Asignado", helper: "Agendado para iniciar.", className: "gold" },
-  open: { label: "Abierto", helper: "Disponible para que un cleaner lo tome.", className: "teal" },
-  cleanerDone: { label: "Terminado por cleaner", helper: "Falta confirmacion final del cliente o admin.", className: "dark" },
+  open: { label: "Abierto", helper: "Disponible para que un limpiador lo tome.", className: "teal" },
+  cleanerDone: { label: "Terminado por limpiador", helper: "Falta confirmacion final del cliente o admin.", className: "dark" },
   clientDone: { label: "Terminado por cliente", helper: "Servicio confirmado por el cliente.", className: "green" },
   adminDone: { label: "Terminado por administrador", helper: "Cerrado manualmente por administracion.", className: "dark" }
 };
@@ -3679,7 +3681,7 @@ function localizedJobCategory(key) {
     assigned: { en: "Scheduled to start.", es: "Agendado para iniciar.", ru: "Запланировано к началу." },
     open: {
       en: "Available for a cleaner to take.",
-      es: "Disponible para que un cleaner lo tome.",
+      es: "Disponible para que un limpiador lo tome.",
       ru: "Доступно для принятия клинером."
     },
     cleanerDone: {
@@ -3713,7 +3715,7 @@ function jobCategoryKey(job) {
   if (isLiveJob(job)) return "live";
   if (job.status === "Confirmado por cliente" || job.status === "Terminado por cliente" || job.clientConfirmed) return "clientDone";
   if (job.status === "Terminado por administrador") return "adminDone";
-  if (job.status === "Terminado por cleaner" || job.cleanerFinished || job.checkedOut) return "cleanerDone";
+  if (job.status === "Terminado por cleaner" || job.status === "Terminado por limpiador" || job.cleanerFinished || job.checkedOut) return "cleanerDone";
   if (job.date < today() && !job.checkedIn) return "expired";
   if (!job.cleanerId || job.status === "Disponible para tomar") return "open";
   return "assigned";
@@ -4457,7 +4459,8 @@ function renderStandaloneClientPortal(unlocked = true, options = {}) {
     "Asignado": { label: localizedJobStatus("Asignado"), cls: "cp-status-assigned" },
     "En progreso": { label: localizedJobStatus("En progreso"), cls: "cp-status-inprogress" },
     "En sitio": { label: localizedJobStatus("En sitio"), cls: "cp-status-inprogress" },
-    "Terminado por cleaner": { label: localizedJobStatus("Terminado por cleaner"), cls: "cp-status-done" },
+    "Terminado por cleaner": { label: localizedJobStatus("Terminado por limpiador"), cls: "cp-status-done" },
+    "Terminado por limpiador": { label: localizedJobStatus("Terminado por limpiador"), cls: "cp-status-done" },
     "Terminado por cliente": { label: localizedJobStatus("Terminado por cliente"), cls: "cp-status-done" },
     "Terminado por administrador": { label: localizedJobStatus("Terminado por administrador"), cls: "cp-status-done" },
   };
@@ -5025,7 +5028,7 @@ function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
       job.checkedOut = true;
       job.cleanerFinished = true;
       job.actualEnd = currentTime();
-      job.status = portalCleanerAdmin ? "Terminado por administrador" : "Terminado por cleaner";
+      job.status = portalCleanerAdmin ? "Terminado por administrador" : "Terminado por limpiador";
 
       if (supabaseClient) {
         try {
@@ -5572,9 +5575,9 @@ function renderMetrics() {
   $("#metricSignatures").textContent = pendingSignatures;
   $("#metricClients").textContent = activeClients().length;
   if (state.mode === "company") {
-    $("#metricSecondaryLabel").textContent = "Active cleaners";
+    $("#metricSecondaryLabel").textContent = t("activeCleaners");
     $("#metricSecondaryValue").textContent = activeCleaners().length;
-    $("#metricSecondaryNote").textContent = `${activeCleaners().length} cleaners activos`;
+    $("#metricSecondaryNote").textContent = `${activeCleaners().length} limpiadores activos`;
   } else {
     $("#metricSecondaryLabel").textContent = t("pendingSignatures");
     $("#metricSecondaryValue").textContent = pendingSignatures;
@@ -5646,10 +5649,10 @@ function jobHtml(job) {
         </div>
         <details class="admin-evidence-box">
           <summary>Evidencia administrativa</summary>
-          <p class="muted">Usa esto si el cleaner olvido subir fotos o si administracion cerro/corrigio el trabajo manualmente.</p>
+          <p class="muted">Usa esto si el limpiador olvido subir fotos o si administracion cerro/corrigio el trabajo manualmente.</p>
           <form class="evidence-form" data-admin-evidence-form="${job.id}">
             <label>Area o lugar
-              <input name="section" list="${areaListId}" placeholder="Ej: Kitchen, bathroom, escritorio" required>
+              <input name="section" list="${areaListId}" placeholder="Ej: Cocina, bano, escritorio" required>
               <datalist id="${areaListId}">
                 ${areaOptions.map((task) => `<option value="${escapeHtml(task)}"></option>`).join("")}
               </datalist>
@@ -5716,28 +5719,28 @@ function jobCardHtml(job) {
           <span class="badge ${badge}">${jobStatusLabel(job)}</span>
         </header>
         <div class="job-facts-row">
-          <span><b>◷</b>${escapeHtml(timeText)}<small>${job.actualEnd ? "Real" : "Estimated"}</small></span>
-          <span><b>⌘</b>${escapeHtml(job.serviceType || "Service")}<small>Service</small></span>
+          <span><b>◷</b>${escapeHtml(timeText)}<small>${job.actualEnd ? "Real" : "Estimado"}</small></span>
+          <span><b>⌘</b>${escapeHtml(job.serviceType || "Servicio")}<small>Servicio</small></span>
           <span><b>$</b>${money(billed)}<small>${isBillableDone(job) ? t("real") : t("planned")}</small></span>
         </div>
         <div class="job-proof-row">
-          <span>▣ ${evidenceCount(job)} photos</span>
+          <span>▣ ${evidenceCount(job)} fotos</span>
           <span>⌁ ${escapeHtml(signatureText)}</span>
-          <span>Cleaner: ${escapeHtml(cleanerName)}</span>
+          <span>Limpiador: ${escapeHtml(cleanerName)}</span>
         </div>
         ${isOverdueLive(job) ? `<div class="job-alert">Alerta: sigue en sitio despues de la hora estimada.</div>` : ""}
         <div class="receipt-actions job-actions">
           <button class="mini-action" type="button" data-edit-job="${job.id}">✎ ${t("editJob")}</button>
-          <button class="mini-action" type="button" data-toggle-evidence="${job.id}">◎ View details</button>
-          ${!isDone(job) ? `<button class="mini-action primary-mini" type="button" data-admin-complete-job="${job.id}">✓ Complete job</button>` : ""}
+          <button class="mini-action" type="button" data-toggle-evidence="${job.id}">◎ Ver detalles</button>
+          ${!isDone(job) ? `<button class="mini-action primary-mini" type="button" data-admin-complete-job="${job.id}">✓ Completar trabajo</button>` : ""}
           <button class="mini-action danger" type="button" data-delete-job="${job.id}">${t("delete")}</button>
         </div>
         <details class="admin-evidence-box" id="jobEvidence-${job.id}">
           <summary>Evidencia administrativa</summary>
-          <p class="muted">Usa esto si el cleaner olvido subir fotos o si administracion cerro/corrigio el trabajo manualmente.</p>
+          <p class="muted">Usa esto si el limpiador olvido subir fotos o si administracion cerro/corrigio el trabajo manualmente.</p>
           <form class="evidence-form" data-admin-evidence-form="${job.id}">
             <label>Area o lugar
-              <input name="section" list="${areaListId}" placeholder="Ej: Kitchen, bathroom, escritorio" required>
+              <input name="section" list="${areaListId}" placeholder="Ej: Cocina, bano, escritorio" required>
               <datalist id="${areaListId}">
                 ${areaOptions.map((task) => `<option value="${escapeHtml(task)}"></option>`).join("")}
               </datalist>
@@ -6130,7 +6133,7 @@ function openDeleteJobModal(jobId) {
     <strong>${client.name}</strong>
     <span>${job.date || "-"} · ${job.start || "-"}-${job.actualEnd || job.end || "-"} · ${jobStatusLabel(job)}</span>
     <span>${client.address || "Sin direccion registrada"}</span>
-    <span>${cleaner ? `Cleaner: ${cleaner.name}` : "Sin cleaner asignado"}</span>
+    <span>${cleaner ? `Limpiador: ${cleaner.name}` : "Sin limpiador asignado"}</span>
   `;
   $("#deleteJobModal").classList.remove("hidden");
 }
@@ -6301,21 +6304,21 @@ function renderCleaners() {
             <button class="mini-action" type="button" data-restore-cleaner="${cleaner.id}">Restaurar</button>
             <button class="mini-action" type="button" data-open-cleaner-portal="${cleaner.id}">Ver historial</button>
           ` : `
-            <button class="mini-action" type="button" data-edit-cleaner="${cleaner.id}">Editar cleaner</button>
-            <button class="mini-action danger" type="button" data-archive-cleaner="${cleaner.id}">Eliminar cleaner</button>
+            <button class="mini-action" type="button" data-edit-cleaner="${cleaner.id}">Editar limpiador</button>
+            <button class="mini-action danger" type="button" data-archive-cleaner="${cleaner.id}">Eliminar limpiador</button>
             <button class="mini-action" type="button" data-copy-cleaner-key="${cleaner.id}">Copiar clave</button>
-            <button class="mini-action" type="button" data-copy-cleaner-link="${cleaner.id}">Copiar link</button>
+            <button class="mini-action" type="button" data-copy-cleaner-link="${cleaner.id}">Copiar enlace</button>
             <button class="mini-action" type="button" data-open-cleaner-portal="${cleaner.id}">Ver portal</button>
           `}
         </div>
       </article>
     `;
   };
-  $("#cleanerCount").textContent = `${cleaners.length} cleaners activos`;
-  $("#jobCleanerSelect").innerHTML = `<option value="">Abrir para que un cleaner lo tome</option>` + cleaners.map((cleaner) => `<option value="${cleaner.id}">${cleaner.name}</option>`).join("");
+  $("#cleanerCount").textContent = `${cleaners.length} limpiadores activos`;
+  $("#jobCleanerSelect").innerHTML = `<option value="">Abrir para que un limpiador lo tome</option>` + cleaners.map((cleaner) => `<option value="${cleaner.id}">${cleaner.name}</option>`).join("");
   $("#cleanerTerritory").innerHTML = territoryHtml(cleaners.map((cleaner) => cleanerLocationRecord(cleaner)), "cleaners");
-  $("#cleanerList").innerHTML = cleaners.map((cleaner) => cleanerCard(cleaner)).join("") || "<p class='muted'>No hay cleaners activos todavia.</p>";
-  $("#archivedCleanerList").innerHTML = archived.map((cleaner) => cleanerCard(cleaner, true)).join("") || "<p class='muted'>Todavia no hay cleaners en historial.</p>";
+  $("#cleanerList").innerHTML = cleaners.map((cleaner) => cleanerCard(cleaner)).join("") || "<p class='muted'>No hay limpiadores activos todavia.</p>";
+  $("#archivedCleanerList").innerHTML = archived.map((cleaner) => cleanerCard(cleaner, true)).join("") || "<p class='muted'>Todavia no hay limpiadores en historial.</p>";
   $$("[data-copy-cleaner-link]").forEach((button) => {
     button.addEventListener("click", () => copyCleanerLink(button.dataset.copyCleanerLink));
   });
@@ -6388,9 +6391,9 @@ async function copyCleanerLink(cleanerId) {
   const text = `${localCleanerPortalUrl(cleaner)}\nClave: ${cleanerPortalDisplayKey(cleaner)}`;
   try {
     await navigator.clipboard.writeText(text);
-    toast("Link y clave del cleaner copiados.");
+    toast("Enlace y clave del limpiador copiados.");
   } catch {
-    window.prompt("Copia este acceso del cleaner:", text);
+    window.prompt("Copia este acceso del limpiador:", text);
   }
 }
 
@@ -6400,9 +6403,9 @@ async function copyCleanerKey(cleanerId) {
   const text = cleanerPortalDisplayKey(cleaner);
   try {
     await navigator.clipboard.writeText(text);
-    toast("Clave del cleaner copiada.");
+    toast("Clave del limpiador copiada.");
   } catch {
-    window.prompt("Copia esta clave del cleaner:", text);
+    window.prompt("Copia esta clave del limpiador:", text);
   }
 }
 
@@ -6417,9 +6420,9 @@ function startCleanerEdit(cleanerId) {
   form.elements.country.value = cleaner.country || state.country || "IL";
   form.elements.city.value = cleaner.city || "";
   form.elements.key.value = cleaner.key || "";
-  $("#saveCleanerButton").textContent = "Actualizar cleaner";
+  $("#saveCleanerButton").textContent = "Actualizar limpiador";
   $("#cancelCleanerEdit").classList.remove("hidden");
-  toast("Editando cleaner. Corrige y guarda.");
+  toast("Editando limpiador. Corrige y guarda.");
 }
 
 function resetCleanerForm() {
@@ -6427,7 +6430,7 @@ function resetCleanerForm() {
   form.reset();
   form.elements.id.value = "";
   form.elements.country.value = state.country || "IL";
-  $("#saveCleanerButton").textContent = "Guardar cleaner";
+  $("#saveCleanerButton").textContent = "Guardar limpiador";
   $("#cancelCleanerEdit").classList.add("hidden");
 }
 
@@ -6668,7 +6671,7 @@ function renderClientLinks() {
   $("#clientLinkKpis").innerHTML = `
     <article>
       <span class="client-link-kpi-icon">🔗</span>
-      <div><p>Total de links</p><strong>${rows.length}</strong><small>Portales activos</small></div>
+      <div><p>Total de enlaces</p><strong>${rows.length}</strong><small>Portales activos</small></div>
     </article>
     <article>
       <span class="client-link-kpi-icon">👥</span>
@@ -6680,7 +6683,7 @@ function renderClientLinks() {
     </article>
     <article>
       <span class="client-link-kpi-icon">▣</span>
-      <div><p>En historial</p><strong>${historyCountTotal}</strong><small>Links utilizados</small></div>
+      <div><p>En historial</p><strong>${historyCountTotal}</strong><small>Enlaces utilizados</small></div>
     </article>
   `;
   $("#clientLinksCountryPill").textContent = `${countryInfo(state.country).name} · ${countryInfo(state.country).dial}`;
@@ -6697,7 +6700,7 @@ function renderClientLinks() {
       <span>Estado</span>
       <span>En historial</span>
       <span>Clave</span>
-      <span>Link del portal</span>
+      <span>Enlace del portal</span>
       <span>Acciones</span>
     </div>
     ${filtered.length ? filtered.map(({ client, activeCount, historyCount, portalUrl, portalPassword, loc }) => {
@@ -6718,14 +6721,14 @@ function renderClientLinks() {
         </div>
         <div class="client-link-key">
           <code>${escapeHtml(portalPassword)}</code>
-          <button type="button" title="Copiar link" data-copy-client-link="${client.id}">⧉</button>
+          <button type="button" title="Copiar enlace" data-copy-client-link="${client.id}">⧉</button>
         </div>
         <div class="client-link-url">
           <strong>${escapeHtml(portalUrl)}</strong>
           <span>Copiado el ${new Date().toLocaleDateString("es")} ${new Date().toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}</span>
         </div>
         <div class="client-link-actions">
-          <button class="ghost" type="button" data-copy-client-link="${client.id}">Copiar link</button>
+          <button class="ghost" type="button" data-copy-client-link="${client.id}">Copiar enlace</button>
           <button class="primary" type="button" data-open-client-portal="${client.id}">Ver portal</button>
           <button class="ghost icon-only" type="button" data-open-client-portal="${client.id}" aria-label="Mas opciones">⋮</button>
         </div>
@@ -6765,10 +6768,10 @@ function renderClientLinks() {
   const countryPill = $("#clientLinksCountryPill");
   if (countryPill) countryPill.textContent = `${currentCountry.name} - ${currentCountry.dial}`;
   $("#clientLinkKpis").innerHTML = [
-    { icon: "↗", label: "Total de links", value: rows.length, copy: "Portales activos" },
+    { icon: "↗", label: "Total de enlaces", value: rows.length, copy: "Portales activos" },
     { icon: "☷", label: "Con servicio activo", value: clientsWithActiveServices, copy: "Clientes con trabajos activos/proximos" },
     { icon: "◇", label: "Seguridad", value: "100%", copy: "Enlaces seguros" },
-    { icon: "▣", label: "En historial", value: historyCountTotal, copy: "Links utilizados" }
+    { icon: "▣", label: "En historial", value: historyCountTotal, copy: "Enlaces utilizados" }
   ].map((item) => `
     <article>
       <span class="client-link-kpi-icon">${item.icon}</span>
@@ -6794,7 +6797,7 @@ function renderClientLinks() {
       <span>Estado</span>
       <span>En historial</span>
       <span>Clave</span>
-      <span>Link del portal</span>
+      <span>Enlace del portal</span>
       <span>Acciones</span>
     </div>
     ${filtered.length ? filtered.map(({ client, activeCount, historyCount, portalUrl, portalPassword, loc }) => {
@@ -6825,7 +6828,7 @@ function renderClientLinks() {
           </div>
           <div class="client-link-actions">
             <button class="ghost" type="button" data-generate-client-key="${client.id}">Generar clave</button>
-            <button class="ghost" type="button" data-copy-client-link="${client.id}">Copiar link</button>
+            <button class="ghost" type="button" data-copy-client-link="${client.id}">Copiar enlace</button>
             <button class="primary" type="button" data-open-client-portal="${client.id}">Ver portal</button>
             <button class="ghost icon-only" type="button" data-open-client-portal="${client.id}" aria-label="Mas opciones">⋮</button>
           </div>
@@ -6860,9 +6863,9 @@ async function copyClientLink(clientId) {
   const text = localClientPortalUrl(client);
   try {
     await navigator.clipboard.writeText(text);
-    toast("Link copiado. La clave ya esta incluida en la URL.");
+    toast("Enlace copiado. La clave ya esta incluida en la URL.");
   } catch {
-    window.prompt("Copia este link:", text);
+    window.prompt("Copia este enlace:", text);
   }
 }
 
@@ -7206,7 +7209,7 @@ function renderReports() {
   $("#reportKpis").innerHTML = `
     <article class="report-kpi"><i>${state.currencySymbol}</i><div><span>Ganancia bruta real</span><strong>${state.currencySymbol}${grossProfit.toFixed(0)}</strong><small>+18.6% vs mes anterior</small></div></article>
     <article class="report-kpi"><i>☷</i><div><span>Clientes atendidos</span><strong>${activeClients}</strong><small>+12% vs mes anterior</small></div></article>
-    <article class="report-kpi"><i>♙</i><div><span>Invertido en cleaners</span><strong>${state.currencySymbol}${cleanerCosts.toFixed(0)}</strong><small>+9.4% vs mes anterior</small></div></article>
+    <article class="report-kpi"><i>♙</i><div><span>Invertido en limpiadores</span><strong>${state.currencySymbol}${cleanerCosts.toFixed(0)}</strong><small>+9.4% vs mes anterior</small></div></article>
     <article class="report-kpi"><i>%</i><div><span>Margen referencial</span><strong>${marginPct}%</strong><small>+5.2% vs mes anterior</small></div></article>
   `;
 
@@ -7216,7 +7219,7 @@ function renderReports() {
   $("#incomeDonut").style.background = `conic-gradient(var(--green) 0 ${incomePct}%, var(--gold) ${incomePct}% ${incomePct + cleanerPct}%, var(--teal) ${incomePct + cleanerPct}% 100%)`;
   $("#incomeLegend").innerHTML = `
     <div class="legend-item"><span><i style="background: var(--green)"></i>Ganancia bruta</span><strong>${state.currencySymbol}${grossProfit.toFixed(0)}</strong></div>
-    <div class="legend-item"><span><i style="background: var(--gold)"></i>Pago cleaners</span><strong>${state.currencySymbol}${cleanerCosts.toFixed(0)}</strong></div>
+    <div class="legend-item"><span><i style="background: var(--gold)"></i>Pago a limpiadores</span><strong>${state.currencySymbol}${cleanerCosts.toFixed(0)}</strong></div>
     <div class="legend-item"><span><i style="background: var(--teal)"></i>IVA estimado</span><strong>${state.currencySymbol}${tax.toFixed(0)}</strong></div>
   `;
 
@@ -7247,9 +7250,9 @@ function renderReports() {
   `;
 
   $("#costRules").innerHTML = `
-    <div class="report-line"><span>Regla general cleaner</span><strong>${state.currencySymbol}${state.costRules.generalCleanerRate}/h</strong></div>
+    <div class="report-line"><span>Regla general del limpiador</span><strong>${state.currencySymbol}${state.costRules.generalCleanerRate}/h</strong></div>
     ${Object.entries(state.costRules.generalServiceRates || {}).map(([service, rate]) => `
-      <div class="report-line"><span>${service}</span><strong>${state.currencySymbol}${rate}/h costo cleaner</strong></div>
+      <div class="report-line"><span>${service}</span><strong>${state.currencySymbol}${rate}/h costo limpiador</strong></div>
     `).join("")}
     ${state.costRules.specialRules.length ? state.costRules.specialRules.map((rule) => `
       <div class="report-line">
@@ -7261,7 +7264,7 @@ function renderReports() {
 
   $("#reportLines").innerHTML = `
     <div class="report-line"><span>Subtotal real</span><strong>${state.currencySymbol}${total.toFixed(0)}</strong></div>
-    <div class="report-line"><span>Pago real/estimado a cleaners</span><strong>${state.currencySymbol}${cleanerCosts.toFixed(0)}</strong></div>
+    <div class="report-line"><span>Pago real/estimado a limpiadores</span><strong>${state.currencySymbol}${cleanerCosts.toFixed(0)}</strong></div>
     <div class="report-line"><span>Ganancia bruta real</span><strong>${state.currencySymbol}${grossProfit.toFixed(0)}</strong></div>
     <div class="report-line"><span>IVA estimado ${state.vatRate}%</span><strong>${state.currencySymbol}${tax.toFixed(0)}</strong></div>
     <div class="report-line"><span>Total referencial</span><strong>${state.currencySymbol}${(total + tax).toFixed(0)}</strong></div>
@@ -7302,7 +7305,7 @@ function renderSettings() {
   const ruleCleaners = activeCleaners();
   $("#specialCleanerSelect").innerHTML = ruleCleaners.length
     ? ruleCleaners.map((cleaner) => `<option value="${cleaner.id}">${cleaner.name}</option>`).join("")
-    : `<option value="">Sin cleaners activos</option>`;
+    : `<option value="">Sin limpiadores activos</option>`;
   if (!ruleCleaners.some((cleaner) => cleaner.id === costForm.elements.specialCleanerId.value) && ruleCleaners[0]) {
     costForm.elements.specialCleanerId.value = ruleCleaners[0].id;
   }
@@ -7540,7 +7543,7 @@ function renderPayments() {
   renderClientPaymentReceipts();
   
   if (!cleanerPaymentsAllowed) {
-    $("#paymentReceipts").innerHTML = "<p class='muted'>Los recibos y pagos a cleaners estan disponibles desde el plan Pro.</p>";
+    $("#paymentReceipts").innerHTML = "<p class='muted'>Los recibos y pagos a limpiadores estan disponibles desde el plan Pro.</p>";
     return;
   }
 
@@ -7585,7 +7588,7 @@ function syncPaymentCleanerSelect(selectedName = "") {
   }
   select.innerHTML = names.length
     ? names.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("")
-    : `<option value="">Sin cleaners activos</option>`;
+    : `<option value="">Sin limpiadores activos</option>`;
   select.value = selectedName || names[0] || "";
 }
 
@@ -7644,11 +7647,11 @@ function renderPaymentJobPicker(selectedJobIds = []) {
   const receiptId = form.elements.id.value;
   const jobs = paymentJobsForCleaner(cleanerName, receiptId);
   if (!cleanerName) {
-    picker.innerHTML = "<p class='muted'>Selecciona un cleaner para ver trabajos realizados.</p>";
+    picker.innerHTML = "<p class='muted'>Selecciona un limpiador para ver trabajos realizados.</p>";
     return;
   }
   if (!jobs.length) {
-    picker.innerHTML = "<p class='muted'>No hay trabajos terminados pendientes de pago para este cleaner.</p>";
+    picker.innerHTML = "<p class='muted'>No hay trabajos terminados pendientes de pago para este limpiador.</p>";
     if (!receiptId) $("#paymentAmount").value = 0;
     return;
   }
@@ -7800,7 +7803,7 @@ function renderClientPaymentJobPicker() {
             <input type="checkbox" class="client-payment-job-checkbox" value="${j.id}" data-amount="${pending}" checked>
             <span>
               <strong>${escapeHtml(j.serviceType || "Limpieza")} - ${escapeHtml(j.date)}</strong>
-              <small>${j.start || ""}-${j.actualEnd || j.end || "por definir"} &bull; Cleaner: ${escapeHtml(cleanerName)} &bull; ${duration}</small>
+              <small>${j.start || ""}-${j.actualEnd || j.end || "por definir"} &bull; Limpiador: ${escapeHtml(cleanerName)} &bull; ${duration}</small>
             </span>
             <b>${money(pending)}</b>
           </label>`;
@@ -8136,7 +8139,7 @@ function toggleMobileMenu() {
 
 function setView(name) {
   if (!viewAllowedByPlan(name)) {
-    openPlanChoiceModal("limit", planUpgradeMessage("La gestion de equipo y portal de cleaners empieza en Company."));
+    openPlanChoiceModal("limit", planUpgradeMessage("La gestion de equipo y portal de limpiadores empieza en Company."));
     name = "dashboard";
   }
   $$(".view").forEach((view) => view.classList.remove("active"));
@@ -8354,14 +8357,14 @@ function setupEvents() {
     resetCleanerForm();
     save();
     renderAll();
-    toast(index >= 0 ? "Cleaner actualizado." : "Cleaner registrado y listo para recibir trabajos.");
+    toast(index >= 0 ? "Limpiador actualizado." : "Limpiador registrado y listo para recibir trabajos.");
   });
   $("#cancelCleanerEdit").addEventListener("click", resetCleanerForm);
   $("#generateCleanerKey")?.addEventListener("click", () => {
     const form = $("#cleanerForm");
     const name = form.elements.name.value || "Cleaner";
     form.elements.key.value = generateCleanerPasscode(name);
-    toast("Clave generada para este cleaner.");
+    toast("Clave generada para este limpiador.");
   });
   $("#jobForm").addEventListener("submit", (event) => {
     event.preventDefault();
@@ -8453,7 +8456,7 @@ function setupEvents() {
     job.checkedOut = true;
     job.cleanerFinished = true;
     job.actualEnd = job.actualEnd || currentTime();
-    job.status = "Terminado por cleaner";
+    job.status = "Terminado por limpiador";
     try {
       if (supabaseClient) {
         await persistCleanerJobAction("finish", job, { actual_end: `${job.date}T${job.actualEnd}:00Z` });
@@ -8628,7 +8631,7 @@ function setupEvents() {
     if (!enforcePlanAction("cleanerPayments")) return;
     const data = Object.fromEntries(new FormData(event.currentTarget));
     if (!data.cleaner) {
-      toast("Primero registra o selecciona un cleaner activo.");
+      toast("Primero registra o selecciona un limpiador activo.");
       return;
     }
     const jobIds = selectedPaymentJobIds();
@@ -8660,7 +8663,7 @@ function setupEvents() {
       await persistCleanerPaymentCritical(payload);
       resetPaymentForm();
       renderAll();
-      toast(index >= 0 ? "Pago actualizado. Firma pendiente." : "Pago registrado. Falta firma del cleaner.");
+      toast(index >= 0 ? "Pago actualizado. Firma pendiente." : "Pago registrado. Falta firma del limpiador.");
     } catch (error) {
       console.error("Error saving cleaner payment:", error);
       saveLocalState();
