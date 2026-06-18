@@ -142,7 +142,7 @@ async function assertOrgAdmin(req, organizationId) {
   const user = await userFromToken(token);
   if (!user?.id) throw new Error("Invalid session token.");
 
-  const query = `?organization_id=eq.${encodeURIComponent(organizationId)}&user_id=eq.${encodeURIComponent(user.id)}&status=eq.active&role=in.(owner,manager,admin)&select=id`;
+  const query = `?organization_id=eq.${encodeURIComponent(organizationId)}&user_id=eq.${encodeURIComponent(user.id)}&status=eq.active&role=in.(owner,manager)&select=id`;
   const memberships = await supabaseFetch("/rest/v1/organization_members", { query });
   if (!Array.isArray(memberships) || memberships.length === 0) {
     throw new Error("User is not an organization admin.");
