@@ -3573,6 +3573,7 @@ function enterApp(mode) {
   save();
   $("#authScreen").classList.add("hidden");
   $("#appShell").classList.remove("hidden");
+  resetIdleTime(true);
   renderAll();
 }
 
@@ -8666,8 +8667,18 @@ if ("serviceWorker" in navigator) {
 let idleTime = 0;
 let idleInterval;
 let countdownInterval;
-let countdownValue = 60;
-const MAX_IDLE_MINUTES = 30; // 30 minutes of inactivity allowed
+let countdownValue = 300;
+const MAX_IDLE_MINUTES = 5;
+const IDLE_COUNTDOWN_SECONDS = 300;
+
+function shouldTrackIdleSession() {
+  const appShell = $("#appShell");
+  const authScreen = $("#authScreen");
+  const path = window.location.pathname.toLowerCase();
+  const params = new URLSearchParams(location.search);
+  const isPortal = params.get("portal") === "client" || params.get("portal") === "cleaner" || path.includes("portal-clientes") || path.includes("portal-cleaners");
+  return Boolean(state.user && appShell && !appShell.classList.contains("hidden") && authScreen?.classList.contains("hidden") && !isPortal);
+}
 
 function resetIdleTime(keepSession = false) {
   idleTime = 0;
@@ -8678,7 +8689,10 @@ function resetIdleTime(keepSession = false) {
 }
 
 function checkIdleTime() {
-  if (!state.user) return; // Only track logged in users
+  if (!shouldTrackIdleSession()) {
+    resetIdleTime();
+    return;
+  }
   idleTime++;
   
   if (idleTime >= MAX_IDLE_MINUTES) {
@@ -8691,7 +8705,7 @@ function showIdleModal() {
   if (!modal || !modal.classList.contains("hidden")) return;
   
   modal.classList.remove("hidden");
-  countdownValue = 60;
+  countdownValue = IDLE_COUNTDOWN_SECONDS;
   $("#idleCountdown").textContent = countdownValue;
   $("#idleCountdownEn").textContent = countdownValue;
   
