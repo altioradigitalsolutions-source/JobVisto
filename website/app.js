@@ -2830,6 +2830,14 @@ function normalizeCostRules() {
     state.costRules.specialCleaner = "";
     state.costRules.specialCleanerRate = 0;
   }
+  const firstSpecialRule = state.costRules.specialRules[0];
+  if (!firstSpecialRule) {
+    state.costRules.specialCleaner = "";
+    state.costRules.specialCleanerRate = 0;
+  } else if (!state.costRules.specialCleaner) {
+    state.costRules.specialCleaner = firstSpecialRule.cleanerName || "";
+    state.costRules.specialCleanerRate = Number(firstSpecialRule.rate || 0);
+  }
 }
 
 function specialCostRuleForCleaner(cleaner) {
@@ -6456,6 +6464,11 @@ function archivePendingCleaner() {
   if (state.costRules?.specialRules) {
     state.costRules.specialRules = state.costRules.specialRules.filter((rule) => rule.cleanerId !== cleaner.id && rule.cleanerName !== cleaner.name);
   }
+  if (state.costRules?.specialCleaner === cleaner.name) {
+    state.costRules.specialCleaner = "";
+    state.costRules.specialCleanerRate = 0;
+  }
+  normalizeCostRules();
   if ($("#cleanerId").value === cleaner.id) resetCleanerForm();
   save();
   renderAll();
@@ -6469,6 +6482,7 @@ function restoreCleaner(cleanerId) {
   cleaner.archived = false;
   delete cleaner.archivedAt;
   cleaner.status = cleaner.status || "Disponible";
+  normalizeCostRules();
   save();
   renderAll();
   toast("Cleaner restaurado al equipo activo.");
@@ -7258,6 +7272,7 @@ function renderReports() {
 }
 
 function renderSettings() {
+  normalizeCostRules();
   const profile = state.companyProfile || {};
   const profileForm = $("#profileSettingsForm");
   if (profileForm) {
