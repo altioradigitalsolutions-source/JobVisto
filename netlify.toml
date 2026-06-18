@@ -13,6 +13,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/app-payment"
+  to = "/.netlify/functions/app-payment"
+  status = 200
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

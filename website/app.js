@@ -320,6 +320,18 @@ async function loadStateFromSupabase(currentUser = null) {
         if ((!state.clientPayments || !state.clientPayments.length) && Array.isArray(clientPaymentsBackupSetting?.value?.payments)) {
           state.clientPayments = clientPaymentsBackupSetting.value.payments;
         }
+        const jobPaymentBackupSetting = settings.find(s => s.key === 'jobs_payment_state_backup');
+        if (Array.isArray(jobPaymentBackupSetting?.value?.jobs)) {
+          const paymentByJob = new Map(jobPaymentBackupSetting.value.jobs.map(item => [item.id, item]));
+          state.jobs.forEach(job => {
+            const savedPayment = paymentByJob.get(job.id);
+            if (!savedPayment) return;
+            job.clientPaidAmount = Number(savedPayment.clientPaidAmount || 0);
+            job.clientPaymentStatus = savedPayment.clientPaymentStatus || job.clientPaymentStatus || "unpaid";
+            job.clientPaidDate = savedPayment.clientPaidDate || job.clientPaidDate || "";
+            job.clientPaymentMethod = savedPayment.clientPaymentMethod || job.clientPaymentMethod || "";
+          });
+        }
       }
     }
   } catch (e) {
@@ -604,6 +616,11 @@ async function asyncSaveToSupabase() {
       organization_id: state.orgId,
       key: 'client_payment_receipts_backup',
       value: { payments: state.clientPayments || [] }
+    }, { onConflict: 'organization_id,key' });
+    await supabaseClient.from('organization_settings').upsert({
+      organization_id: state.orgId,
+      key: 'jobs_payment_state_backup',
+      value: { jobs: jobPaymentBackupRows() }
     }, { onConflict: 'organization_id,key' });
   } catch (e) {
     console.error("Error saving state to Supabase: ", e);
@@ -2539,7 +2556,7 @@ function addDays(days) {
   return date.toISOString().slice(0, 10);
 }
 
-function save() {
+function saveLocalState() {
   localStorage.setItem("jobvisto-mode", state.mode);
   localStorage.setItem("jobvisto-country", state.country);
   localStorage.setItem("jobvisto-language", state.language);
@@ -2554,17 +2571,180 @@ function save() {
   localStorage.setItem("jobvisto-company-profile", JSON.stringify(state.companyProfile));
   localStorage.setItem("jobvisto-vat-rate", String(state.vatRate));
   localStorage.setItem("jobvisto-currency-symbol", state.currencySymbol);
-  
+}
+
+function save() {
+  saveLocalState();
   if (supabaseClient && state.orgId && state.user) {
     asyncSaveToSupabase().catch((error) => console.error("Background Supabase save failed:", error));
   }
 }
 
 async function saveAndSyncCritical() {
-  save();
+  saveLocalState();
   if (supabaseClient && state.orgId && state.user) {
     await asyncSaveToSupabase();
   }
+}
+
+function jobPaymentBackupRows() {
+  return (state.jobs || []).map(job => ({
+    id: job.id,
+    clientPaidAmount: Number(job.clientPaidAmount || 0),
+    clientPaymentStatus: job.clientPaymentStatus || "unpaid",
+    clientPaidDate: job.clientPaidDate || "",
+    clientPaymentMethod: job.clientPaymentMethod || ""
+  }));
+}
+
+async function upsertOrganizationSetting(key, value) {
+  if (!supabaseClient || !state.orgId || !state.user) return;
+  const { error } = await supabaseClient.from("organization_settings").upsert({
+    organization_id: state.orgId,
+    key,
+    value
+  }, { onConflict: "organization_id,key" });
+  if (error) throw error;
+}
+
+function shouldUseServerPaymentPersistence() {
+  const host = window.location.hostname;
+  return host && host !== "localhost" && host !== "127.0.0.1";
+}
+
+async function currentSupabaseAccessToken() {
+  if (!supabaseClient?.auth?.getSession) return "";
+  const { data, error } = await supabaseClient.auth.getSession();
+  if (error) throw error;
+  return data?.session?.access_token || "";
+}
+
+async function persistPaymentThroughServer(payload) {
+  const token = await currentSupabaseAccessToken();
+  if (!token) throw new Error("No hay sesion activa para guardar el pago.");
+
+  const response = await fetch("/api/app-payment", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      organizationId: state.orgId,
+      ...payload
+    })
+  });
+
+  const text = await response.text();
+  let data = {};
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { error: text };
+    }
+  }
+
+  if (!response.ok || data?.ok === false) {
+    throw new Error(data?.error || "No se pudo guardar el pago en el servidor.");
+  }
+}
+
+async function persistCleanerPaymentCritical(receipt) {
+  saveLocalState();
+  if (!supabaseClient || !state.orgId || !state.user) return;
+  ensureValidUuids();
+  saveLocalState();
+
+  const [start, end] = receiptPeriodDates(receipt.period, receipt.createdAt || receipt.date);
+  const cleanerId = receipt.cleanerId || state.cleaners.find(c => c.name === receipt.cleaner)?.id || null;
+  if (!cleanerId) throw new Error("No se encontro el cleaner para registrar el pago.");
+
+  if (shouldUseServerPaymentPersistence()) {
+    await persistPaymentThroughServer({
+      type: "cleaner_payment",
+      receipt: { ...receipt, cleanerId },
+      backups: { receipts: state.receipts || [] }
+    });
+    return;
+  }
+
+  const { error: receiptError } = await supabaseClient.from("payment_receipts").upsert({
+    id: receipt.id,
+    organization_id: state.orgId,
+    cleaner_id: cleanerId,
+    period_start: start,
+    period_end: end,
+    amount: Number(receipt.amount || 0),
+    payment_method: receipt.method === "Efectivo" ? "cash" : "transfer",
+    receiver_name: receipt.receiver || receipt.cleaner || null,
+    receiver_signature_data: receipt.signature || null,
+    job_ids: receipt.jobIds || [],
+    status: receipt.status === "signed" ? "signed" : "draft"
+  });
+  if (receiptError) {
+    console.warn("Cleaner payment primary table failed; keeping backup setting:", receiptError);
+  }
+
+  await upsertOrganizationSetting("payment_receipts_backup", { receipts: state.receipts || [] });
+}
+
+async function persistClientPaymentCritical(payment, jobIds = []) {
+  saveLocalState();
+  if (!supabaseClient || !state.orgId || !state.user) return;
+  ensureValidUuids();
+  saveLocalState();
+
+  const jobsBackup = jobPaymentBackupRows();
+
+  if (shouldUseServerPaymentPersistence()) {
+    await persistPaymentThroughServer({
+      type: "client_payment",
+      payment: { ...payment, jobIds },
+      backups: {
+        clientPayments: state.clientPayments || [],
+        jobs: jobsBackup
+      }
+    });
+    return;
+  }
+
+  const jobsToPersist = (state.jobs || []).filter(job => jobIds.includes(job.id));
+  for (const job of jobsToPersist) {
+    const { error: jobPaymentError } = await supabaseClient
+      .from("jobs")
+      .update({
+        client_paid_amount: Number(job.clientPaidAmount || 0),
+        client_payment_status: job.clientPaymentStatus || "unpaid",
+        client_paid_date: job.clientPaidDate || null,
+        client_payment_method: job.clientPaymentMethod || null
+      })
+      .eq("id", job.id)
+      .eq("organization_id", state.orgId);
+    if (jobPaymentError) {
+      console.warn("Client payment job status failed; keeping backup setting:", jobPaymentError);
+    }
+  }
+
+  const { error: receiptError } = await supabaseClient.from("client_payment_receipts").upsert({
+    id: payment.id,
+    organization_id: state.orgId,
+    client_id: payment.clientId,
+    client_name: payment.clientName || null,
+    amount_received: Number(payment.amountReceived || 0),
+    discount: Number(payment.discount || 0),
+    subtotal: Number(payment.subtotal || 0),
+    balance_after: Number(payment.balanceAfter || 0),
+    payment_method: payment.method || "Efectivo",
+    job_ids: payment.jobIds || [],
+    paid_at: payment.createdAt || new Date().toISOString()
+  });
+  if (receiptError) {
+    console.warn("Client payment primary table failed; keeping backup setting:", receiptError);
+  }
+
+  await upsertOrganizationSetting("client_payment_receipts_backup", { payments: state.clientPayments || [] });
+  await upsertOrganizationSetting("jobs_payment_state_backup", { jobs: jobsBackup });
 }
 
 function clientFor(job) {
@@ -8453,7 +8633,7 @@ function setupEvents() {
     if (index >= 0) state.receipts[index] = { ...state.receipts[index], ...payload };
     else state.receipts.unshift(payload);
     try {
-      await saveAndSyncCritical();
+      await persistCleanerPaymentCritical(payload);
       resetPaymentForm();
       renderAll();
       toast(index >= 0 ? "Pago actualizado. Firma pendiente." : "Pago registrado. Falta firma del cleaner.");
@@ -8559,25 +8739,26 @@ function setupEvents() {
 
     const client = state.clients.find(c => c.id === data.client);
     const balanceAfter = Math.max(0, roundMoney(totalSelected - totalPaidBefore - amountReceived - discount));
+    const clientPayment = {
+      id: crypto.randomUUID(),
+      clientId: data.client,
+      clientName: client?.name || "Cliente",
+      amountReceived,
+      discount,
+      subtotal: totalSelected,
+      balanceAfter,
+      method: data.method,
+      jobIds,
+      date: new Date().toLocaleString("es"),
+      createdAt: new Date().toISOString()
+    };
     state.clientPayments = [
-      {
-        id: crypto.randomUUID(),
-        clientId: data.client,
-        clientName: client?.name || "Cliente",
-        amountReceived,
-        discount,
-        subtotal: totalSelected,
-        balanceAfter,
-        method: data.method,
-        jobIds,
-        date: new Date().toLocaleString("es"),
-        createdAt: new Date().toISOString()
-      },
+      clientPayment,
       ...(state.clientPayments || [])
     ];
 
     try {
-      await saveAndSyncCritical();
+      await persistClientPaymentCritical(clientPayment, jobIds);
       renderAll();
       toast(balanceAfter > 0 ? `Cobro parcial registrado. Saldo pendiente: ${money(balanceAfter)}.` : "Cobro registrado exitosamente.");
       formEl.reset();
