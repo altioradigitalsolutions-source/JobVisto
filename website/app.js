@@ -1,6 +1,18 @@
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
+function mergeById(primary = [], backup = []) {
+  const merged = new Map();
+  [...(primary || []), ...(backup || [])].forEach((item) => {
+    if (!item) return;
+    const id = item.id || crypto.randomUUID();
+    merged.set(id, { ...item, id });
+  });
+  return [...merged.values()].sort((a, b) =>
+    String(b.createdAt || b.date || "").localeCompare(String(a.createdAt || a.date || ""))
+  );
+}
+
 const JOBVISTO_SUPABASE_URL = window.JOBVISTO_CONFIG?.supabaseUrl || "https://fmpzdmmmqwqxxgeytmkr.supabase.co";
 const JOBVISTO_SUPABASE_ANON_KEY = window.JOBVISTO_CONFIG?.supabaseAnonKey || "sb_publishable_YWE8eNstQh3KkkAWc6cXyA_Crhbvord";
 
@@ -313,12 +325,12 @@ async function loadStateFromSupabase(currentUser = null) {
           state.costRules = { ...state.costRules, ...costRulesSetting.value };
         }
         const receiptsBackupSetting = settings.find(s => s.key === 'payment_receipts_backup');
-        if ((!state.receipts || !state.receipts.length) && Array.isArray(receiptsBackupSetting?.value?.receipts)) {
-          state.receipts = receiptsBackupSetting.value.receipts;
+        if (Array.isArray(receiptsBackupSetting?.value?.receipts)) {
+          state.receipts = mergeById(state.receipts || [], receiptsBackupSetting.value.receipts);
         }
         const clientPaymentsBackupSetting = settings.find(s => s.key === 'client_payment_receipts_backup');
-        if ((!state.clientPayments || !state.clientPayments.length) && Array.isArray(clientPaymentsBackupSetting?.value?.payments)) {
-          state.clientPayments = clientPaymentsBackupSetting.value.payments;
+        if (Array.isArray(clientPaymentsBackupSetting?.value?.payments)) {
+          state.clientPayments = mergeById(state.clientPayments || [], clientPaymentsBackupSetting.value.payments);
         }
         const jobPaymentBackupSetting = settings.find(s => s.key === 'jobs_payment_state_backup');
         if (Array.isArray(jobPaymentBackupSetting?.value?.jobs)) {
@@ -5528,9 +5540,6 @@ function renderDashboardReminders() {
   `).join("");
   
   container.innerHTML = html;
-  $$("[data-open-debt-client]").forEach((button) => {
-    button.addEventListener("click", () => openClientDebtPayment(button.dataset.openDebtClient));
-  });
 }
 
 function renderMetrics() {
@@ -8639,9 +8648,10 @@ function setupEvents() {
       toast(index >= 0 ? "Pago actualizado. Firma pendiente." : "Pago registrado. Falta firma del cleaner.");
     } catch (error) {
       console.error("Error saving cleaner payment:", error);
-      state.receipts = previousReceipts;
-      renderPayments();
-      toast("No se pudo guardar el pago en la base. Intenta otra vez.");
+      saveLocalState();
+      resetPaymentForm();
+      renderAll();
+      toast("Pago guardado en respaldo. Si no aparece en otro dispositivo, recarga la pagina.");
     }
   });
   $("#paymentCleanerSelect").addEventListener("change", () => {
@@ -8764,10 +8774,10 @@ function setupEvents() {
       formEl.reset();
     } catch (error) {
       console.error("Error saving client payment:", error);
-      state.jobs = previousJobs;
-      state.clientPayments = previousClientPayments;
-      renderPayments();
-      toast("No se pudo guardar el cobro en la base. Intenta otra vez.");
+      saveLocalState();
+      renderAll();
+      toast(balanceAfter > 0 ? `Cobro guardado en respaldo. Saldo pendiente: ${money(balanceAfter)}.` : "Cobro guardado en respaldo.");
+      formEl.reset();
     }
   });
 
