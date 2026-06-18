@@ -2648,6 +2648,10 @@ async function persistPaymentThroughServer(payload) {
   if (!response.ok || data?.ok === false) {
     throw new Error(data?.error || "No se pudo guardar el pago en el servidor.");
   }
+  if (Array.isArray(data?.warnings) && data.warnings.length) {
+    console.warn("Payment saved with fallback warnings:", data.warnings);
+  }
+  return data;
 }
 
 async function persistCleanerPaymentCritical(receipt) {
@@ -2802,12 +2806,18 @@ function normalizeCostRules() {
       ])
     )
   }));
-  const activeCleanerIds = new Set((state.cleaners || []).filter((cleaner) => !cleaner.archived).map((cleaner) => cleaner.id));
-  const activeCleanerNames = new Set((state.cleaners || []).filter((cleaner) => !cleaner.archived).map((cleaner) => cleaner.name));
+  const normalizeName = (value) => String(value || "").trim().toLowerCase();
+  const activeCleanerList = (state.cleaners || []).filter((cleaner) => !cleaner.archived);
+  const activeCleanerIds = new Set(activeCleanerList.map((cleaner) => cleaner.id).filter(Boolean));
+  const activeCleanerNames = new Set(activeCleanerList.map((cleaner) => normalizeName(cleaner.name)));
   state.costRules.specialRules = state.costRules.specialRules.filter((rule) => {
     if (rule.cleanerId) return activeCleanerIds.has(rule.cleanerId);
-    return activeCleanerNames.has(rule.cleanerName);
+    return activeCleanerNames.has(normalizeName(rule.cleanerName));
   });
+  if (state.costRules.specialCleaner && !activeCleanerNames.has(normalizeName(state.costRules.specialCleaner))) {
+    state.costRules.specialCleaner = "";
+    state.costRules.specialCleanerRate = 0;
+  }
 }
 
 function specialCostRuleForCleaner(cleaner) {
@@ -5804,50 +5814,6 @@ function renderDashboardMap(jobs = state.jobs.filter((job) => job.date === today
 function renderRecentActivity() {
   const target = $("#recentActivityList");
   if (!target) return;
-  const recentJob = state.jobs.find(isDone) || state.jobs[0];
-  const recentClient = activeClients()[0];
-  const recentCleaner = activeCleaners()[0];
-  const items = [
-    {
-      icon: "✓",
-      title: recentJob ? `${cleanerFor(recentJob)?.name || "Cleaner"} ${t("completed")} ${clientFor(recentJob).name}` : t("completedJobs"),
-      copy: recentJob ? clientFor(recentJob).address : t("noLiveAgenda"),
-      time: recentJob?.date || ""
-    },
-    {
-      icon: "▣",
-      title: `${recentCleaner?.name || "Cleaner"} ${t("uploadedPhotos")}`,
-      copy: recentJob?.serviceType || t("evidence"),
-      time: recentJob?.date || ""
-    },
-    {
-      icon: "$",
-      title: t("paymentReceived"),
-      copy: `${money(320)} ${recentClient ? `from ${recentClient.name}` : ""}`,
-      time: ""
-    },
-    {
-      icon: "+",
-      title: t("newClientRegistered"),
-      copy: recentClient?.name || "Cliente",
-      time: ""
-    }
-  ];
-  target.innerHTML = items.map((item) => `
-    <article class="recent-item">
-      <span>${item.icon}</span>
-      <div>
-        <strong>${escapeHtml(item.title)}</strong>
-        <p>${escapeHtml(item.copy)}</p>
-      </div>
-      <time>${item.time}</time>
-    </article>
-  `).join("");
-}
-
-function renderRecentActivity() {
-  const target = $("#recentActivityList");
-  if (!target) return;
   const dateLabel = (value) => {
     if (!value) return "";
     const parsed = new Date(value);
@@ -8083,6 +8049,59 @@ function closeMobileMenu() {
   toggle.setAttribute("aria-expanded", "false");
 }
 
+function openRecentActivityPanel() {
+  setView("dashboard");
+  recentActivityExpanded = true;
+  renderRecentActivity();
+  document.querySelector(".recent-panel")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  toast("Actividad reciente abierta.");
+}
+
+function setupDelegatedAppClicks() {
+  document.addEventListener("click", (event) => {
+    const debtButton = event.target.closest("[data-open-debt-client]");
+    if (debtButton) {
+      event.preventDefault();
+      openClientDebtPayment(debtButton.dataset.openDebtClient);
+      return;
+    }
+
+    const viewTargetButton = event.target.closest("[data-view-target]");
+    if (viewTargetButton) {
+      event.preventDefault();
+      setView(viewTargetButton.dataset.viewTarget);
+      return;
+    }
+
+    const openJobButton = event.target.closest("[data-open-job]");
+    if (openJobButton) {
+      event.preventDefault();
+      setView("jobs");
+      return;
+    }
+
+    if (event.target.closest(".notification-button")) {
+      event.preventDefault();
+      openRecentActivityPanel();
+      return;
+    }
+
+    if (event.target.closest(".recent-panel .text-link")) {
+      event.preventDefault();
+      recentActivityExpanded = true;
+      renderRecentActivity();
+      toast("Mostrando mas actividad.");
+      return;
+    }
+
+    if (event.target.closest(".growth-banner .primary")) {
+      event.preventDefault();
+      setView("reports");
+      document.getElementById("reportsView")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  });
+}
+
 function toggleMobileMenu() {
   const shell = $("#appShell");
   const toggle = $("#mobileMenuToggle");
@@ -8114,6 +8133,7 @@ function setView(name) {
 function setupEvents() {
   state.language = localStorage.getItem("jobvisto-language") || state.language || "es";
   applyStaticLanguage();
+  setupDelegatedAppClicks();
   $$("[data-language]").forEach((button) => {
     button.addEventListener("click", () => setLanguage(button.dataset.language));
   });
@@ -8253,26 +8273,6 @@ function setupEvents() {
   $("#globalMobileMenu")?.addEventListener("click", toggleMobileMenu);
   $("#mobileMenuBackdrop").addEventListener("click", closeMobileMenu);
   $$(".sidebar nav button").forEach((button) => button.addEventListener("click", () => setView(button.dataset.view)));
-  $$("[data-view-target]").forEach((button) => button.addEventListener("click", () => setView(button.dataset.viewTarget)));
-  $$("[data-open-job]").forEach((button) => button.addEventListener("click", () => setView("jobs")));
-  $$(".notification-button").forEach((button) => {
-    button.addEventListener("click", () => {
-      setView("dashboard");
-      recentActivityExpanded = true;
-      renderRecentActivity();
-      document.querySelector(".recent-panel")?.scrollIntoView({ behavior: "smooth", block: "center" });
-      toast("Actividad reciente abierta.");
-    });
-  });
-  document.querySelector(".recent-panel .text-link")?.addEventListener("click", () => {
-    recentActivityExpanded = true;
-    renderRecentActivity();
-    toast("Mostrando mas actividad.");
-  });
-  document.querySelector(".growth-banner .primary")?.addEventListener("click", () => {
-    setView("reports");
-    document.getElementById("reportsView")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  });
   $("#logoutButton").addEventListener("click", async () => {
     if (supabaseClient) await supabaseClient.auth.signOut();
     state.user = null;

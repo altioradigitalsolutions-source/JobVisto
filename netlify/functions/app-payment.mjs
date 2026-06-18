@@ -79,6 +79,49 @@ async function supabaseFetch(path, { method = "GET", body, query = "" } = {}) {
   return data;
 }
 
+function missingColumnFromError(error) {
+  const message = String(error?.message || "");
+  return message.match(/'([^']+)'\s+column/i)?.[1]
+    || message.match(/column\s+"?([a-zA-Z0-9_]+)"?\s+does not exist/i)?.[1]
+    || "";
+}
+
+function withoutKeys(object, keys) {
+  const remove = new Set(keys.filter(Boolean));
+  return Object.fromEntries(Object.entries(object).filter(([key]) => !remove.has(key)));
+}
+
+async function upsertWithSchemaFallback(path, { query, body, optionalKeys = [] }) {
+  const warnings = [];
+  let retryBody = body;
+  const optional = new Set(optionalKeys);
+
+  for (let attempt = 0; attempt <= optionalKeys.length + 1; attempt += 1) {
+    try {
+      await supabaseFetch(path, { method: "POST", query, body: retryBody });
+      return warnings;
+    } catch (error) {
+      const missingColumn = missingColumnFromError(error);
+      if (!missingColumn || !optional.has(missingColumn)) throw error;
+      warnings.push(`${path}: saved without optional column ${missingColumn}`);
+      retryBody = withoutKeys(retryBody, [missingColumn]);
+    }
+  }
+
+  await supabaseFetch(path, { method: "POST", query, body: retryBody });
+  return warnings;
+}
+
+async function safeWrite(label, action) {
+  try {
+    await action();
+    return null;
+  } catch (error) {
+    console.error(`${label} failed:`, error);
+    return error.message || String(error);
+  }
+}
+
 async function userFromToken(token) {
   const supabaseUrl = env("SUPABASE_URL");
   const serviceRoleKey = env("SUPABASE_SERVICE_ROLE_KEY");
@@ -99,7 +142,7 @@ async function assertOrgAdmin(req, organizationId) {
   const user = await userFromToken(token);
   if (!user?.id) throw new Error("Invalid session token.");
 
-  const query = `?organization_id=eq.${encodeURIComponent(organizationId)}&user_id=eq.${encodeURIComponent(user.id)}&status=eq.active&role=in.(owner,manager)&select=id`;
+  const query = `?organization_id=eq.${encodeURIComponent(organizationId)}&user_id=eq.${encodeURIComponent(user.id)}&status=eq.active&role=in.(owner,manager,admin)&select=id`;
   const memberships = await supabaseFetch("/rest/v1/organization_members", { query });
   if (!Array.isArray(memberships) || memberships.length === 0) {
     throw new Error("User is not an organization admin.");
@@ -123,36 +166,47 @@ async function persistCleanerPayment(organizationId, receipt = {}, backups = {})
   const cleanerId = receipt.cleanerId;
   if (!cleanerId) throw new Error("Cleaner id is missing.");
 
-  await supabaseFetch("/rest/v1/payment_receipts", {
-    method: "POST",
-    query: "?on_conflict=id",
-    body: {
-      id: receipt.id,
-      organization_id: organizationId,
-      cleaner_id: cleanerId,
-      period_start: periodStart,
-      period_end: periodEnd,
-      amount: money(receipt.amount),
-      currency: "ILS",
-      payment_method: paymentMethod(receipt.method),
-      receiver_name: receipt.receiver || receipt.cleaner || null,
-      receiver_signature_data: receipt.signature || null,
-      notes: receipt.notes || null,
-      job_ids: cleanUuidArray(receipt.jobIds),
-      status: receiptStatus(receipt.status),
-      paid_at: receipt.createdAt || new Date().toISOString()
-    }
-  });
-
   await upsertSetting(organizationId, "payment_receipts_backup", { receipts: backups.receipts || [] });
+
+  const warnings = [];
+  const primaryWarning = await safeWrite("cleaner payment primary receipt", async () => {
+    const retryWarnings = await upsertWithSchemaFallback("/rest/v1/payment_receipts", {
+      query: "?on_conflict=id",
+      body: {
+        id: receipt.id,
+        organization_id: organizationId,
+        cleaner_id: cleanerId,
+        period_start: periodStart,
+        period_end: periodEnd,
+        amount: money(receipt.amount),
+        currency: "ILS",
+        payment_method: paymentMethod(receipt.method),
+        receiver_name: receipt.receiver || receipt.cleaner || null,
+        receiver_signature_data: receipt.signature || null,
+        notes: receipt.notes || null,
+        job_ids: cleanUuidArray(receipt.jobIds),
+        status: receiptStatus(receipt.status),
+        paid_at: receipt.createdAt || new Date().toISOString()
+      },
+      optionalKeys: ["currency", "receiver_name", "receiver_signature_data", "notes", "job_ids", "status", "paid_at"]
+    });
+    warnings.push(...retryWarnings);
+  });
+  if (primaryWarning) warnings.push(primaryWarning);
+
+  return warnings;
 }
 
 async function persistClientPayment(organizationId, payment = {}, backups = {}) {
   const jobIds = cleanUuidArray(payment.jobIds);
   const jobs = Array.isArray(backups.jobs) ? backups.jobs.filter((job) => jobIds.includes(job.id)) : [];
+  const warnings = [];
+
+  await upsertSetting(organizationId, "client_payment_receipts_backup", { payments: backups.clientPayments || [] });
+  await upsertSetting(organizationId, "jobs_payment_state_backup", { jobs: backups.jobs || [] });
 
   for (const job of jobs) {
-    await supabaseFetch(`/rest/v1/jobs?id=eq.${encodeURIComponent(job.id)}&organization_id=eq.${encodeURIComponent(organizationId)}`, {
+    const warning = await safeWrite(`job payment state ${job.id}`, () => supabaseFetch(`/rest/v1/jobs?id=eq.${encodeURIComponent(job.id)}&organization_id=eq.${encodeURIComponent(organizationId)}`, {
       method: "PATCH",
       body: {
         client_paid_amount: money(job.clientPaidAmount),
@@ -160,29 +214,33 @@ async function persistClientPayment(organizationId, payment = {}, backups = {}) 
         client_paid_date: job.clientPaidDate || null,
         client_payment_method: job.clientPaymentMethod || null
       }
-    });
+    }));
+    if (warning) warnings.push(warning);
   }
 
-  await supabaseFetch("/rest/v1/client_payment_receipts", {
-    method: "POST",
-    query: "?on_conflict=id",
-    body: {
-      id: payment.id,
-      organization_id: organizationId,
-      client_id: payment.clientId,
-      client_name: payment.clientName || null,
-      amount_received: money(payment.amountReceived),
-      discount: money(payment.discount),
-      subtotal: money(payment.subtotal),
-      balance_after: money(payment.balanceAfter),
-      payment_method: payment.method || "Efectivo",
-      job_ids: jobIds,
-      paid_at: payment.createdAt || new Date().toISOString()
-    }
+  const receiptWarning = await safeWrite("client payment primary receipt", async () => {
+    const receiptWarnings = await upsertWithSchemaFallback("/rest/v1/client_payment_receipts", {
+      query: "?on_conflict=id",
+      body: {
+        id: payment.id,
+        organization_id: organizationId,
+        client_id: payment.clientId,
+        client_name: payment.clientName || null,
+        amount_received: money(payment.amountReceived),
+        discount: money(payment.discount),
+        subtotal: money(payment.subtotal),
+        balance_after: money(payment.balanceAfter),
+        payment_method: payment.method || "Efectivo",
+        job_ids: jobIds,
+        paid_at: payment.createdAt || new Date().toISOString()
+      },
+      optionalKeys: ["client_name", "discount", "subtotal", "balance_after", "payment_method", "job_ids", "paid_at"]
+    });
+    warnings.push(...receiptWarnings);
   });
+  if (receiptWarning) warnings.push(receiptWarning);
 
-  await upsertSetting(organizationId, "client_payment_receipts_backup", { payments: backups.clientPayments || [] });
-  await upsertSetting(organizationId, "jobs_payment_state_backup", { jobs: backups.jobs || [] });
+  return warnings;
 }
 
 export default async (req) => {
@@ -196,13 +254,13 @@ export default async (req) => {
     await assertOrgAdmin(req, organizationId);
 
     if (body.type === "cleaner_payment") {
-      await persistCleanerPayment(organizationId, body.receipt, body.backups);
-      return json({ ok: true });
+      const warnings = await persistCleanerPayment(organizationId, body.receipt, body.backups);
+      return json({ ok: true, warnings });
     }
 
     if (body.type === "client_payment") {
-      await persistClientPayment(organizationId, body.payment, body.backups);
-      return json({ ok: true });
+      const warnings = await persistClientPayment(organizationId, body.payment, body.backups);
+      return json({ ok: true, warnings });
     }
 
     return json({ error: "Unsupported payment type" }, 400);
