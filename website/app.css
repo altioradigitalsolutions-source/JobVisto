@@ -292,6 +292,10 @@ button:disabled {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
+body.social-login-disabled .auth-divider,
+body.social-login-disabled .social-row {
+  display: none !important;
+}
 .google {
   min-height: 52px;
   background: #fff;
