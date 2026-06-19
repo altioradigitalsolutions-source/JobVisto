@@ -122,6 +122,22 @@ async function safeWrite(label, action) {
   }
 }
 
+function pushWarning(warnings, warning) {
+  if (warning) warnings.push(warning);
+  return !warning;
+}
+
+async function safeBackupSetting(warnings, organizationId, key, value) {
+  const warning = await safeWrite(`backup setting ${key}`, () => upsertSetting(organizationId, key, value));
+  return pushWarning(warnings, warning);
+}
+
+function requireHistorySaved(saved, warnings, label) {
+  if (saved) return;
+  const detail = warnings.length ? ` Detalle: ${warnings.join(" | ")}` : "";
+  throw new Error(`${label} no pudo guardarse en el historial.${detail}`);
+}
+
 async function userFromToken(token) {
   const supabaseUrl = env("SUPABASE_URL");
   const serviceRoleKey = env("SUPABASE_SERVICE_ROLE_KEY");
@@ -145,7 +161,11 @@ async function assertOrgAdmin(req, organizationId) {
   const query = `?organization_id=eq.${encodeURIComponent(organizationId)}&user_id=eq.${encodeURIComponent(user.id)}&status=eq.active&role=in.(owner,manager)&select=id`;
   const memberships = await supabaseFetch("/rest/v1/organization_members", { query });
   if (!Array.isArray(memberships) || memberships.length === 0) {
-    throw new Error("User is not an organization admin.");
+    const ownerQuery = `?id=eq.${encodeURIComponent(organizationId)}&owner_user_id=eq.${encodeURIComponent(user.id)}&select=id`;
+    const ownedOrganizations = await supabaseFetch("/rest/v1/organizations", { query: ownerQuery });
+    if (!Array.isArray(ownedOrganizations) || ownedOrganizations.length === 0) {
+      throw new Error("User is not an organization admin.");
+    }
   }
 }
 
@@ -166,9 +186,10 @@ async function persistCleanerPayment(organizationId, receipt = {}, backups = {})
   const cleanerId = receipt.cleanerId;
   if (!cleanerId) throw new Error("Cleaner id is missing.");
 
-  await upsertSetting(organizationId, "payment_receipts_backup", { receipts: backups.receipts || [] });
-
   const warnings = [];
+  let historySaved = false;
+  historySaved = await safeBackupSetting(warnings, organizationId, "payment_receipts_backup", { receipts: backups.receipts || [] }) || historySaved;
+
   const primaryWarning = await safeWrite("cleaner payment primary receipt", async () => {
     const retryWarnings = await upsertWithSchemaFallback("/rest/v1/payment_receipts", {
       query: "?on_conflict=id",
@@ -192,7 +213,8 @@ async function persistCleanerPayment(organizationId, receipt = {}, backups = {})
     });
     warnings.push(...retryWarnings);
   });
-  if (primaryWarning) warnings.push(primaryWarning);
+  historySaved = pushWarning(warnings, primaryWarning) || historySaved;
+  requireHistorySaved(historySaved, warnings, "El pago al cleaner");
 
   return warnings;
 }
@@ -201,9 +223,10 @@ async function persistClientPayment(organizationId, payment = {}, backups = {}) 
   const jobIds = cleanUuidArray(payment.jobIds);
   const jobs = Array.isArray(backups.jobs) ? backups.jobs.filter((job) => jobIds.includes(job.id)) : [];
   const warnings = [];
+  let historySaved = false;
 
-  await upsertSetting(organizationId, "client_payment_receipts_backup", { payments: backups.clientPayments || [] });
-  await upsertSetting(organizationId, "jobs_payment_state_backup", { jobs: backups.jobs || [] });
+  historySaved = await safeBackupSetting(warnings, organizationId, "client_payment_receipts_backup", { payments: backups.clientPayments || [] }) || historySaved;
+  await safeBackupSetting(warnings, organizationId, "jobs_payment_state_backup", { jobs: backups.jobs || [] });
 
   for (const job of jobs) {
     const warning = await safeWrite(`job payment state ${job.id}`, () => supabaseFetch(`/rest/v1/jobs?id=eq.${encodeURIComponent(job.id)}&organization_id=eq.${encodeURIComponent(organizationId)}`, {
@@ -238,7 +261,8 @@ async function persistClientPayment(organizationId, payment = {}, backups = {}) 
     });
     warnings.push(...receiptWarnings);
   });
-  if (receiptWarning) warnings.push(receiptWarning);
+  historySaved = pushWarning(warnings, receiptWarning) || historySaved;
+  requireHistorySaved(historySaved, warnings, "El cobro del cliente");
 
   return warnings;
 }
