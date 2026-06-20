@@ -2611,13 +2611,38 @@ function jobPaymentBackupRows() {
 }
 
 async function upsertOrganizationSetting(key, value) {
-  if (!supabaseClient || !state.orgId || !state.user) return;
-  const { error } = await supabaseClient.from("organization_settings").upsert({
+  if (!supabaseClient || !state.orgId || !state.user) return false;
+  const row = {
     organization_id: state.orgId,
     key,
     value
-  }, { onConflict: "organization_id,key" });
-  if (error) throw error;
+  };
+  const { error } = await supabaseClient.from("organization_settings").upsert(row, { onConflict: "organization_id,key" });
+  if (!error) return true;
+
+  console.warn(`Setting upsert failed for ${key}; trying update/insert fallback:`, error);
+  const { data: existing, error: lookupError } = await supabaseClient
+    .from("organization_settings")
+    .select("id")
+    .eq("organization_id", state.orgId)
+    .eq("key", key)
+    .limit(1)
+    .maybeSingle();
+
+  if (lookupError) throw error;
+
+  if (existing?.id) {
+    const { error: updateError } = await supabaseClient
+      .from("organization_settings")
+      .update({ value })
+      .eq("id", existing.id);
+    if (updateError) throw updateError;
+    return true;
+  }
+
+  const { error: insertError } = await supabaseClient.from("organization_settings").insert(row);
+  if (insertError) throw insertError;
+  return true;
 }
 
 function shouldUseServerPaymentPersistence() {
@@ -2674,36 +2699,60 @@ async function persistCleanerPaymentCritical(receipt) {
   saveLocalState();
 
   const [start, end] = receiptPeriodDates(receipt.period, receipt.createdAt || receipt.date);
-  const cleanerId = receipt.cleanerId || state.cleaners.find(c => c.name === receipt.cleaner)?.id || null;
-  if (!cleanerId) throw new Error("No se encontro el cleaner para registrar el pago.");
+  const cleanerRecord = activeCleaners().find((cleaner) =>
+    cleaner.id === receipt.cleanerId || normalizeKey(cleaner.name) === normalizeKey(receipt.cleaner)
+  );
+  const cleanerId = receipt.cleanerId || cleanerRecord?.id || null;
+  if (!cleanerId) throw new Error("No se encontro el cleaner activo para registrar el pago.");
 
   if (shouldUseServerPaymentPersistence()) {
-    await persistPaymentThroughServer({
-      type: "cleaner_payment",
-      receipt: { ...receipt, cleanerId },
-      backups: { receipts: state.receipts || [] }
+    try {
+      await persistPaymentThroughServer({
+        type: "cleaner_payment",
+        receipt: { ...receipt, cleanerId },
+        backups: { receipts: state.receipts || [] }
+      });
+      return;
+    } catch (error) {
+      console.warn("Server cleaner payment persistence failed; falling back to browser persistence:", error);
+    }
+  }
+
+  let backupSaved = false;
+  let receiptSaved = false;
+  let lastError = null;
+
+  try {
+    backupSaved = await upsertOrganizationSetting("payment_receipts_backup", { receipts: state.receipts || [] });
+  } catch (error) {
+    lastError = error;
+    console.warn("Cleaner payment backup setting failed:", error);
+  }
+
+  try {
+    const { error: receiptError } = await supabaseClient.from("payment_receipts").upsert({
+      id: receipt.id,
+      organization_id: state.orgId,
+      cleaner_id: cleanerId,
+      period_start: start,
+      period_end: end,
+      amount: Number(receipt.amount || 0),
+      payment_method: receipt.method === "Efectivo" ? "cash" : "transfer",
+      receiver_name: receipt.receiver || receipt.cleaner || null,
+      receiver_signature_data: receipt.signature || null,
+      job_ids: receipt.jobIds || [],
+      status: receipt.status === "signed" ? "signed" : "draft"
     });
-    return;
+    if (receiptError) throw receiptError;
+    receiptSaved = true;
+  } catch (error) {
+    lastError = error;
+    console.warn("Cleaner payment primary table failed; keeping backup setting:", error);
   }
 
-  const { error: receiptError } = await supabaseClient.from("payment_receipts").upsert({
-    id: receipt.id,
-    organization_id: state.orgId,
-    cleaner_id: cleanerId,
-    period_start: start,
-    period_end: end,
-    amount: Number(receipt.amount || 0),
-    payment_method: receipt.method === "Efectivo" ? "cash" : "transfer",
-    receiver_name: receipt.receiver || receipt.cleaner || null,
-    receiver_signature_data: receipt.signature || null,
-    job_ids: receipt.jobIds || [],
-    status: receipt.status === "signed" ? "signed" : "draft"
-  });
-  if (receiptError) {
-    console.warn("Cleaner payment primary table failed; keeping backup setting:", receiptError);
+  if (!backupSaved && !receiptSaved) {
+    throw lastError || new Error("No se pudo guardar el pago al cleaner.");
   }
-
-  await upsertOrganizationSetting("payment_receipts_backup", { receipts: state.receipts || [] });
 }
 
 async function persistClientPaymentCritical(payment, jobIds = []) {
@@ -2715,73 +2764,127 @@ async function persistClientPaymentCritical(payment, jobIds = []) {
   const jobsBackup = jobPaymentBackupRows();
 
   if (shouldUseServerPaymentPersistence()) {
-    await persistPaymentThroughServer({
-      type: "client_payment",
-      payment: { ...payment, jobIds },
-      backups: {
-        clientPayments: state.clientPayments || [],
-        jobs: jobsBackup
-      }
-    });
-    return;
-  }
-
-  const jobsToPersist = (state.jobs || []).filter(job => jobIds.includes(job.id));
-  for (const job of jobsToPersist) {
-    const { error: jobPaymentError } = await supabaseClient
-      .from("jobs")
-      .update({
-        client_paid_amount: Number(job.clientPaidAmount || 0),
-        client_payment_status: job.clientPaymentStatus || "unpaid",
-        client_paid_date: job.clientPaidDate || null,
-        client_payment_method: job.clientPaymentMethod || null
-      })
-      .eq("id", job.id)
-      .eq("organization_id", state.orgId);
-    if (jobPaymentError) {
-      console.warn("Client payment job status failed; keeping backup setting:", jobPaymentError);
+    try {
+      await persistPaymentThroughServer({
+        type: "client_payment",
+        payment: { ...payment, jobIds },
+        backups: {
+          clientPayments: state.clientPayments || [],
+          jobs: jobsBackup
+        }
+      });
+      return;
+    } catch (error) {
+      console.warn("Server client payment persistence failed; falling back to browser persistence:", error);
     }
   }
 
-  const { error: receiptError } = await supabaseClient.from("client_payment_receipts").upsert({
-    id: payment.id,
-    organization_id: state.orgId,
-    client_id: payment.clientId,
-    client_name: payment.clientName || null,
-    amount_received: Number(payment.amountReceived || 0),
-    discount: Number(payment.discount || 0),
-    subtotal: Number(payment.subtotal || 0),
-    balance_after: Number(payment.balanceAfter || 0),
-    payment_method: payment.method || "Efectivo",
-    job_ids: payment.jobIds || [],
-    paid_at: payment.createdAt || new Date().toISOString()
-  });
-  if (receiptError) {
-    console.warn("Client payment primary table failed; keeping backup setting:", receiptError);
+  const jobsToPersist = (state.jobs || []).filter(job => jobIds.includes(job.id));
+  let clientBackupSaved = false;
+  let jobBackupSaved = false;
+  let receiptSaved = false;
+  let anyJobStatusSaved = false;
+  let lastError = null;
+
+  try {
+    clientBackupSaved = await upsertOrganizationSetting("client_payment_receipts_backup", { payments: state.clientPayments || [] });
+  } catch (error) {
+    lastError = error;
+    console.warn("Client payment backup setting failed:", error);
   }
 
-  await upsertOrganizationSetting("client_payment_receipts_backup", { payments: state.clientPayments || [] });
-  await upsertOrganizationSetting("jobs_payment_state_backup", { jobs: jobsBackup });
+  try {
+    jobBackupSaved = await upsertOrganizationSetting("jobs_payment_state_backup", { jobs: jobsBackup });
+  } catch (error) {
+    lastError = error;
+    console.warn("Job payment backup setting failed:", error);
+  }
+
+  for (const job of jobsToPersist) {
+    try {
+      const { error: jobPaymentError } = await supabaseClient
+        .from("jobs")
+        .update({
+          client_paid_amount: Number(job.clientPaidAmount || 0),
+          client_payment_status: job.clientPaymentStatus || "unpaid",
+          client_paid_date: job.clientPaidDate || null,
+          client_payment_method: job.clientPaymentMethod || null
+        })
+        .eq("id", job.id)
+        .eq("organization_id", state.orgId);
+      if (jobPaymentError) throw jobPaymentError;
+      anyJobStatusSaved = true;
+    } catch (error) {
+      lastError = error;
+      console.warn("Client payment job status failed; keeping backup setting:", error);
+    }
+  }
+
+  try {
+    const { error: receiptError } = await supabaseClient.from("client_payment_receipts").upsert({
+      id: payment.id,
+      organization_id: state.orgId,
+      client_id: payment.clientId,
+      client_name: payment.clientName || null,
+      amount_received: Number(payment.amountReceived || 0),
+      discount: Number(payment.discount || 0),
+      subtotal: Number(payment.subtotal || 0),
+      balance_after: Number(payment.balanceAfter || 0),
+      payment_method: payment.method || "Efectivo",
+      job_ids: payment.jobIds || [],
+      paid_at: payment.createdAt || new Date().toISOString()
+    });
+    if (receiptError) throw receiptError;
+    receiptSaved = true;
+  } catch (error) {
+    lastError = error;
+    console.warn("Client payment primary table failed; keeping backup setting:", error);
+  }
+
+  if (!clientBackupSaved && !jobBackupSaved && !receiptSaved && !anyJobStatusSaved) {
+    throw lastError || new Error("No se pudo guardar el cobro del cliente.");
+  }
 }
 
 function clientFor(job) {
   return state.clients.find((client) => client.id === job.clientId) || state.clients[0];
 }
 
+function recordStatusKey(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function isArchivedRecord(record = {}) {
+  const status = recordStatusKey(record.status || record.state || record.lifecycle);
+  return Boolean(
+    record.archived ||
+    record.isArchived ||
+    record.is_archived ||
+    record.archivedAt ||
+    record.archived_at ||
+    record.deleted ||
+    record.isDeleted ||
+    record.is_deleted ||
+    record.deletedAt ||
+    record.deleted_at ||
+    ["archived", "archive", "archivado", "deleted", "eliminado", "inactive", "inactivo"].includes(status)
+  );
+}
+
 function activeClients() {
-  return state.clients.filter((client) => !client.archived);
+  return state.clients.filter((client) => !isArchivedRecord(client));
 }
 
 function archivedClients() {
-  return state.clients.filter((client) => client.archived);
+  return state.clients.filter((client) => isArchivedRecord(client));
 }
 
 function activeCleaners() {
-  return state.cleaners.filter((cleaner) => !cleaner.archived);
+  return state.cleaners.filter((cleaner) => !isArchivedRecord(cleaner));
 }
 
 function archivedCleaners() {
-  return state.cleaners.filter((cleaner) => cleaner.archived);
+  return state.cleaners.filter((cleaner) => isArchivedRecord(cleaner));
 }
 
 function cleanerFor(job) {
@@ -2820,7 +2923,7 @@ function normalizeCostRules() {
     )
   }));
   const normalizeName = (value) => String(value || "").trim().toLowerCase();
-  const activeCleanerList = (state.cleaners || []).filter((cleaner) => !cleaner.archived);
+  const activeCleanerList = activeCleaners();
   const activeCleanerIds = new Set(activeCleanerList.map((cleaner) => cleaner.id).filter(Boolean));
   const activeCleanerNames = new Set(activeCleanerList.map((cleaner) => normalizeName(cleaner.name)));
   state.costRules.specialRules = state.costRules.specialRules.filter((rule) => {
@@ -3951,20 +4054,35 @@ async function persistPortalClientConfirmation(job) {
 }
 
 async function persistPortalClientReview(jobId, rating, text) {
-  if (!supabaseClient) return;
   if (portalPageVisible("#clientPortalPage")) {
     const { clientId, clientKey } = clientPortalCredentials();
-    const { error } = await supabaseClient.rpc("portal_client_review_job", {
-      client_id: clientId,
-      client_key: clientKey,
-      job_id: jobId,
-      p_rating: rating,
-      p_review_text: text || ""
+    let rpcError = null;
+    if (supabaseClient) {
+      const { error } = await supabaseClient.rpc("portal_client_review_job", {
+        client_id: clientId,
+        client_key: clientKey,
+        job_id: jobId,
+        p_rating: rating,
+        p_review_text: text || ""
+      });
+      if (!error) return;
+      rpcError = error;
+      console.warn("Portal review RPC failed; trying server fallback:", error);
+    }
+
+    const response = await fetch("/api/app-review", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, clientKey, jobId, rating, reviewText: text || "" })
     });
-    if (error) throw error;
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result?.ok === false) {
+      throw new Error(result?.error || rpcError?.message || t("reviewSaveError"));
+    }
     return;
   }
 
+  if (!supabaseClient) return;
   const { error } = await supabaseClient
     .from("jobs")
     .update({ client_rating: rating, client_review_text: text || "" })
@@ -7583,18 +7701,15 @@ function syncPaymentCleanerSelect(selectedName = "") {
   const select = $("#paymentCleanerSelect");
   if (!select) return;
   const names = activeCleaners().map((cleaner) => cleaner.name);
-  if (selectedName && !names.some((name) => normalizeKey(name) === normalizeKey(selectedName))) {
-    names.push(selectedName);
-  }
+  const selected = names.find((name) => normalizeKey(name) === normalizeKey(selectedName));
   select.innerHTML = names.length
     ? names.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("")
     : `<option value="">Sin limpiadores activos</option>`;
-  select.value = selectedName || names[0] || "";
+  select.value = selected || names[0] || "";
 }
 
 function paymentCleanerRecord(name = $("#paymentCleanerSelect")?.value) {
-  return activeCleaners().find((cleaner) => normalizeKey(cleaner.name) === normalizeKey(name))
-    || state.cleaners.find((cleaner) => normalizeKey(cleaner.name) === normalizeKey(name));
+  return activeCleaners().find((cleaner) => normalizeKey(cleaner.name) === normalizeKey(name));
 }
 
 function receiptPaidJobIds(exceptReceiptId = "") {
@@ -7738,13 +7853,13 @@ function deletePendingReceipt() {
 function syncClientPaymentSelect() {
   const select = $("#clientPaymentSelect");
   if (!select) return;
-  const clients = state.clients;
+  const clients = activeClients();
   select.innerHTML = clients.length
     ? clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("")
-    : `<option value="">Sin clientes registrados</option>`;
+    : `<option value="">Sin clientes activos</option>`;
   // Update avatar initial
   const avatar = $("#clientPaymentAvatar");
-  if (avatar && clients.length) avatar.textContent = clients[0].name.charAt(0).toUpperCase();
+  if (avatar) avatar.textContent = clients.length ? clients[0].name.charAt(0).toUpperCase() : "-";
 }
 
 function renderClientPaymentJobPicker() {
@@ -7752,6 +7867,13 @@ function renderClientPaymentJobPicker() {
   if (!picker) return;
   const clientId = $("#clientPaymentSelect")?.value;
   if (!clientId) { picker.innerHTML = ""; return; }
+  const activeClient = activeClients().find((client) => client.id === clientId);
+  if (!activeClient) {
+    picker.innerHTML = `<p class="muted" style="padding: 8px 0;">Selecciona un cliente activo para registrar cobros.</p>`;
+    const submitBtn = $("#clientPaymentSubmitBtn");
+    if (submitBtn) submitBtn.disabled = true;
+    return;
+  }
 
   // Jobs that are finished and not fully paid for this client
   const unpaidJobs = state.jobs.filter(j =>
@@ -7862,7 +7984,7 @@ function renderClientBalances() {
   if (!container) return;
 
   const debts = [];
-  state.clients.forEach(c => {
+  activeClients().forEach(c => {
     const jobs = state.jobs.filter(j => j.clientId === c.id && isBillableDone(j) && j.clientPaymentStatus !== "paid");
     const debt = jobs.reduce((sum, j) => sum + Math.max(0, estimateJob(j) - parseMoneyInput(j.clientPaidAmount)), 0);
     if (debt > 0) debts.push({ client: c, debt, count: jobs.length });
@@ -8104,12 +8226,6 @@ function setupDelegatedAppClicks() {
     if (openJobButton) {
       event.preventDefault();
       setView("jobs");
-      return;
-    }
-
-    if (event.target.closest(".notification-button")) {
-      event.preventDefault();
-      openRecentActivityPanel();
       return;
     }
 

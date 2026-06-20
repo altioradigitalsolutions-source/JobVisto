@@ -3082,34 +3082,6 @@ body.social-login-disabled .social-row {
   color: var(--muted);
 }
 
-.notification-button {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  border: 0;
-  border-radius: 50%;
-  color: var(--ink);
-  background: #fff;
-  box-shadow: 0 8px 22px rgba(16, 26, 28, .05);
-  font-size: 1.35rem;
-}
-
-.notification-button b {
-  position: absolute;
-  top: 2px;
-  right: 1px;
-  display: grid;
-  place-items: center;
-  min-width: 20px;
-  height: 20px;
-  border-radius: 999px;
-  color: #fff;
-  background: var(--green);
-  font-size: .72rem;
-}
-
 .user-chip {
   display: inline-flex;
   align-items: center;
@@ -5424,12 +5396,6 @@ body.social-login-disabled .social-row {
     display: inline-flex;
     align-items: center;
     gap: 10px;
-  }
-
-  .saas-mobile-head .notification-button {
-    width: 44px;
-    height: 44px;
-    box-shadow: none;
   }
 
   .mobile-plus-button {

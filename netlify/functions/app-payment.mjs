@@ -169,16 +169,50 @@ async function assertOrgAdmin(req, organizationId) {
   }
 }
 
+function restValue(value) {
+  return encodeURIComponent(String(value ?? ""));
+}
+
 async function upsertSetting(organizationId, key, value) {
-  await supabaseFetch("/rest/v1/organization_settings", {
-    method: "POST",
-    query: "?on_conflict=organization_id,key",
-    body: {
-      organization_id: organizationId,
-      key,
-      value
+  const row = {
+    organization_id: organizationId,
+    key,
+    value
+  };
+
+  try {
+    await supabaseFetch("/rest/v1/organization_settings", {
+      method: "POST",
+      query: "?on_conflict=organization_id,key",
+      body: row
+    });
+    return true;
+  } catch (upsertError) {
+    let existing = [];
+    try {
+      existing = await supabaseFetch("/rest/v1/organization_settings", {
+        query: `?organization_id=eq.${restValue(organizationId)}&key=eq.${restValue(key)}&select=id&limit=1`
+      });
+    } catch {
+      throw upsertError;
     }
-  });
+
+    const existingId = Array.isArray(existing) && existing[0]?.id;
+    if (existingId) {
+      await supabaseFetch("/rest/v1/organization_settings", {
+        method: "PATCH",
+        query: `?id=eq.${restValue(existingId)}`,
+        body: { value }
+      });
+      return true;
+    }
+
+    await supabaseFetch("/rest/v1/organization_settings", {
+      method: "POST",
+      body: row
+    });
+    return true;
+  }
 }
 
 async function persistCleanerPayment(organizationId, receipt = {}, backups = {}) {
