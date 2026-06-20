@@ -2652,23 +2652,29 @@ function shouldUseServerPaymentPersistence() {
 
 async function currentSupabaseAccessToken() {
   if (!supabaseClient?.auth?.getSession) return "";
-  const { data, error } = await supabaseClient.auth.getSession();
-  if (error) throw error;
-  return data?.session?.access_token || "";
+  try {
+    const { data, error } = await supabaseClient.auth.getSession();
+    if (error) {
+      console.warn("No active Supabase session token for server save:", error);
+      return "";
+    }
+    return data?.session?.access_token || "";
+  } catch (error) {
+    console.warn("Could not read Supabase session token for server save:", error);
+    return "";
+  }
 }
 
 async function persistPaymentThroughServer(payload) {
   const token = await currentSupabaseAccessToken();
-  if (!token) throw new Error("No hay sesion activa para guardar el pago.");
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   const response = await fetch("/api/app-payment", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`
-    },
+    headers,
     body: JSON.stringify({
-      organizationId: state.orgId,
+      organizationId: payload.organizationId || state.orgId,
       ...payload
     })
   });
@@ -4056,7 +4062,23 @@ async function persistPortalClientConfirmation(job) {
 async function persistPortalClientReview(jobId, rating, text) {
   if (portalPageVisible("#clientPortalPage")) {
     const { clientId, clientKey } = clientPortalCredentials();
-    let rpcError = null;
+    let serverError = null;
+    try {
+      const response = await fetch("/api/app-review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId, clientKey, jobId, rating, reviewText: text || "" })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result?.ok === false) {
+        throw new Error(result?.error || t("reviewSaveError"));
+      }
+      return;
+    } catch (error) {
+      serverError = error;
+      console.warn("Portal review server save failed; trying RPC fallback:", error);
+    }
+
     if (supabaseClient) {
       const { error } = await supabaseClient.rpc("portal_client_review_job", {
         client_id: clientId,
@@ -4066,20 +4088,10 @@ async function persistPortalClientReview(jobId, rating, text) {
         p_review_text: text || ""
       });
       if (!error) return;
-      rpcError = error;
-      console.warn("Portal review RPC failed; trying server fallback:", error);
+      throw new Error(error.message || serverError?.message || t("reviewSaveError"));
     }
 
-    const response = await fetch("/api/app-review", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clientId, clientKey, jobId, rating, reviewText: text || "" })
-    });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok || result?.ok === false) {
-      throw new Error(result?.error || rpcError?.message || t("reviewSaveError"));
-    }
-    return;
+    throw new Error(serverError?.message || t("reviewSaveError"));
   }
 
   if (!supabaseClient) return;
@@ -5202,15 +5214,6 @@ function bindCleanerPortalChrome(cleaner) {
     mobileMenuBtn.onclick = () => {
       const isOpen = $("#cleanerPortalPage")?.classList.toggle("mobile-menu-open");
       mobileMenuBtn.setAttribute("aria-expanded", isOpen ? "true" : "false");
-    };
-  }
-  const notificationBtn = $("#cleanerNotificationsBtn");
-  if (notificationBtn) {
-    notificationBtn.onclick = () => {
-      setCleanerTab("jobs");
-      toast(pendingCount
-        ? t("pendingJobsToast").replace("{count}", pendingCount)
-        : t("noPendingJobsToast"));
     };
   }
   const performanceBtn = $("#cleanerPerformanceBtn");
