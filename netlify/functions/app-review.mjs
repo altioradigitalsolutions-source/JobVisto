@@ -78,7 +78,6 @@ async function persistClientReview({ clientId, clientKey, jobId, rating, reviewT
   });
   const job = Array.isArray(jobs) ? jobs[0] : null;
   if (!job) throw new Error("Job not available for this client.");
-  if (job.request_review === false) throw new Error("Review was not requested for this job.");
 
   await supabaseFetch("/rest/v1/jobs", {
     method: "PATCH",
@@ -86,6 +85,7 @@ async function persistClientReview({ clientId, clientKey, jobId, rating, reviewT
     body: {
       client_rating: cleanRating,
       client_review_text: String(reviewText || "").trim() || null,
+      request_review: true,
       updated_at: new Date().toISOString()
     }
   });

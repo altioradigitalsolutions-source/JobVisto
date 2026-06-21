@@ -6,7 +6,22 @@ function mergeById(primary = [], backup = []) {
   [...(primary || []), ...(backup || [])].forEach((item) => {
     if (!item) return;
     const id = item.id || crypto.randomUUID();
-    merged.set(id, { ...item, id });
+    const existing = merged.get(id);
+    if (!existing) {
+      merged.set(id, { ...item, id });
+      return;
+    }
+    const mergedItem = { ...existing, ...item, id };
+    if (existing.status === "signed" && item.status !== "signed") {
+      mergedItem.status = "signed";
+      mergedItem.signature = existing.signature || item.signature;
+      mergedItem.receiver = existing.receiver || item.receiver;
+    }
+    if (existing.signature && !item.signature) {
+      mergedItem.signature = existing.signature;
+      mergedItem.receiver = existing.receiver || item.receiver;
+    }
+    merged.set(id, mergedItem);
   });
   return [...merged.values()].sort((a, b) =>
     String(b.createdAt || b.date || "").localeCompare(String(a.createdAt || a.date || ""))
@@ -458,6 +473,7 @@ async function asyncSaveToSupabase() {
 
     // 5. Sync cleaners
     for (const cleaner of state.cleaners) {
+      ensureCleanerPortalKey(cleaner);
       await supabaseClient.from('cleaners').upsert({
         id: cleaner.id,
         organization_id: state.orgId,
@@ -2490,8 +2506,23 @@ function applyStripePaymentReturnState() {
   $("#paymentStep")?.classList.add("hidden");
 }
 
+function localDateKey(date = new Date()) {
+  const safeDate = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(safeDate.getTime())) return localDateKey(new Date());
+  const year = safeDate.getFullYear();
+  const month = String(safeDate.getMonth() + 1).padStart(2, "0");
+  const day = String(safeDate.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function localDateFromKey(value) {
+  const [year, month, day] = String(value || "").split("-").map(Number);
+  if (!year || !month || !day) return new Date();
+  return new Date(year, month - 1, day);
+}
+
 function today() {
-  return new Date().toISOString().slice(0, 10);
+  return localDateKey();
 }
 
 function currentPeriodLabel(date = new Date()) {
@@ -2509,7 +2540,7 @@ function receiptPeriodDates(period = "", fallbackDate = new Date()) {
   const safeBase = Number.isNaN(base.getTime()) ? new Date() : base;
   const startDate = new Date(safeBase.getFullYear(), safeBase.getMonth(), 1);
   const endDate = new Date(safeBase.getFullYear(), safeBase.getMonth() + 1, 0);
-  return [startDate.toISOString().slice(0, 10), endDate.toISOString().slice(0, 10)];
+  return [localDateKey(startDate), localDateKey(endDate)];
 }
 
 function isFutureJob(job) {
@@ -2566,7 +2597,7 @@ function clearCleanerHistoryAdminPermission() {
 function addDays(days) {
   const date = new Date();
   date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
+  return localDateKey(date);
 }
 
 function saveLocalState() {
@@ -3251,7 +3282,16 @@ function cleanerPortalPassword(cleaner) {
   return cleaner?.key || `JV-${fallbackName.slice(0, 10).toUpperCase()}`;
 }
 
+function ensureCleanerPortalKey(cleaner) {
+  if (!cleaner) return "";
+  if (!String(cleaner.key || "").trim()) {
+    cleaner.key = generateCleanerPasscode(cleaner.name || "Cleaner");
+  }
+  return cleaner.key;
+}
+
 function cleanerPortalDisplayKey(cleaner) {
+  ensureCleanerPortalKey(cleaner);
   return cleanerPortalPassword(cleaner).trim();
 }
 
@@ -3472,14 +3512,14 @@ function limitText(value) {
 
 function recurringJobsPreview(payload, count, recurrence) {
   const safeCount = Math.max(1, Math.min(24, Number(count || 1)));
-  const baseDate = new Date(`${payload.date}T00:00:00`);
+  const baseDate = localDateFromKey(payload.date);
   const intervalDays = recurrence === "weekly" ? 7 : recurrence === "biweekly" ? 14 : 0;
 
   return Array.from({ length: safeCount }, (_, index) => {
     const date = new Date(baseDate);
     if (recurrence === "monthly") date.setMonth(baseDate.getMonth() + index);
     else date.setDate(baseDate.getDate() + (intervalDays * index));
-    return date.toISOString().slice(0, 10);
+    return localDateKey(date);
   });
 }
 
@@ -4141,6 +4181,16 @@ async function persistPortalReceiptSignature(receipt) {
       p_signature_data: receipt.signature
     });
     if (error) throw error;
+    try {
+      await persistPaymentThroughServer({
+        organizationId: receipt.organizationId || state.orgId,
+        type: "cleaner_payment",
+        receipt: { ...receipt, cleanerId },
+        backups: { receipts: state.receipts || [] }
+      });
+    } catch (serverError) {
+      console.warn("Receipt signature backup refresh failed after portal signature:", serverError);
+    }
     return;
   }
 
@@ -5627,7 +5677,7 @@ function renderDashboardReminders() {
   const container = $("#dashboardReminders");
   if (!container) return;
   
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = today();
   const reminders = state.clients.filter(c => c.followUpDate && c.followUpDate <= todayStr);
   
   // Calculate debts
@@ -6307,7 +6357,7 @@ function resetJobForm() {
 
 function addRecurringJobs(payload, count, recurrence) {
   const safeCount = Math.max(1, Math.min(24, Number(count || 1)));
-  const baseDate = new Date(`${payload.date}T00:00:00`);
+  const baseDate = localDateFromKey(payload.date);
   const intervalDays = recurrence === "weekly" ? 7 : recurrence === "biweekly" ? 14 : 0;
 
   return Array.from({ length: safeCount }, (_, index) => {
@@ -6318,7 +6368,7 @@ function addRecurringJobs(payload, count, recurrence) {
     return {
       ...payload,
       id: index === 0 ? payload.id : safeId(),
-      date: date.toISOString().slice(0, 10),
+      date: localDateKey(date),
       recurrence: recurrence || "",
       seriesId: payload.seriesId || payload.id,
       status: payload.status || (payload.cleanerId ? "Asignado" : "Disponible para tomar"),
@@ -6456,7 +6506,12 @@ function renderCleaners() {
     button.addEventListener("click", () => restoreCleaner(button.dataset.restoreCleaner));
   });
   $$("[data-open-cleaner-portal]").forEach((button) => {
-    button.addEventListener("click", () => window.open(localCleanerPortalUrl(state.cleaners.find((item) => item.id === button.dataset.openCleanerPortal)), "_blank"));
+    button.addEventListener("click", () => {
+      const cleaner = state.cleaners.find((item) => item.id === button.dataset.openCleanerPortal);
+      ensureCleanerPortalKey(cleaner);
+      save();
+      window.open(localCleanerPortalUrl(cleaner), "_blank");
+    });
   });
 }
 
@@ -6509,6 +6564,8 @@ function territoryHtml(records, label) {
 async function copyCleanerLink(cleanerId) {
   const cleaner = state.cleaners.find((item) => item.id === cleanerId);
   if (!cleaner) return;
+  ensureCleanerPortalKey(cleaner);
+  save();
   const text = `${localCleanerPortalUrl(cleaner)}\nClave: ${cleanerPortalDisplayKey(cleaner)}`;
   try {
     await navigator.clipboard.writeText(text);
@@ -6521,6 +6578,8 @@ async function copyCleanerLink(cleanerId) {
 async function copyCleanerKey(cleanerId) {
   const cleaner = state.cleaners.find((item) => item.id === cleanerId);
   if (!cleaner) return;
+  ensureCleanerPortalKey(cleaner);
+  save();
   const text = cleanerPortalDisplayKey(cleaner);
   try {
     await navigator.clipboard.writeText(text);
@@ -6706,7 +6765,7 @@ function renderCalendar() {
   const cells = Array.from({ length: 42 }, (_, index) => {
     const date = new Date(start);
     date.setDate(start.getDate() + index);
-    const key = date.toISOString().slice(0, 10);
+    const key = localDateKey(date);
     const dayJobs = state.jobs.filter((job) => job.date === key);
     const outside = date.getMonth() !== month;
     const isToday = key === today();
@@ -8871,13 +8930,13 @@ function setupEvents() {
         if (remainingToCover >= owe) {
           job.clientPaidAmount = jobCost;
           job.clientPaymentStatus = "paid";
-          job.clientPaidDate = new Date().toISOString().split('T')[0];
+          job.clientPaidDate = today();
           job.clientPaymentMethod = data.method;
           remainingToCover = roundMoney(remainingToCover - owe);
         } else if (remainingToCover > 0) {
           job.clientPaidAmount = roundMoney(alreadyPaid + remainingToCover);
           job.clientPaymentStatus = "partial";
-          job.clientPaidDate = new Date().toISOString().split('T')[0];
+          job.clientPaidDate = today();
           job.clientPaymentMethod = data.method;
           remainingToCover = 0;
         }

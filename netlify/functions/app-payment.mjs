@@ -34,6 +34,15 @@ function receiptStatus(value) {
   return String(value || "").toLowerCase() === "signed" ? "signed" : "draft";
 }
 
+function localDateKey(date = new Date()) {
+  const safeDate = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(safeDate.getTime())) return localDateKey(new Date());
+  const year = safeDate.getFullYear();
+  const month = String(safeDate.getMonth() + 1).padStart(2, "0");
+  const day = String(safeDate.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function periodDates(period = "", fallbackDate = new Date()) {
   if (String(period).includes(" - ")) {
     const [start, end] = String(period).split(" - ");
@@ -45,7 +54,7 @@ function periodDates(period = "", fallbackDate = new Date()) {
   const safeBase = Number.isNaN(base.getTime()) ? new Date() : base;
   const start = new Date(safeBase.getFullYear(), safeBase.getMonth(), 1);
   const end = new Date(safeBase.getFullYear(), safeBase.getMonth() + 1, 0);
-  return [start.toISOString().slice(0, 10), end.toISOString().slice(0, 10)];
+  return [localDateKey(start), localDateKey(end)];
 }
 
 async function supabaseFetch(path, { method = "GET", body, query = "" } = {}) {
