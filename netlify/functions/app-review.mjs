@@ -27,6 +27,13 @@ function clientPortalKeyMatches(client = {}, key = "") {
   return expected && expected === normalizeKey(key);
 }
 
+function optionalRating(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < 1 || number > 5) return null;
+  return number;
+}
+
 async function supabaseFetch(path, { method = "GET", body, query = "" } = {}) {
   const supabaseUrl = env("SUPABASE_URL");
   const serviceRoleKey = env("SUPABASE_SERVICE_ROLE_KEY");
@@ -60,7 +67,7 @@ async function supabaseFetch(path, { method = "GET", body, query = "" } = {}) {
   return data;
 }
 
-async function persistClientReview({ clientId, clientKey, jobId, rating, reviewText }) {
+async function persistClientReview({ clientId, clientKey, jobId, rating, reviewText, cleanerFeedback = {} }) {
   const cleanRating = Number(rating);
   if (!clientId || !clientKey || !jobId) throw new Error("Missing portal review data.");
   if (!Number.isInteger(cleanRating) || cleanRating < 1 || cleanRating > 5) {
@@ -79,16 +86,35 @@ async function persistClientReview({ clientId, clientKey, jobId, rating, reviewT
   const job = Array.isArray(jobs) ? jobs[0] : null;
   if (!job) throw new Error("Job not available for this client.");
 
-  await supabaseFetch("/rest/v1/jobs", {
-    method: "PATCH",
-    query: `?id=eq.${restValue(job.id)}`,
-    body: {
-      client_rating: cleanRating,
-      client_review_text: String(reviewText || "").trim() || null,
-      request_review: true,
-      updated_at: new Date().toISOString()
-    }
-  });
+  const baseBody = {
+    client_rating: cleanRating,
+    client_review_text: String(reviewText || "").trim() || null,
+    request_review: true,
+    updated_at: new Date().toISOString()
+  };
+  const qualityBody = {
+    ...baseBody,
+    cleaner_quality_rating: optionalRating(cleanerFeedback.qualityRating),
+    cleaner_punctuality_rating: optionalRating(cleanerFeedback.punctualityRating),
+    cleaner_professionalism_rating: optionalRating(cleanerFeedback.professionalismRating),
+    cleaner_quality_text: String(cleanerFeedback.qualityText || "").trim() || null,
+    cleaner_recommended: typeof cleanerFeedback.recommended === "boolean" ? cleanerFeedback.recommended : null
+  };
+
+  try {
+    await supabaseFetch("/rest/v1/jobs", {
+      method: "PATCH",
+      query: `?id=eq.${restValue(job.id)}`,
+      body: qualityBody
+    });
+  } catch (error) {
+    if (!String(error.message || "").includes("cleaner_")) throw error;
+    await supabaseFetch("/rest/v1/jobs", {
+      method: "PATCH",
+      query: `?id=eq.${restValue(job.id)}`,
+      body: baseBody
+    });
+  }
 }
 
 export default async (req) => {

@@ -235,6 +235,11 @@ async function loadStateFromSupabase(currentUser = null) {
             requestReview: Boolean(j.request_review),
             clientRating: j.client_rating ? Number(j.client_rating) : null,
             clientReviewText: j.client_review_text || "",
+            cleanerQualityRating: j.cleaner_quality_rating ? Number(j.cleaner_quality_rating) : null,
+            cleanerPunctualityRating: j.cleaner_punctuality_rating ? Number(j.cleaner_punctuality_rating) : null,
+            cleanerProfessionalismRating: j.cleaner_professionalism_rating ? Number(j.cleaner_professionalism_rating) : null,
+            cleanerQualityText: j.cleaner_quality_text || "",
+            cleanerRecommended: typeof j.cleaner_recommended === "boolean" ? j.cleaner_recommended : null,
             clientPaidAmount: Number(j.client_paid_amount || 0),
             clientPaymentStatus: j.client_payment_status || "unpaid",
             clientPaidDate: j.client_paid_date || "",
@@ -898,7 +903,7 @@ const stripePaymentLinksTest = {
 const stripePaymentLinks = stripePaymentLinksLive;
 
 const demoAccounts = {
-  "admin@jobvisto.com": {
+  "jobvisto@zohomail.com": {
     mode: "company",
     name: "Altiora Cleaning",
     plan: "pro",
@@ -4099,7 +4104,7 @@ async function persistPortalClientConfirmation(job) {
   });
 }
 
-async function persistPortalClientReview(jobId, rating, text) {
+async function persistPortalClientReview(jobId, rating, text, cleanerFeedback = {}) {
   if (portalPageVisible("#clientPortalPage")) {
     const { clientId, clientKey } = clientPortalCredentials();
     let serverError = null;
@@ -4107,7 +4112,7 @@ async function persistPortalClientReview(jobId, rating, text) {
       const response = await fetch("/api/app-review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, clientKey, jobId, rating, reviewText: text || "" })
+        body: JSON.stringify({ clientId, clientKey, jobId, rating, reviewText: text || "", cleanerFeedback })
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || result?.ok === false) {
@@ -4125,7 +4130,12 @@ async function persistPortalClientReview(jobId, rating, text) {
         client_key: clientKey,
         job_id: jobId,
         p_rating: rating,
-        p_review_text: text || ""
+        p_review_text: text || "",
+        p_cleaner_quality_rating: cleanerFeedback.qualityRating || null,
+        p_cleaner_punctuality_rating: cleanerFeedback.punctualityRating || null,
+        p_cleaner_professionalism_rating: cleanerFeedback.professionalismRating || null,
+        p_cleaner_quality_text: cleanerFeedback.qualityText || "",
+        p_cleaner_recommended: typeof cleanerFeedback.recommended === "boolean" ? cleanerFeedback.recommended : null
       });
       if (!error) return;
       throw new Error(error.message || serverError?.message || t("reviewSaveError"));
@@ -4137,7 +4147,15 @@ async function persistPortalClientReview(jobId, rating, text) {
   if (!supabaseClient) return;
   const { error } = await supabaseClient
     .from("jobs")
-    .update({ client_rating: rating, client_review_text: text || "" })
+    .update({
+      client_rating: rating,
+      client_review_text: text || "",
+      cleaner_quality_rating: cleanerFeedback.qualityRating || null,
+      cleaner_punctuality_rating: cleanerFeedback.punctualityRating || null,
+      cleaner_professionalism_rating: cleanerFeedback.professionalismRating || null,
+      cleaner_quality_text: cleanerFeedback.qualityText || null,
+      cleaner_recommended: typeof cleanerFeedback.recommended === "boolean" ? cleanerFeedback.recommended : null
+    })
     .eq("id", jobId);
   if (error) throw error;
 }
@@ -4420,6 +4438,11 @@ async function enterClientPortalFromUrl(params = new URLSearchParams(location.se
             requestReview: Boolean(j.request_review),
             clientRating: j.client_rating ? Number(j.client_rating) : null,
             clientReviewText: j.client_review_text || "",
+            cleanerQualityRating: j.cleaner_quality_rating ? Number(j.cleaner_quality_rating) : null,
+            cleanerPunctualityRating: j.cleaner_punctuality_rating ? Number(j.cleaner_punctuality_rating) : null,
+            cleanerProfessionalismRating: j.cleaner_professionalism_rating ? Number(j.cleaner_professionalism_rating) : null,
+            cleanerQualityText: j.cleaner_quality_text || "",
+            cleanerRecommended: typeof j.cleaner_recommended === "boolean" ? j.cleaner_recommended : null,
             clientPaidAmount: Number(j.client_paid_amount || 0),
             clientPaymentStatus: j.client_payment_status || "unpaid",
             clientPaidDate: j.client_paid_date || "",
@@ -4547,6 +4570,11 @@ async function enterCleanerPortalFromUrl(params = new URLSearchParams(location.s
             requestReview: Boolean(j.request_review),
             clientRating: j.client_rating ? Number(j.client_rating) : null,
             clientReviewText: j.client_review_text || "",
+            cleanerQualityRating: j.cleaner_quality_rating ? Number(j.cleaner_quality_rating) : null,
+            cleanerPunctualityRating: j.cleaner_punctuality_rating ? Number(j.cleaner_punctuality_rating) : null,
+            cleanerProfessionalismRating: j.cleaner_professionalism_rating ? Number(j.cleaner_professionalism_rating) : null,
+            cleanerQualityText: j.cleaner_quality_text || "",
+            cleanerRecommended: typeof j.cleaner_recommended === "boolean" ? j.cleaner_recommended : null,
             clientPaidAmount: Number(j.client_paid_amount || 0),
             clientPaymentStatus: j.client_payment_status || "unpaid",
             clientPaidDate: j.client_paid_date || "",
@@ -5646,6 +5674,7 @@ function renderAll() {
   renderCalendar();
   renderMobile();
   renderClientLinks();
+  renderAutomaticNotifications();
   renderReports();
   renderPayments();
   renderSettings();
@@ -5724,6 +5753,128 @@ function renderDashboardReminders() {
   container.innerHTML = html;
 }
 
+function notificationTemplates() {
+  return [
+    { key: "confirmation", title: "Confirmacion de cita", trigger: "Al crear o actualizar un trabajo", audience: "Cliente", channel: "WhatsApp / SMS / Email", copy: "Hola {cliente}, tu servicio de limpieza queda confirmado para {fecha} a las {hora}." },
+    { key: "tomorrow", title: "Recordatorio de manana", trigger: "24 horas antes del servicio", audience: "Cliente", channel: "WhatsApp / SMS", copy: "Recordatorio: manana tienes un servicio con {empresa}. Hora estimada: {hora}." },
+    { key: "work-order", title: "Orden para el cleaner", trigger: "La noche anterior o manana temprano", audience: "Cleaner", channel: "Portal / WhatsApp", copy: "{cleaner}, manana tienes trabajo con {cliente}. Revisa direccion, hora y checklist." },
+    { key: "on-way", title: "Cleaner en camino", trigger: "Cuando el cleaner toca 'voy en camino'", audience: "Cliente", channel: "WhatsApp / SMS", copy: "{cleaner} ya va en camino para tu servicio de JobVisto." },
+    { key: "arrived", title: "Cleaner llego", trigger: "Cuando marca llegada", audience: "Cliente / Admin", channel: "Portal / WhatsApp", copy: "{cleaner} ya llego y el trabajo esta iniciando." },
+    { key: "finished", title: "Trabajo terminado", trigger: "Cuando el cleaner finaliza", audience: "Cliente", channel: "WhatsApp / Email", copy: "Tu servicio fue marcado como terminado. Puedes revisar evidencia y dejar feedback." },
+    { key: "review", title: "Solicitud de review", trigger: "Despues de terminar el servicio", audience: "Cliente", channel: "Portal / WhatsApp", copy: "Como fue el servicio? Tu opinion ayuda a mejorar la calidad del equipo." }
+  ];
+}
+
+function jobNotificationContext(job) {
+  const client = clientFor(job);
+  const cleaner = state.cleaners.find((item) => item.id === job.cleanerId);
+  return {
+    cliente: client?.name || "Cliente",
+    cleanerName: cleaner?.name || "Cleaner por asignar",
+    empresa: state.companyProfile?.businessName || "JobVisto",
+    fecha: job.date || "sin fecha",
+    hora: job.start || "por definir"
+  };
+}
+
+function fillNotificationTemplate(copy, context) {
+  return String(copy || "")
+    .replaceAll("{cliente}", context.cliente)
+    .replaceAll("{cleaner}", context.cleanerName)
+    .replaceAll("{empresa}", context.empresa)
+    .replaceAll("{fecha}", context.fecha)
+    .replaceAll("{hora}", context.hora);
+}
+
+function daysUntilJob(job) {
+  if (!job?.date) return 999;
+  return Math.round((localDateFromKey(job.date) - localDateFromKey(today())) / (1000 * 60 * 60 * 24));
+}
+
+function notificationStatusFor(job, templateKey) {
+  if (templateKey === "confirmation") return "scheduled";
+  if (templateKey === "tomorrow") return daysUntilJob(job) <= 1 && daysUntilJob(job) >= 0 ? "ready" : "scheduled";
+  if (templateKey === "work-order") return job.cleanerId ? "ready" : "waiting";
+  if (templateKey === "on-way") return job.cleanerOnWayAt ? "sent" : job.cleanerId ? "waiting" : "blocked";
+  if (templateKey === "arrived") return job.checkedIn ? "sent" : "waiting";
+  if (templateKey === "finished") return isDone(job) ? "sent" : "waiting";
+  if (templateKey === "review") return isDone(job) && job.requestReview ? "ready" : "waiting";
+  return "scheduled";
+}
+
+function notificationStatusLabel(status) {
+  return { sent: "Enviado", ready: "Listo", scheduled: "Programado", waiting: "Esperando evento", blocked: "Falta asignacion" }[status] || "Programado";
+}
+
+function notificationStatusClass(status) {
+  return status === "sent" ? "dark" : status === "ready" ? "green" : status === "blocked" ? "danger" : "gold";
+}
+
+function notificationEventsForJob(job) {
+  const context = jobNotificationContext(job);
+  return notificationTemplates().map((template) => ({
+    ...template,
+    job,
+    context,
+    status: notificationStatusFor(job, template.key),
+    message: fillNotificationTemplate(template.copy, context)
+  }));
+}
+
+function renderAutomaticNotifications() {
+  if (!$("#notificationsView")) return;
+  const templates = notificationTemplates();
+  const visibleJobs = [...state.jobs]
+    .filter((job) => job.date >= today() || isDone(job))
+    .sort((a, b) => `${a.date || ""} ${a.start || ""}`.localeCompare(`${b.date || ""} ${b.start || ""}`))
+    .slice(0, 8);
+  const events = visibleJobs.flatMap(notificationEventsForJob);
+  const ready = events.filter((event) => event.status === "ready").length;
+  const sent = events.filter((event) => event.status === "sent").length;
+  const waiting = events.filter((event) => event.status === "waiting" || event.status === "scheduled").length;
+
+  $("#notificationKpis").innerHTML = `
+    <article><span>Plantillas</span><strong>${templates.length}</strong><small>preparadas para automatizar</small></article>
+    <article><span>Listas ahora</span><strong>${ready}</strong><small>se enviarian al activar integraciones</small></article>
+    <article><span>Eventos enviados</span><strong>${sent}</strong><small>segun estado del trabajo</small></article>
+    <article><span>En espera</span><strong>${waiting}</strong><small>dependen de fecha o accion del cleaner</small></article>
+  `;
+
+  $("#notificationFlow").innerHTML = templates.map((template, index) => `
+    <article class="notification-flow-step">
+      <span>${index + 1}</span>
+      <div><strong>${template.title}</strong><small>${template.trigger}</small></div>
+    </article>
+  `).join("");
+
+  $("#notificationTemplates").innerHTML = templates.map((template) => `
+    <article class="notification-template-card">
+      <div><strong>${template.title}</strong><span>${template.audience} - ${template.channel}</span></div>
+      <p>${template.copy}</p>
+    </article>
+  `).join("");
+
+  $("#notificationTimeline").innerHTML = visibleJobs.length ? visibleJobs.map((job) => {
+    const context = jobNotificationContext(job);
+    return `
+      <article class="notification-job-card">
+        <div class="notification-job-head">
+          <div><strong>${escapeHtml(context.cliente)} - ${escapeHtml(job.date || "")}</strong><span>${escapeHtml(job.start || "")} - ${escapeHtml(context.cleanerName)} - ${escapeHtml(jobStatusLabel(job))}</span></div>
+          <span class="status-chip">${escapeHtml(job.serviceType || "Servicio")}</span>
+        </div>
+        <div class="notification-event-list">
+          ${notificationEventsForJob(job).map((event) => `
+            <div class="notification-event">
+              <span class="badge ${notificationStatusClass(event.status)}">${notificationStatusLabel(event.status)}</span>
+              <div><strong>${event.title}</strong><small>${event.message}</small></div>
+            </div>
+          `).join("")}
+        </div>
+      </article>
+    `;
+  }).join("") : "<p class='muted'>Crea trabajos para ver la simulacion de notificaciones automaticas.</p>";
+}
+
 function renderMetrics() {
   renderDashboardReminders();
   const monthJobs = state.jobs.filter(isCurrentMonth);
@@ -5770,7 +5921,7 @@ function renderMetrics() {
 }
 
 function viewTitle(name) {
-  const titles = { dashboard: t("dashboard"), clients: t("clients"), cleaners: t("cleaners"), calendar: t("calendar"), jobs: t("jobs"), mobile: "Simulator", clientLinks: t("clientLinks"), reports: t("reports"), payments: t("payments"), settings: t("settings") };
+  const titles = { dashboard: t("dashboard"), clients: t("clients"), cleaners: t("cleaners"), calendar: t("calendar"), jobs: t("jobs"), mobile: "Simulator", clientLinks: t("clientLinks"), notifications: "Notificaciones", reports: t("reports"), payments: t("payments"), settings: t("settings") };
   return titles[name] || t("dashboard");
 }
 
@@ -7180,6 +7331,7 @@ function clientReviewHtml(job) {
       <h2 style="color: var(--gold);">${t("reviewQuestion").replace("{date}", job.date)}</h2>
       <p>${t("reviewCopy")}</p>
       <form onsubmit="submitClientReview(event, '${job.id}')" style="display: flex; flex-direction: column; gap: 10px; margin-top: 12px;">
+        <p class="muted" style="margin:0;">Calificacion general del servicio</p>
         <div class="star-rating-input" style="font-size: 2.5rem; color: #ccc; cursor: pointer; display: flex; gap: 8px; justify-content: center;">
           <span onclick="setReviewRating('${job.id}', 1)" id="star_${job.id}_1">★</span>
           <span onclick="setReviewRating('${job.id}', 2)" id="star_${job.id}_2">★</span>
@@ -7189,6 +7341,50 @@ function clientReviewHtml(job) {
         </div>
         <input type="hidden" name="rating" id="reviewRating_${job.id}" value="0" required>
         <textarea name="reviewText" placeholder="${t("reviewPlaceholder")}" rows="3" style="width: 100%; border-radius: 6px; border: 1px solid var(--border-color); padding: 8px; font-family: inherit; resize: vertical;"></textarea>
+        <div class="cleaner-quality-form" style="background: var(--surface-2); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: grid; gap: 10px; text-align: left;">
+          <strong>Feedback interno del cleaner</strong>
+          <small class="muted">Esto ayuda a la empresa a controlar calidad. No se publica.</small>
+          <label>Limpieza realizada
+            <select name="cleanerQualityRating">
+              <option value="">Sin calificar</option>
+              <option value="5">5 - Excelente</option>
+              <option value="4">4 - Buena</option>
+              <option value="3">3 - Regular</option>
+              <option value="2">2 - Mala</option>
+              <option value="1">1 - Muy mala</option>
+            </select>
+          </label>
+          <label>Puntualidad
+            <select name="cleanerPunctualityRating">
+              <option value="">Sin calificar</option>
+              <option value="5">5 - Muy puntual</option>
+              <option value="4">4 - Bien</option>
+              <option value="3">3 - Regular</option>
+              <option value="2">2 - Tarde</option>
+              <option value="1">1 - Muy tarde</option>
+            </select>
+          </label>
+          <label>Trato profesional
+            <select name="cleanerProfessionalismRating">
+              <option value="">Sin calificar</option>
+              <option value="5">5 - Excelente</option>
+              <option value="4">4 - Bueno</option>
+              <option value="3">3 - Regular</option>
+              <option value="2">2 - Malo</option>
+              <option value="1">1 - Muy malo</option>
+            </select>
+          </label>
+          <label>Comentario sobre el cleaner
+            <textarea name="cleanerQualityText" rows="2" placeholder="Ej: llego tarde, dejo detalles, fue muy amable..." style="width: 100%; border-radius: 6px; border: 1px solid var(--border-color); padding: 8px; font-family: inherit; resize: vertical;"></textarea>
+          </label>
+          <label>Lo recomendarias otra vez?
+            <select name="cleanerRecommended">
+              <option value="">Sin responder</option>
+              <option value="yes">Si</option>
+              <option value="no">No</option>
+            </select>
+          </label>
+        </div>
         <button type="submit" class="primary" style="background: var(--gold); border: none; color: black; font-weight: bold; margin-top: 8px;">${t("sendReview")}</button>
       </form>
     </section>
@@ -7212,6 +7408,13 @@ window.submitClientReview = async function(event, jobId) {
   const formData = new FormData(form);
   const rating = parseInt(formData.get("rating"), 10);
   const text = formData.get("reviewText");
+  const cleanerFeedback = {
+    qualityRating: Number(formData.get("cleanerQualityRating") || 0) || null,
+    punctualityRating: Number(formData.get("cleanerPunctualityRating") || 0) || null,
+    professionalismRating: Number(formData.get("cleanerProfessionalismRating") || 0) || null,
+    qualityText: String(formData.get("cleanerQualityText") || "").trim(),
+    recommended: formData.get("cleanerRecommended") === "yes" ? true : formData.get("cleanerRecommended") === "no" ? false : null
+  };
   
   if (!rating || rating < 1 || rating > 5) {
     alert("Por favor selecciona una calificación de estrellas.");
@@ -7226,13 +7429,18 @@ window.submitClientReview = async function(event, jobId) {
   
   try {
     if (supabaseClient) {
-      await withTimeout(persistPortalClientReview(jobId, rating, text), 15000, t("reviewSaveError"));
+      await withTimeout(persistPortalClientReview(jobId, rating, text, cleanerFeedback), 15000, t("reviewSaveError"));
     }
 
     const job = state.jobs.find(j => j.id === jobId);
     if (job) {
       job.clientRating = rating;
       job.clientReviewText = text;
+      job.cleanerQualityRating = cleanerFeedback.qualityRating;
+      job.cleanerPunctualityRating = cleanerFeedback.punctualityRating;
+      job.cleanerProfessionalismRating = cleanerFeedback.professionalismRating;
+      job.cleanerQualityText = cleanerFeedback.qualityText;
+      job.cleanerRecommended = cleanerFeedback.recommended;
       save();
     }
 
@@ -7369,6 +7577,47 @@ function bindPhotoActions(canDelete = false) {
   });
 }
 
+function cleanerQualityScores(job) {
+  return [job.cleanerQualityRating, job.cleanerPunctualityRating, job.cleanerProfessionalismRating]
+    .map(Number)
+    .filter((score) => Number.isFinite(score) && score >= 1 && score <= 5);
+}
+
+function cleanerQualityAverage(job) {
+  const scores = cleanerQualityScores(job);
+  if (!scores.length) return null;
+  return scores.reduce((sum, score) => sum + score, 0) / scores.length;
+}
+
+function cleanerQualityReportHtml(jobs = state.jobs) {
+  const rows = activeCleaners().map((cleaner) => {
+    const cleanerJobs = jobs.filter((job) => job.cleanerId === cleaner.id && cleanerQualityAverage(job));
+    const allScores = cleanerJobs.flatMap(cleanerQualityScores);
+    const average = allScores.length ? allScores.reduce((sum, score) => sum + score, 0) / allScores.length : null;
+    const lowJobs = cleanerJobs.filter((job) => cleanerQualityAverage(job) < 3.5 || job.cleanerRecommended === false);
+    const latestCommentJob = [...cleanerJobs].reverse().find((job) => job.cleanerQualityText);
+    return { cleaner, jobs: cleanerJobs, average, lowJobs, latestCommentJob };
+  }).filter((row) => row.jobs.length);
+
+  if (!rows.length) {
+    return "<p class='muted'>Todavia no hay feedback interno de cleaners. Aparecera cuando los clientes completen la reseña del servicio.</p>";
+  }
+
+  return rows
+    .sort((a, b) => (a.average ?? 0) - (b.average ?? 0))
+    .map(({ cleaner, jobs, average, lowJobs, latestCommentJob }) => {
+      const alertLabel = lowJobs.length ? `${lowJobs.length} alerta${lowJobs.length === 1 ? "" : "s"}` : "Sin alertas";
+      const alertClass = lowJobs.length ? "gold" : "dark";
+      const comment = latestCommentJob?.cleanerQualityText ? ` - "${escapeHtml(latestCommentJob.cleanerQualityText)}"` : "";
+      return `
+        <div class="report-line">
+          <span>${escapeHtml(cleaner.name)}<small>${jobs.length} feedback${jobs.length === 1 ? "" : "s"}${comment}</small></span>
+          <strong>${average.toFixed(1)}/5 <em class="badge ${alertClass}">${alertLabel}</em></strong>
+        </div>
+      `;
+    }).join("");
+}
+
 function renderReports() {
   const reportJobs = state.jobs.filter(isCurrentMonth);
   const billableJobs = reportJobs.filter(isBillableDone);
@@ -7452,6 +7701,8 @@ function renderReports() {
     <div class="report-line"><span>Trabajos registrados sin contabilizar</span><strong>${registeredJobs.length}</strong></div>
     <div class="report-line"><span>Horas realizadas</span><strong>${totalHours.toFixed(1)}h</strong></div>
   `;
+  const cleanerQualityReport = $("#cleanerQualityReport");
+  if (cleanerQualityReport) cleanerQualityReport.innerHTML = cleanerQualityReportHtml(reportJobs);
 }
 
 function renderSettings() {

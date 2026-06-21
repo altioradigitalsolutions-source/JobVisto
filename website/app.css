@@ -13,6 +13,154 @@
   --shadow: 0 20px 60px rgba(16, 26, 28, 0.08);
 }
 
+/* Automatic notifications simulation */
+#notificationsView {
+  display: none;
+  gap: 18px;
+}
+
+#notificationsView.active {
+  display: grid;
+}
+
+.notifications-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(29, 209, 121, 0.12), rgba(10, 80, 75, 0.08));
+  border: 1px solid var(--border-color);
+}
+
+.notifications-hero h3 {
+  margin: 0;
+  font-size: 1.7rem;
+}
+
+.notification-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.notification-kpis article {
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 14px;
+  display: grid;
+  gap: 5px;
+}
+
+.notification-kpis span,
+.notification-template-card span,
+.notification-job-head span,
+.notification-event small,
+.notification-flow-step small {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.notification-kpis strong {
+  font-size: 1.8rem;
+  color: var(--ink);
+}
+
+.notifications-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 16px;
+}
+
+.notification-flow,
+.notification-template-list,
+.notification-timeline,
+.notification-event-list {
+  display: grid;
+  gap: 10px;
+}
+
+.notification-flow-step,
+.notification-template-card,
+.notification-job-card,
+.notification-event {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.notification-flow-step {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+}
+
+.notification-flow-step > span {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--green);
+  color: white;
+  font-weight: 700;
+}
+
+.notification-template-card {
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.notification-template-card div,
+.notification-job-head,
+.notification-event {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.notification-template-card p {
+  margin: 0;
+  color: var(--ink);
+}
+
+.notification-job-card {
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.notification-event {
+  padding: 10px;
+  background: var(--surface);
+}
+
+.notification-event div,
+.notification-job-head div {
+  display: grid;
+  gap: 3px;
+}
+
+@media (max-width: 900px) {
+  .notifications-hero,
+  .notification-template-card div,
+  .notification-job-head,
+  .notification-event {
+    flex-direction: column;
+  }
+
+  .notification-kpis,
+  .notifications-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 * { box-sizing: border-box; }
 body {
   margin: 0;

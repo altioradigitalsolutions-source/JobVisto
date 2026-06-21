@@ -30,7 +30,7 @@ Incluye:
 
 ## Para instalar en la cuenta real de Supabase
 
-1. Crear un proyecto Supabase en la cuenta de `meir.meiras1@gmail.com`.
+1. Crear un proyecto Supabase en la cuenta oficial de `jobvisto@zohomail.com`.
 2. Instalar o abrir Supabase CLI.
 3. Iniciar sesion:
 

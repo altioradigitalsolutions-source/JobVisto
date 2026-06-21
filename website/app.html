@@ -198,6 +198,7 @@
           <button data-view="calendar"><i data-icon="calendar"></i> <span data-i18n="calendar">Calendar</span></button>
           <button data-view="jobs"><i data-icon="briefcase"></i> <span data-i18n="jobs">Jobs</span></button>
           <button data-view="clientLinks"><i data-icon="link"></i> <span data-i18n="clientLinks">Client links</span></button>
+          <button data-view="notifications"><i data-icon="bell"></i> <span>Notificaciones</span></button>
           <button data-view="reports"><i data-icon="chart"></i> <span data-i18n="reports">Reports</span></button>
           <button data-view="payments"><i data-icon="receipt"></i> <span data-i18n="payments">Payments</span></button>
           <button data-view="settings"><i data-icon="settings"></i> <span data-i18n="settings">Settings</span></button>
@@ -684,6 +685,32 @@
           </div>
         </section>
 
+        <section class="view" id="notificationsView">
+          <div class="notifications-hero">
+            <div>
+              <p class="eyebrow">Automatizacion</p>
+              <h3>Notificaciones automaticas</h3>
+              <p class="muted">Vista simulada de mensajes para confirmar servicios, recordar citas y avisar el progreso del cleaner.</p>
+            </div>
+            <span class="status-chip">Simulado</span>
+          </div>
+          <div class="notification-kpis" id="notificationKpis"></div>
+          <div class="notifications-grid">
+            <section class="panel">
+              <div class="panel-head"><h3>Flujo automatico</h3><span class="status-chip">Cliente + cleaner</span></div>
+              <div class="notification-flow" id="notificationFlow"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h3>Plantillas</h3><span class="status-chip">Preparadas</span></div>
+              <div class="notification-template-list" id="notificationTemplates"></div>
+            </section>
+          </div>
+          <section class="panel">
+            <div class="panel-head"><h3>Linea de tiempo simulada</h3><span class="status-chip">Proximos trabajos</span></div>
+            <div class="notification-timeline" id="notificationTimeline"></div>
+          </section>
+        </section>
+
         <section class="view" id="reportsView">
           <div class="reports-page-head">
             <div>
@@ -731,6 +758,11 @@
             <section class="panel">
               <h3>Consolidado</h3>
               <div class="report-lines" id="reportLines"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head"><h3>Calidad de cleaners</h3><span class="status-chip">Interno</span></div>
+              <p class="muted">Feedback privado de clientes para detectar excelencia, alertas y necesidad de entrenamiento.</p>
+              <div class="report-lines" id="cleanerQualityReport"></div>
             </section>
             <section class="panel report-trend-card">
               <div class="panel-head"><h3>Tendencia de ingresos</h3><span class="status-chip">Últimos 7 días</span></div>
@@ -1138,6 +1170,10 @@
             <button class="more-grid-item" data-more-view="clientLinks" type="button">
               <span class="more-grid-icon">🔗</span>
               <strong>Links Clientes</strong>
+            </button>
+            <button class="more-grid-item" data-more-view="notifications" type="button">
+              <span class="more-grid-icon">*</span>
+              <strong>Notificaciones</strong>
             </button>
             <button class="more-grid-item" data-more-view="reports" type="button">
               <span class="more-grid-icon">📊</span>
