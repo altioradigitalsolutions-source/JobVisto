@@ -2,6 +2,9 @@
   publish = "website"
   functions = "netlify/functions"
 
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = "EMAIL_FROM,EMAIL_REPLY_TO"
+
 [[redirects]]
   from = "/app"
   to = "/app.html"
