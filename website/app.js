@@ -808,7 +808,7 @@ async function saveJobsCritical(jobsToSave) {
   ensureValidUuids();
 
   const jobs = Array.isArray(jobsToSave) ? jobsToSave : [jobsToSave];
-  if (shouldUseServerPaymentPersistence()) {
+  if (window.JOBVISTO_USE_SERVER_JOB_SAVE === true) {
     try {
       await persistJobsThroughServer(jobs);
       return;
@@ -4485,7 +4485,7 @@ function enterApp(mode) {
     state.user.name = state.companyProfile.ownerName || state.user.name || state.user.email?.split('@')[0] || "Usuario";
     state.user.plan = selectedPlan || "free";
   }
-  save();
+  saveLocalState();
   $("#authScreen").classList.add("hidden");
   $("#appShell").classList.remove("hidden");
   resetIdleTime(true);
