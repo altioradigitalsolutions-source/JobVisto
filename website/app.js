@@ -3779,6 +3779,7 @@ function clientHistoryTimelineHtml(historyJobs, currentJob) {
                         ${"★".repeat(job.clientRating)}${"☆".repeat(5 - job.clientRating)}
                       </div>
                       <p style="margin: 0; font-size: 0.85rem; color: #557067; font-style: italic;">"${escapeHtml(job.clientReviewText || t("noComment"))}"</p>
+                      ${cleanerFeedbackPromptHtml(job)}
                     </div>
                   ` : `
                     <div style="background: #f8faf9; border: 1px solid #dce6e2; border-radius: 8px; padding: 12px; margin-top: 8px;" id="historyReviewForm_${job.id}">
@@ -7383,6 +7384,7 @@ function clientReviewHtml(job) {
         <h2 style="color: var(--gold);">${t("reviewThanks")}</h2>
         <div style="color: var(--gold); font-size: 1.5rem; margin-bottom: 8px;">${"⭐".repeat(job.clientRating)}${"☆".repeat(5 - job.clientRating)}</div>
         <p style="margin:0;"><em>"${escapeHtml(job.clientReviewText || '')}"</em></p>
+        ${cleanerFeedbackPromptHtml(job)}
       </section>
     `;
   }
@@ -7449,6 +7451,69 @@ function clientReviewHtml(job) {
         <button type="submit" class="primary" style="background: var(--gold); border: none; color: black; font-weight: bold; margin-top: 8px;">${t("sendReview")}</button>
       </form>
     </section>
+  `;
+}
+
+function cleanerFeedbackPromptHtml(job) {
+  if (!job || !job.cleanerId) return "";
+  if (hasCleanerQualityFeedback(job)) {
+    return `
+      <div class="cleaner-quality-form" style="margin-top: 14px; background: var(--surface-2); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; text-align: left;">
+        <strong>Feedback del cleaner guardado</strong>
+        <p class="muted" style="margin: 6px 0 0;">Gracias. Esta parte queda privada para control interno de la empresa.</p>
+      </div>
+    `;
+  }
+  const cleaner = cleanerFor(job);
+  const cleanerName = cleaner.name || "el cleaner";
+  return `
+    <details class="cleaner-quality-form" style="margin-top: 14px; background: var(--surface-2); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; text-align: left;">
+      <summary style="cursor: pointer; font-weight: 800;">Quieres puntuar al cleaner? Toma menos de 1 minuto</summary>
+      <p class="muted" style="margin: 8px 0 10px;">Esto es privado para la empresa. Ayuda a saber si ${escapeHtml(cleanerName)} debe seguir, mejorar o recibir apoyo.</p>
+      <form onsubmit="submitCleanerQualityReview(event, '${job.id}')" style="display: grid; gap: 10px;">
+        <label>Limpieza realizada
+          <select name="cleanerQualityRating" required>
+            <option value="">Seleccionar</option>
+            <option value="5">5 - Excelente</option>
+            <option value="4">4 - Buena</option>
+            <option value="3">3 - Regular</option>
+            <option value="2">2 - Mala</option>
+            <option value="1">1 - Muy mala</option>
+          </select>
+        </label>
+        <label>Puntualidad
+          <select name="cleanerPunctualityRating">
+            <option value="">Sin calificar</option>
+            <option value="5">5 - Muy puntual</option>
+            <option value="4">4 - Bien</option>
+            <option value="3">3 - Regular</option>
+            <option value="2">2 - Tarde</option>
+            <option value="1">1 - Muy tarde</option>
+          </select>
+        </label>
+        <label>Trato profesional
+          <select name="cleanerProfessionalismRating">
+            <option value="">Sin calificar</option>
+            <option value="5">5 - Excelente</option>
+            <option value="4">4 - Bueno</option>
+            <option value="3">3 - Regular</option>
+            <option value="2">2 - Malo</option>
+            <option value="1">1 - Muy malo</option>
+          </select>
+        </label>
+        <label>Comentario sobre el cleaner
+          <textarea name="cleanerQualityText" rows="2" placeholder="Ej: llego tarde, dejo detalles, fue muy amable..." style="width: 100%; border-radius: 6px; border: 1px solid var(--border-color); padding: 8px; font-family: inherit; resize: vertical;"></textarea>
+        </label>
+        <label>Lo recomendarias otra vez?
+          <select name="cleanerRecommended">
+            <option value="">Sin responder</option>
+            <option value="yes">Si</option>
+            <option value="no">No</option>
+          </select>
+        </label>
+        <button type="submit" class="primary" style="align-self: flex-start;">Guardar feedback del cleaner</button>
+      </form>
+    </details>
   `;
 }
 
@@ -7519,6 +7584,66 @@ window.submitClientReview = async function(event, jobId) {
     if (submitBtn) {
       submitBtn.disabled = false;
       submitBtn.textContent = t("sendRating");
+    }
+  }
+};
+
+window.submitCleanerQualityReview = async function(event, jobId) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const formData = new FormData(form);
+  const job = state.jobs.find(j => j.id === jobId);
+  if (!job) return;
+  const cleanerFeedback = {
+    qualityRating: Number(formData.get("cleanerQualityRating") || 0) || null,
+    punctualityRating: Number(formData.get("cleanerPunctualityRating") || 0) || null,
+    professionalismRating: Number(formData.get("cleanerProfessionalismRating") || 0) || null,
+    qualityText: String(formData.get("cleanerQualityText") || "").trim(),
+    recommended: formData.get("cleanerRecommended") === "yes" ? true : formData.get("cleanerRecommended") === "no" ? false : null
+  };
+
+  if (!cleanerFeedback.qualityRating) {
+    alert("Por favor selecciona la calificacion de limpieza del cleaner.");
+    return;
+  }
+
+  const submitBtn = form.querySelector("button[type='submit']");
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = t("sending");
+  }
+
+  try {
+    if (supabaseClient) {
+      await withTimeout(
+        persistPortalClientReview(jobId, job.clientRating || 5, job.clientReviewText || "", cleanerFeedback),
+        15000,
+        t("reviewSaveError")
+      );
+    }
+
+    job.clientRating = job.clientRating || 5;
+    job.cleanerQualityRating = cleanerFeedback.qualityRating;
+    job.cleanerPunctualityRating = cleanerFeedback.punctualityRating;
+    job.cleanerProfessionalismRating = cleanerFeedback.professionalismRating;
+    job.cleanerQualityText = cleanerFeedback.qualityText;
+    job.cleanerRecommended = cleanerFeedback.recommended;
+    save();
+
+    toast("Feedback del cleaner guardado.");
+    if (portalPageVisible("#clientPortalPage")) {
+      renderStandaloneClientPortal(true);
+    } else {
+      const clientViewId = new URLSearchParams(location.search).get("id");
+      if (clientViewId) renderClientPortal(clientViewId, true);
+      else renderAll();
+    }
+  } catch (error) {
+    console.error("Error saving cleaner quality feedback:", error);
+    toast(t("reviewSaveError"));
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Guardar feedback del cleaner";
     }
   }
 };
@@ -7650,6 +7775,37 @@ function cleanerQualityAverage(job) {
   return scores.reduce((sum, score) => sum + score, 0) / scores.length;
 }
 
+function hasCleanerQualityFeedback(job) {
+  return Boolean(
+    cleanerQualityScores(job).length ||
+    job.cleanerQualityText ||
+    typeof job.cleanerRecommended === "boolean"
+  );
+}
+
+function serviceQualityReportHtml(jobs = state.jobs) {
+  const reviewedJobs = jobs
+    .filter((job) => job.clientRating || job.clientReviewText)
+    .sort((a, b) => `${b.date || ""} ${b.start || ""}`.localeCompare(`${a.date || ""} ${a.start || ""}`));
+
+  if (!reviewedJobs.length) {
+    return "<p class='muted'>Todavia no hay comentarios de servicio. Apareceran cuando los clientes completen el review del trabajo.</p>";
+  }
+
+  return reviewedJobs.map((job) => {
+    const client = clientFor(job);
+    const cleaner = cleanerFor(job);
+    const stars = job.clientRating ? `${job.clientRating}/5` : "Sin estrellas";
+    const comment = job.clientReviewText ? ` - "${escapeHtml(job.clientReviewText)}"` : "";
+    return `
+      <div class="report-line">
+        <span>${escapeHtml(client.name)}<small>${escapeHtml(job.date || "")} - ${escapeHtml(job.serviceType || "Servicio")} - Cleaner: ${escapeHtml(cleaner.name || "Sin asignar")}${comment}</small></span>
+        <strong>${stars}</strong>
+      </div>
+    `;
+  }).join("");
+}
+
 function cleanerQualityReportHtml(jobs = state.jobs) {
   const rows = activeCleaners().map((cleaner) => {
     const cleanerJobs = jobs.filter((job) => job.cleanerId === cleaner.id && cleanerQualityAverage(job));
@@ -7762,6 +7918,8 @@ function renderReports() {
     <div class="report-line"><span>Trabajos registrados sin contabilizar</span><strong>${registeredJobs.length}</strong></div>
     <div class="report-line"><span>Horas realizadas</span><strong>${totalHours.toFixed(1)}h</strong></div>
   `;
+  const serviceQualityReport = $("#serviceQualityReport");
+  if (serviceQualityReport) serviceQualityReport.innerHTML = serviceQualityReportHtml(reportJobs);
   const cleanerQualityReport = $("#cleanerQualityReport");
   if (cleanerQualityReport) cleanerQualityReport.innerHTML = cleanerQualityReportHtml(reportJobs);
 }
