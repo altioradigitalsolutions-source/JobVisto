@@ -1,7 +1,7 @@
 import { json, processAutomaticNotifications, sendTestNotification } from "./_shared/jobvisto-notifications.mjs";
 
 function env(name) {
-  return globalThis.Netlify?.env?.get ? globalThis.Netlify.env.get(name) : process.env[name];
+  return process.env[name] || globalThis.Netlify?.env?.get?.(name);
 }
 
 function isAuthorized(req) {
