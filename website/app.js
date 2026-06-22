@@ -504,37 +504,7 @@ async function asyncSaveToSupabase() {
 
     // 6. Sync jobs
     for (const job of state.jobs) {
-      const scheduledStart = `${job.date}T${job.scheduledStart || job.start || "08:00"}:00Z`;
-      const actualStart = job.checkedIn ? `${job.date}T${job.start || "08:00"}:00Z` : null;
-      const scheduledEnd = job.end ? `${job.date}T${job.end}:00Z` : null;
-      const actualEnd = job.actualEnd ? `${job.date}T${job.actualEnd}:00Z` : null;
-      
-      const dbStatus = dbStatusFromAppStatus(job.status, job.cleanerId);
-
-      const { error: jobSaveError } = await supabaseClient.from('jobs').upsert({
-        id: job.id,
-        organization_id: state.orgId,
-        client_id: job.clientId,
-        assigned_cleaner_id: job.cleanerId || null,
-        service_type: job.serviceType,
-        scheduled_start: scheduledStart,
-        scheduled_end: scheduledEnd,
-        actual_start: actualStart,
-        actual_end: actualEnd,
-        client_hourly_rate: job.rate,
-        extras_amount: job.extras,
-        request_review: Boolean(job.requestReview),
-        client_rating: job.clientRating || null,
-        client_review_text: job.clientReviewText || null,
-        client_paid_amount: Number(job.clientPaidAmount || 0),
-        client_payment_status: job.clientPaymentStatus || 'unpaid',
-        client_paid_date: job.clientPaidDate || null,
-        client_payment_method: job.clientPaymentMethod || null,
-        cleaner_on_way_at: job.cleanerOnWayAt || null,
-        ...cleanerLocationPayload(job.cleanerLocation),
-        status: dbStatus,
-        checklist: job.tasks
-      });
+      const { error: jobSaveError } = await supabaseClient.from('jobs').upsert(jobSupabasePayload(job));
       if (jobSaveError) throw jobSaveError;
 
       // Sync signatures
@@ -704,6 +674,167 @@ async function upsertClientAddress(client) {
 
   const { error } = await supabaseClient.from("client_addresses").insert(row);
   if (error) throw error;
+}
+
+function jobSupabasePayload(job) {
+  if (!job?.clientId || !isUuid(job.clientId)) {
+    throw new Error("Selecciona un cliente valido antes de guardar el trabajo.");
+  }
+  if (job.cleanerId && !isUuid(job.cleanerId)) {
+    throw new Error("El limpiador seleccionado no es valido. Vuelve a elegirlo.");
+  }
+  if (!job.date || !job.start) {
+    throw new Error("Fecha y hora de inicio son obligatorias.");
+  }
+
+  const scheduledStart = `${job.date}T${job.scheduledStart || job.start || "08:00"}:00Z`;
+  const actualStart = job.checkedIn ? `${job.date}T${job.start || "08:00"}:00Z` : null;
+  const scheduledEnd = job.end ? `${job.date}T${job.end}:00Z` : null;
+  const actualEnd = job.actualEnd ? `${job.date}T${job.actualEnd}:00Z` : null;
+
+  return {
+    id: job.id,
+    organization_id: state.orgId,
+    client_id: job.clientId,
+    assigned_cleaner_id: job.cleanerId || null,
+    service_type: job.serviceType || "Limpieza normal",
+    scheduled_start: scheduledStart,
+    scheduled_end: scheduledEnd,
+    actual_start: actualStart,
+    actual_end: actualEnd,
+    client_hourly_rate: Number(job.rate || 0),
+    extras_amount: Number(job.extras || 0),
+    request_review: Boolean(job.requestReview),
+    client_rating: job.clientRating || null,
+    client_review_text: job.clientReviewText || null,
+    client_paid_amount: Number(job.clientPaidAmount || 0),
+    client_payment_status: job.clientPaymentStatus || "unpaid",
+    client_paid_date: job.clientPaidDate || null,
+    client_payment_method: job.clientPaymentMethod || null,
+    cleaner_on_way_at: job.cleanerOnWayAt || null,
+    ...cleanerLocationPayload(job.cleanerLocation),
+    status: dbStatusFromAppStatus(job.status, job.cleanerId),
+    checklist: Array.isArray(job.tasks) ? job.tasks : []
+  };
+}
+
+function clientSupabasePayload(client) {
+  return {
+    id: client.id,
+    organization_id: state.orgId,
+    name: client.name,
+    phone: client.phone,
+    email: client.email,
+    preferred_language: client.preferredLanguage || state.language || "es",
+    default_payment_method: client.paymentMethod === "Efectivo" ? "cash" : "transfer",
+    notes: client.notes,
+    portal_passcode: client.portalPasscode || null,
+    portal_active: client.portalActive !== false,
+    archived: Boolean(client.archived),
+    archived_at: client.archivedAt || null
+  };
+}
+
+function clientAddressSupabasePayload(client) {
+  if (!client?.address) return null;
+  return {
+    organization_id: state.orgId,
+    client_id: client.id,
+    label: "Main",
+    address_line: client.address,
+    country: client.country || state.country || "IL"
+  };
+}
+
+function cleanerSupabasePayload(cleaner) {
+  ensureCleanerPortalKey(cleaner);
+  return {
+    id: cleaner.id,
+    organization_id: state.orgId,
+    name: cleaner.name,
+    phone: cleaner.phone,
+    email: cleaner.email,
+    access_key: cleaner.key,
+    status: cleaner.status === "Disponible" ? "available" : "busy",
+    country: cleaner.country || state.country || "IL",
+    city: cleaner.city || "Zona principal",
+    language: state.language || "es",
+    archived: Boolean(cleaner.archived),
+    archived_at: cleaner.archivedAt || null
+  };
+}
+
+async function persistJobsThroughServer(jobsToSave) {
+  const jobs = Array.isArray(jobsToSave) ? jobsToSave : [jobsToSave];
+  const firstJob = jobs[0];
+  const client = state.clients.find((item) => item.id === firstJob?.clientId);
+  if (!client) throw new Error("El trabajo no tiene cliente seleccionado.");
+  const cleaner = firstJob?.cleanerId ? state.cleaners.find((item) => item.id === firstJob.cleanerId) : null;
+  const token = await currentSupabaseAccessToken();
+  if (!token) throw new Error("No hay sesion activa para guardar el trabajo.");
+
+  const response = await fetch("/api/app-job", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      organizationId: state.orgId,
+      client: clientSupabasePayload(client),
+      clientAddress: clientAddressSupabasePayload(client),
+      cleaner: cleaner ? cleanerSupabasePayload(cleaner) : null,
+      jobs: jobs.map(jobSupabasePayload)
+    })
+  });
+
+  const text = await response.text();
+  let data = {};
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { error: text };
+    }
+  }
+  if (!response.ok || data?.ok === false) {
+    throw new Error(data?.error || "No se pudo guardar el trabajo en el servidor.");
+  }
+}
+
+async function saveJobsCritical(jobsToSave) {
+  saveLocalState();
+  if (!supabaseClient || !state.orgId || !state.user) return;
+  ensureValidUuids();
+
+  const jobs = Array.isArray(jobsToSave) ? jobsToSave : [jobsToSave];
+  if (shouldUseServerPaymentPersistence()) {
+    try {
+      await persistJobsThroughServer(jobs);
+      return;
+    } catch (error) {
+      console.warn("Server job save failed; trying browser Supabase save:", error);
+    }
+  }
+
+  for (const job of jobs) {
+    const client = state.clients.find((item) => item.id === job.clientId);
+    if (!client) throw new Error("El trabajo no tiene cliente seleccionado.");
+
+    const { error: clientError } = await supabaseClient.from("clients").upsert(clientSupabasePayload(client));
+    if (clientError) throw clientError;
+    if (client.address) await upsertClientAddress(client);
+
+    if (job.cleanerId) {
+      const cleaner = state.cleaners.find((item) => item.id === job.cleanerId);
+      if (!cleaner) throw new Error("El limpiador seleccionado no existe.");
+      const { error: cleanerError } = await supabaseClient.from("cleaners").upsert(cleanerSupabasePayload(cleaner));
+      if (cleanerError) throw cleanerError;
+    }
+
+    const { error: jobError } = await supabaseClient.from("jobs").upsert(jobSupabasePayload(job));
+    if (jobError) throw jobError;
+  }
 }
 
 const pageParams = new URLSearchParams(location.search);
@@ -6390,7 +6521,10 @@ function renderJobs() {
   renderDashboardMap(dashboardJobs);
   $("#allJobs").innerHTML = renderJobDashboard();
   $("#jobCount").textContent = `${state.jobs.length} ${state.jobs.length === 1 ? t("job") : t("jobsWord")}`;
-  $("#jobClientSelect").innerHTML = activeClients().map((client) => `<option value="${client.id}">${client.name}</option>`).join("");
+  const clientsForJobs = activeClients();
+  $("#jobClientSelect").innerHTML = clientsForJobs.length
+    ? `<option value="">Selecciona cliente</option>` + clientsForJobs.map((client) => `<option value="${client.id}">${client.name}</option>`).join("")
+    : `<option value="">Primero crea un cliente</option>`;
   updateJobClientAddressHint();
   $$("[data-job-group]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -9025,9 +9159,17 @@ function setupEvents() {
     const previousJobs = structuredClone(state.jobs);
     const previousClients = structuredClone(state.clients);
     const data = Object.fromEntries(new FormData(event.currentTarget));
+    if (!data.clientId) {
+      toast("Selecciona un cliente antes de guardar el trabajo.");
+      return;
+    }
     
     // Auto-save address to client if it's missing
     const clientForJob = state.clients.find(c => c.id === data.clientId);
+    if (!clientForJob) {
+      toast("El cliente seleccionado no existe. Vuelve a elegirlo.");
+      return;
+    }
     if (clientForJob && !clientForJob.address && data.jobAddress) {
       clientForJob.address = data.jobAddress.trim();
     }
@@ -9056,24 +9198,28 @@ function setupEvents() {
     })) return;
     const previousJob = index >= 0 ? state.jobs[index] : {};
     applyJobStatusControl(payload, previousJob);
+    let jobsToSave = [];
     if (index >= 0) {
       state.jobs[index] = { ...state.jobs[index], ...payload, recurrence: data.recurrence || state.jobs[index].recurrence || "" };
+      jobsToSave = [state.jobs[index]];
     } else {
-      state.jobs.push(...addRecurringJobs(payload, data.repeatCount, data.recurrence));
+      jobsToSave = addRecurringJobs(payload, data.repeatCount, data.recurrence);
+      state.jobs.push(...jobsToSave);
     }
     const createdCount = Number(data.repeatCount || 1);
     try {
       toast("Guardando trabajo en la nube...");
-      await saveAndSyncCritical();
+      await saveJobsCritical(jobsToSave);
     } catch (error) {
       console.error("Job save failed:", error);
       state.jobs = previousJobs;
       state.clients = previousClients;
       saveLocalState();
       renderAll();
-      toast("No se pudo guardar el trabajo en Supabase. Revisa la conexion o permisos.");
+      toast(`No se pudo guardar el trabajo: ${error.message || "revisa la conexion o permisos."}`);
       return;
     }
+    saveLocalState();
     resetJobForm();
     renderAll();
     toast(index >= 0 ? "Trabajo actualizado y guardado." : createdCount > 1 ? `${createdCount} fechas creadas y guardadas.` : "Trabajo creado y guardado.");
