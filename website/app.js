@@ -8632,6 +8632,7 @@ function setView(name) {
     openPlanChoiceModal("limit", planUpgradeMessage("La gestion de equipo y portal de limpiadores empieza en Company."));
     name = "dashboard";
   }
+  const mobileBottomNav = $(".mobile-bottom-nav");
   $$(".view").forEach((view) => view.classList.remove("active"));
   const targetView = $(`#${name}View`);
   if (!targetView) return;
@@ -8642,6 +8643,7 @@ function setView(name) {
   $$(".mobile-bottom-nav .nav-item").forEach((button) => {
     button.classList.toggle("active", button.dataset.mobileView === name);
   });
+  mobileBottomNav?.classList.toggle("hidden", name === "settings");
 
   $("#pageTitle").textContent = viewTitle(name);
   closeMobileMenu();
