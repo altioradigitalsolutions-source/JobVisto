@@ -2191,6 +2191,114 @@ body.social-login-disabled .social-row {
 .confirm-modal-card {
   width: min(560px, 100%);
 }
+.idle-brand-card {
+  width: 100%;
+  max-width: 350px;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid rgba(53, 209, 127, .28);
+  background:
+    linear-gradient(145deg, rgba(4, 34, 29, .98), rgba(9, 87, 66, .96) 48%, rgba(15, 139, 99, .94)),
+    var(--green-dark);
+  color: #ffffff;
+  text-align: center;
+  box-shadow: 0 28px 80px rgba(2, 28, 22, .32);
+}
+.idle-brand-card > h3,
+.idle-brand-card > p {
+  display: none;
+}
+.idle-brand-mark {
+  display: grid;
+  place-items: center;
+  padding: 28px 28px 8px;
+}
+.idle-brand-mark img {
+  width: min(220px, 72%);
+  height: auto;
+  object-fit: contain;
+}
+.idle-countdown-ring {
+  display: grid;
+  place-items: center;
+  width: 138px;
+  height: 138px;
+  margin: 16px auto;
+  border: 8px solid rgba(255, 255, 255, .16);
+  border-top-color: #35d17f;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .08);
+}
+.idle-countdown-ring span {
+  font-size: 2.65rem;
+  font-weight: 900;
+  line-height: 1;
+}
+.idle-countdown-ring small {
+  margin-top: -16px;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, .76);
+}
+.idle-brand-copy {
+  padding: 0 30px 18px;
+}
+.idle-brand-copy .status-chip {
+  color: #07302d;
+  background: #dff8eb;
+}
+.idle-brand-copy h3 {
+  margin: 14px 0 8px;
+  color: #ffffff;
+  font-size: 1.65rem;
+}
+.idle-brand-copy p {
+  margin: 0;
+  color: rgba(255, 255, 255, .82);
+}
+.idle-brand-card[dir="rtl"] .idle-brand-copy {
+  direction: rtl;
+}
+.idle-brand-card[dir="rtl"] .idle-brand-copy h3,
+.idle-brand-card[dir="rtl"] .idle-brand-copy p {
+  text-align: center;
+}
+.idle-brand-card > div[style] {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px !important;
+  margin: 0 !important;
+  padding: 20px;
+  background: rgba(255, 255, 255, .96);
+}
+.idle-brand-card #stayLoggedInButton,
+.idle-brand-card #logOutNowButton {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 12px;
+  font-weight: 900;
+}
+.idle-brand-card #stayLoggedInButton {
+  border: 0;
+  color: #07302d;
+  background: #35d17f;
+}
+.idle-brand-card #logOutNowButton {
+  background: transparent !important;
+  color: #9f1d1d !important;
+  border: 1px solid rgba(159, 29, 29, .45) !important;
+}
+@media (max-width: 520px) {
+  .idle-brand-card > div[style] {
+    grid-template-columns: 1fr;
+  }
+  .idle-brand-copy h3 {
+    font-size: 1.45rem;
+  }
+}
 .delete-job-summary {
   display: grid;
   gap: 8px;

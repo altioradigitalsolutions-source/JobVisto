@@ -2260,6 +2260,9 @@ function setLanguage(language) {
   if (!$("#cleanerPortalPage").classList.contains("hidden")) {
     renderStandaloneCleanerPortal($("#cleanerPortalLock").classList.contains("hidden"));
   }
+  if ($("#idleTimeoutModal") && !$("#idleTimeoutModal").classList.contains("hidden")) {
+    applyIdleModalCopy();
+  }
 }
 
 function countryInfo(code) {
@@ -9921,20 +9924,78 @@ function checkIdleTime() {
   }
 }
 
+function idleModalCopy() {
+  const lang = state.language || localStorage.getItem("jobvisto-language") || "es";
+  const copy = {
+    es: {
+      security: "Seguridad de sesion",
+      title: "Sigues trabajando en JobVisto?",
+      body: "Por seguridad, tu sesion se cerrara automaticamente si no confirmas que sigues activo.",
+      seconds: "segundos",
+      stay: "Seguir conectado",
+      logout: "Cerrar sesion",
+      rtl: false
+    },
+    en: {
+      security: "Session security",
+      title: "Are you still working in JobVisto?",
+      body: "For security, your session will close automatically if you do not confirm that you are still active.",
+      seconds: "seconds",
+      stay: "Stay connected",
+      logout: "Log out",
+      rtl: false
+    },
+    ru: {
+      security: "Безопасность сессии",
+      title: "Вы все еще работаете в JobVisto?",
+      body: "В целях безопасности сессия закроется автоматически, если вы не подтвердите активность.",
+      seconds: "секунд",
+      stay: "Остаться в системе",
+      logout: "Выйти",
+      rtl: false
+    },
+    he: {
+      security: "אבטחת התחברות",
+      title: "האם אתה עדיין עובד ב-JobVisto?",
+      body: "מטעמי אבטחה, ההתחברות תיסגר אוטומטית אם לא תאשר שאתה עדיין פעיל.",
+      seconds: "שניות",
+      stay: "להישאר מחובר",
+      logout: "התנתק",
+      rtl: true
+    }
+  };
+  return copy[lang] || copy.es;
+}
+
+function applyIdleModalCopy() {
+  const copy = idleModalCopy();
+  const card = $(".idle-brand-card");
+  if (card) card.setAttribute("dir", copy.rtl ? "rtl" : "ltr");
+  $("#idleSecurityLabel").textContent = copy.security;
+  $("#idleTitle").textContent = copy.title;
+  $("#idleBody").textContent = copy.body;
+  $("#idleSecondsLabel").textContent = copy.seconds;
+  $("#stayLoggedInButton").textContent = copy.stay;
+  $("#logOutNowButton").textContent = copy.logout;
+}
+
 function showIdleModal() {
   const modal = $("#idleTimeoutModal");
   if (!modal || !modal.classList.contains("hidden")) return;
   
   modal.classList.remove("hidden");
   countdownValue = IDLE_COUNTDOWN_SECONDS;
+  applyIdleModalCopy();
   $("#idleCountdown").textContent = countdownValue;
   $("#idleCountdownEn").textContent = countdownValue;
+  $("#idleCountdownVisual").textContent = countdownValue;
   
   clearInterval(countdownInterval);
   countdownInterval = setInterval(() => {
     countdownValue--;
     $("#idleCountdown").textContent = countdownValue;
     $("#idleCountdownEn").textContent = countdownValue;
+    $("#idleCountdownVisual").textContent = countdownValue;
     
     if (countdownValue <= 0) {
       clearInterval(countdownInterval);

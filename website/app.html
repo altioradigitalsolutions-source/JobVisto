@@ -1684,7 +1684,19 @@
     </div>
 
     <div class="modal hidden" id="idleTimeoutModal">
-      <div class="modal-card form-layout">
+      <div class="modal-card idle-brand-card">
+        <div class="idle-brand-mark">
+          <img src="./assets/Logo Jobvisto white transparent.png" alt="JobVisto">
+        </div>
+        <div class="idle-countdown-ring" aria-live="polite">
+          <span id="idleCountdownVisual">300</span>
+          <small id="idleSecondsLabel">segundos</small>
+        </div>
+        <div class="idle-brand-copy">
+          <span class="status-chip" id="idleSecurityLabel">Seguridad de sesion</span>
+          <h3 id="idleTitle">Sigues trabajando en JobVisto?</h3>
+          <p id="idleBody">Por seguridad, tu sesion se cerrara automaticamente si no confirmas que sigues activo.</p>
+        </div>
         <h3>¿Sigues ahí? / Are you still there?</h3>
         <p>Por seguridad, tu sesión se cerrará en <strong id="idleCountdown">60</strong> segundos por inactividad.</p>
         <p class="muted">For security, your session will close in <strong id="idleCountdownEn">60</strong> seconds due to inactivity.</p>
