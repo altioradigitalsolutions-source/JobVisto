@@ -138,6 +138,7 @@ async function loadStateFromSupabase(currentUser = null) {
           email: c.email || "",
           address: "",
           country: state.country || "IL",
+          preferredLanguage: c.preferred_language || state.language || "es",
           paymentMethod: c.default_payment_method === 'cash' ? 'Efectivo' : 'Transferencia',
           notes: c.notes || "",
           portalPasscode: c.portal_passcode || null,
@@ -366,6 +367,17 @@ async function loadStateFromSupabase(currentUser = null) {
           });
         }
       }
+
+      const notifications = await supabaseData(
+        supabaseClient
+          .from('notifications')
+          .select('*')
+          .eq('organization_id', orgId)
+          .order('created_at', { ascending: false })
+          .limit(80),
+        "Cargar notificaciones"
+      );
+      state.notificationLogs = Array.isArray(notifications) ? notifications : [];
     }
   } catch (e) {
     console.error("Error loading state from Supabase: ", e);
@@ -457,7 +469,7 @@ async function asyncSaveToSupabase() {
         name: client.name,
         phone: client.phone,
         email: client.email,
-        preferred_language: state.language || 'es',
+        preferred_language: client.preferredLanguage || state.language || 'es',
         default_payment_method: client.paymentMethod === 'Efectivo' ? 'cash' : 'transfer',
         notes: client.notes,
         portal_passcode: client.portalPasscode || null,
@@ -467,12 +479,7 @@ async function asyncSaveToSupabase() {
       });
 
       if (client.address) {
-        await supabaseClient.from('client_addresses').upsert({
-          organization_id: state.orgId,
-          client_id: client.id,
-          address_line: client.address,
-          country: client.country || state.country || 'IL'
-        }, { onConflict: 'client_id' });
+        await upsertClientAddress(client);
       }
     }
 
@@ -662,6 +669,43 @@ async function asyncSaveToSupabase() {
   }
 }
 
+async function upsertClientAddress(client) {
+  if (!client?.address || !state.orgId || !supabaseClient) return;
+  const row = {
+    organization_id: state.orgId,
+    client_id: client.id,
+    label: "Main",
+    address_line: client.address,
+    country: client.country || state.country || "IL"
+  };
+
+  const { error: upsertError } = await supabaseClient
+    .from("client_addresses")
+    .upsert(row, { onConflict: "client_id" });
+  if (!upsertError) return;
+
+  console.warn("Client address upsert failed; trying update/insert fallback:", upsertError);
+  const { data: existing, error: lookupError } = await supabaseClient
+    .from("client_addresses")
+    .select("id")
+    .eq("client_id", client.id)
+    .limit(1)
+    .maybeSingle();
+  if (lookupError) throw upsertError;
+
+  if (existing?.id) {
+    const { error } = await supabaseClient
+      .from("client_addresses")
+      .update(row)
+      .eq("id", existing.id);
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await supabaseClient.from("client_addresses").insert(row);
+  if (error) throw error;
+}
+
 const pageParams = new URLSearchParams(location.search);
 
 function normalizePlanKey(plan) {
@@ -715,6 +759,7 @@ const state = {
   ],
   receipts: JSON.parse(localStorage.getItem("jobvisto-receipts") || "[]"),
   clientPayments: JSON.parse(localStorage.getItem("jobvisto-client-payments") || "[]"),
+  notificationLogs: [],
   serviceRules: JSON.parse(localStorage.getItem("jobvisto-service-rules") || "null") || {
     "Limpieza normal": 60,
     "Deep cleaning": 95,
@@ -5755,13 +5800,9 @@ function renderDashboardReminders() {
 
 function notificationTemplates() {
   return [
-    { key: "confirmation", title: "Confirmacion de cita", trigger: "Al crear o actualizar un trabajo", audience: "Cliente", channel: "WhatsApp / SMS / Email", copy: "Hola {cliente}, tu servicio de limpieza queda confirmado para {fecha} a las {hora}." },
-    { key: "tomorrow", title: "Recordatorio de manana", trigger: "24 horas antes del servicio", audience: "Cliente", channel: "WhatsApp / SMS", copy: "Recordatorio: manana tienes un servicio con {empresa}. Hora estimada: {hora}." },
-    { key: "work-order", title: "Orden para el cleaner", trigger: "La noche anterior o manana temprano", audience: "Cleaner", channel: "Portal / WhatsApp", copy: "{cleaner}, manana tienes trabajo con {cliente}. Revisa direccion, hora y checklist." },
-    { key: "on-way", title: "Cleaner en camino", trigger: "Cuando el cleaner toca 'voy en camino'", audience: "Cliente", channel: "WhatsApp / SMS", copy: "{cleaner} ya va en camino para tu servicio de JobVisto." },
-    { key: "arrived", title: "Cleaner llego", trigger: "Cuando marca llegada", audience: "Cliente / Admin", channel: "Portal / WhatsApp", copy: "{cleaner} ya llego y el trabajo esta iniciando." },
-    { key: "finished", title: "Trabajo terminado", trigger: "Cuando el cleaner finaliza", audience: "Cliente", channel: "WhatsApp / Email", copy: "Tu servicio fue marcado como terminado. Puedes revisar evidencia y dejar feedback." },
-    { key: "review", title: "Solicitud de review", trigger: "Despues de terminar el servicio", audience: "Cliente", channel: "Portal / WhatsApp", copy: "Como fue el servicio? Tu opinion ayuda a mejorar la calidad del equipo." }
+    { key: "tomorrow", title: "Recordatorio de manana", trigger: "Se envia cada hora cuando el trabajo esta a unas 24 horas", audience: "Cliente", channel: "Email", copy: "Recordatorio: manana tienes un servicio con {empresa}. Hora estimada: {hora}." },
+    { key: "arrived", title: "Cleaner llego", trigger: "Se envia cuando el cleaner marca llegada", audience: "Cliente", channel: "Email", copy: "{cleaner} ya llego y el trabajo esta iniciando." },
+    { key: "finished", title: "Trabajo terminado", trigger: "Se envia cuando el cleaner termina el trabajo", audience: "Cliente", channel: "Email", copy: "Tu servicio fue marcado como terminado. Puedes revisar el portal y dejar feedback." }
   ];
 }
 
@@ -5792,13 +5833,9 @@ function daysUntilJob(job) {
 }
 
 function notificationStatusFor(job, templateKey) {
-  if (templateKey === "confirmation") return "scheduled";
   if (templateKey === "tomorrow") return daysUntilJob(job) <= 1 && daysUntilJob(job) >= 0 ? "ready" : "scheduled";
-  if (templateKey === "work-order") return job.cleanerId ? "ready" : "waiting";
-  if (templateKey === "on-way") return job.cleanerOnWayAt ? "sent" : job.cleanerId ? "waiting" : "blocked";
   if (templateKey === "arrived") return job.checkedIn ? "sent" : "waiting";
   if (templateKey === "finished") return isDone(job) ? "sent" : "waiting";
-  if (templateKey === "review") return isDone(job) && job.requestReview ? "ready" : "waiting";
   return "scheduled";
 }
 
@@ -5812,54 +5849,76 @@ function notificationStatusClass(status) {
 
 function notificationEventsForJob(job) {
   const context = jobNotificationContext(job);
+  const client = clientFor(job);
+  const logs = notificationLogsForJob(job.id);
   return notificationTemplates().map((template) => ({
     ...template,
     job,
     context,
-    status: notificationStatusFor(job, template.key),
+    status: logs.find((log) => log.template_key === template.key)?.status || notificationStatusFor(job, template.key),
+    client,
     message: fillNotificationTemplate(template.copy, context)
   }));
+}
+
+function notificationLogsForJob(jobId) {
+  return (state.notificationLogs || []).filter((log) => log.job_id === jobId);
+}
+
+function languageName(code) {
+  return { es: "Español", en: "English", ru: "Русский", he: "עברית" }[code] || "Español";
+}
+
+function notificationLogLabel(log) {
+  if (!log) return "";
+  const title = notificationTemplates().find((template) => template.key === log.template_key)?.title || log.template_key;
+  const when = log.sent_at || log.created_at;
+  const date = when ? new Date(when).toLocaleString("es") : "";
+  return `${title} - ${log.status || "registrado"}${date ? ` - ${date}` : ""}`;
 }
 
 function renderAutomaticNotifications() {
   if (!$("#notificationsView")) return;
   const templates = notificationTemplates();
   const visibleJobs = [...state.jobs]
-    .filter((job) => job.date >= today() || isDone(job))
+    .filter((job) => job.date >= today() || notificationLogsForJob(job.id).length)
     .sort((a, b) => `${a.date || ""} ${a.start || ""}`.localeCompare(`${b.date || ""} ${b.start || ""}`))
-    .slice(0, 8);
+    .slice(0, 12);
   const events = visibleJobs.flatMap(notificationEventsForJob);
   const ready = events.filter((event) => event.status === "ready").length;
   const sent = events.filter((event) => event.status === "sent").length;
   const waiting = events.filter((event) => event.status === "waiting" || event.status === "scheduled").length;
+  const clientsWithoutEmail = activeClients().filter((client) => !client.email);
 
   $("#notificationKpis").innerHTML = `
-    <article><span>Plantillas</span><strong>${templates.length}</strong><small>preparadas para automatizar</small></article>
-    <article><span>Listas ahora</span><strong>${ready}</strong><small>se enviarian al activar integraciones</small></article>
-    <article><span>Eventos enviados</span><strong>${sent}</strong><small>segun estado del trabajo</small></article>
-    <article><span>En espera</span><strong>${waiting}</strong><small>dependen de fecha o accion del cleaner</small></article>
+    <article><span>Emails enviados</span><strong>${sent}</strong><small>registrados en Supabase</small></article>
+    <article><span>Listos para enviar</span><strong>${ready}</strong><small>Netlify los procesa cada hora</small></article>
+    <article><span>En espera</span><strong>${waiting}</strong><small>por fecha o accion del cleaner</small></article>
+    <article><span>Clientes sin email</span><strong>${clientsWithoutEmail.length}</strong><small>no recibiran avisos</small></article>
   `;
 
   $("#notificationFlow").innerHTML = templates.map((template, index) => `
     <article class="notification-flow-step">
       <span>${index + 1}</span>
-      <div><strong>${template.title}</strong><small>${template.trigger}</small></div>
+      <div><strong>${template.title}</strong><small>${template.trigger}. Canal actual: ${template.channel}.</small></div>
     </article>
   `).join("");
 
-  $("#notificationTemplates").innerHTML = templates.map((template) => `
+  $("#notificationTemplates").innerHTML = clientsWithoutEmail.length ? clientsWithoutEmail.map((client) => `
     <article class="notification-template-card">
-      <div><strong>${template.title}</strong><span>${template.audience} - ${template.channel}</span></div>
-      <p>${template.copy}</p>
+      <div><strong>${escapeHtml(client.name)}</strong><span>${languageName(client.preferredLanguage || state.language || "es")}</span></div>
+      <p>Agrega un email en Clientes para que JobVisto pueda enviarle recordatorios automaticos.</p>
     </article>
-  `).join("");
+  `).join("") : "<p class='muted'>Todos los clientes activos tienen email registrado.</p>";
 
   $("#notificationTimeline").innerHTML = visibleJobs.length ? visibleJobs.map((job) => {
     const context = jobNotificationContext(job);
+    const client = clientFor(job);
+    const logs = notificationLogsForJob(job.id);
     return `
       <article class="notification-job-card">
         <div class="notification-job-head">
-          <div><strong>${escapeHtml(context.cliente)} - ${escapeHtml(job.date || "")}</strong><span>${escapeHtml(job.start || "")} - ${escapeHtml(context.cleanerName)} - ${escapeHtml(jobStatusLabel(job))}</span></div>
+          <div><strong>${escapeHtml(context.cliente)} - ${escapeHtml(job.date || "")}</strong><span>${escapeHtml(client?.email || "sin email")} - ${languageName(client?.preferredLanguage || state.language || "es")} - ${escapeHtml(jobStatusLabel(job))}</span></div>
           <span class="status-chip">${escapeHtml(job.serviceType || "Servicio")}</span>
         </div>
         <div class="notification-event-list">
@@ -5869,10 +5928,11 @@ function renderAutomaticNotifications() {
               <div><strong>${event.title}</strong><small>${event.message}</small></div>
             </div>
           `).join("")}
+          ${logs.length ? `<div class="notification-event"><span class="badge dark">Historial</span><div>${logs.map((log) => `<small>${escapeHtml(notificationLogLabel(log))}</small>`).join("")}</div></div>` : ""}
         </div>
       </article>
     `;
-  }).join("") : "<p class='muted'>Crea trabajos para ver la simulacion de notificaciones automaticas.</p>";
+  }).join("") : "<p class='muted'>Crea un trabajo futuro con cliente y email para ver su estado de notificacion.</p>";
 }
 
 function renderMetrics() {
@@ -6830,6 +6890,7 @@ function startClientEdit(clientId) {
   form.elements.name.value = client.name || "";
   form.elements.phoneLocal.value = client.phoneLocal || (client.phone || "").replace(/^\+\d+\s*/, "");
   form.elements.email.value = client.email || "";
+  if (form.elements.preferredLanguage) form.elements.preferredLanguage.value = client.preferredLanguage || state.language || "es";
   
   const addressInput = form.querySelector('[name="address"]');
   if (addressInput) addressInput.value = client.address || "";
@@ -8747,6 +8808,7 @@ function setupEvents() {
       phoneLocal: data.phoneLocal,
       phone: data.phoneLocal ? `${country.dial} ${data.phoneLocal}` : "",
       email: data.email,
+      preferredLanguage: data.preferredLanguage || state.language || "es",
       address: data.address,
       country: state.country,
       paymentMethod: data.paymentMethod,
@@ -8795,8 +8857,10 @@ function setupEvents() {
     form.elements.key.value = generateCleanerPasscode(name);
     toast("Clave generada para este limpiador.");
   });
-  $("#jobForm").addEventListener("submit", (event) => {
+  $("#jobForm").addEventListener("submit", async (event) => {
     event.preventDefault();
+    const previousJobs = structuredClone(state.jobs);
+    const previousClients = structuredClone(state.clients);
     const data = Object.fromEntries(new FormData(event.currentTarget));
     
     // Auto-save address to client if it's missing
@@ -8834,11 +8898,22 @@ function setupEvents() {
     } else {
       state.jobs.push(...addRecurringJobs(payload, data.repeatCount, data.recurrence));
     }
-    resetJobForm();
-    save();
-    renderAll();
     const createdCount = Number(data.repeatCount || 1);
-    toast(index >= 0 ? "Trabajo actualizado." : createdCount > 1 ? `${createdCount} fechas creadas y agregadas al calendario.` : "Trabajo creado y agregado al calendario.");
+    try {
+      toast("Guardando trabajo en la nube...");
+      await saveAndSyncCritical();
+    } catch (error) {
+      console.error("Job save failed:", error);
+      state.jobs = previousJobs;
+      state.clients = previousClients;
+      saveLocalState();
+      renderAll();
+      toast("No se pudo guardar el trabajo en Supabase. Revisa la conexion o permisos.");
+      return;
+    }
+    resetJobForm();
+    renderAll();
+    toast(index >= 0 ? "Trabajo actualizado y guardado." : createdCount > 1 ? `${createdCount} fechas creadas y guardadas.` : "Trabajo creado y guardado.");
   });
   $("#cancelJobEdit").addEventListener("click", resetJobForm);
   $("#jobServiceType").addEventListener("change", applyServiceRuleToJobForm);

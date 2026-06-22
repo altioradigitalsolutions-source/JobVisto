@@ -13,7 +13,7 @@
   --shadow: 0 20px 60px rgba(16, 26, 28, 0.08);
 }
 
-/* Automatic notifications simulation */
+/* Automatic notifications */
 #notificationsView {
   display: none;
   gap: 18px;
@@ -95,8 +95,13 @@
   display: grid;
   grid-template-columns: 34px 1fr;
   gap: 10px;
-  align-items: center;
+  align-items: flex-start;
   padding: 10px;
+}
+
+.notification-flow-step div {
+  display: grid;
+  gap: 4px;
 }
 
 .notification-flow-step > span {

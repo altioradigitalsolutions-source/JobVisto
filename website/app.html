@@ -423,6 +423,14 @@
                 </div>
               </label>
               <label>Email <input name="email" type="email" placeholder="cliente@email.com"></label>
+              <label>Idioma para mensajes
+                <select name="preferredLanguage">
+                  <option value="es">Español</option>
+                  <option value="en">English</option>
+                  <option value="ru">Русский</option>
+                  <option value="he">עברית</option>
+                </select>
+              </label>
               <label>Direccion <input name="address" list="addressSuggestions" placeholder="Herzl 42, Tel Aviv"></label>
               <datalist id="addressSuggestions"></datalist>
               <label>Metodo esperado de pago
@@ -688,25 +696,25 @@
         <section class="view" id="notificationsView">
           <div class="notifications-hero">
             <div>
-              <p class="eyebrow">Automatizacion</p>
+              <p class="eyebrow">Email automatico real</p>
               <h3>Notificaciones automaticas</h3>
-              <p class="muted">Vista simulada de mensajes para confirmar servicios, recordar citas y avisar el progreso del cleaner.</p>
+              <p class="muted">JobVisto envia emails desde Netlify cada hora segun la fecha y el estado del trabajo.</p>
             </div>
-            <span class="status-chip">Simulado</span>
+            <span class="status-chip">Activo con Resend</span>
           </div>
           <div class="notification-kpis" id="notificationKpis"></div>
           <div class="notifications-grid">
             <section class="panel">
-              <div class="panel-head"><h3>Flujo automatico</h3><span class="status-chip">Cliente + cleaner</span></div>
+              <div class="panel-head"><h3>Que se envia</h3><span class="status-chip">Email</span></div>
               <div class="notification-flow" id="notificationFlow"></div>
             </section>
             <section class="panel">
-              <div class="panel-head"><h3>Plantillas</h3><span class="status-chip">Preparadas</span></div>
+              <div class="panel-head"><h3>Clientes sin email</h3><span class="status-chip">No se enviaran</span></div>
               <div class="notification-template-list" id="notificationTemplates"></div>
             </section>
           </div>
           <section class="panel">
-            <div class="panel-head"><h3>Linea de tiempo simulada</h3><span class="status-chip">Proximos trabajos</span></div>
+            <div class="panel-head"><h3>Estado real de envios</h3><span class="status-chip">Proximos y enviados</span></div>
             <div class="notification-timeline" id="notificationTimeline"></div>
           </section>
         </section>

@@ -83,14 +83,108 @@ function companyName(org = {}) {
   return org.name || "JobVisto";
 }
 
-function emailShell({ preview, body, actionUrl, actionLabel = "Abrir portal" }) {
+function clientLanguage(client = {}) {
+  const language = String(client.preferred_language || "es").toLowerCase();
+  return ["es", "en", "ru", "he"].includes(language) ? language : "es";
+}
+
+function emailCopy(language) {
+  return {
+    es: {
+      openPortal: "Abrir portal",
+      automatic: "Mensaje automatico enviado por JobVisto.",
+      tomorrowSubject: (business) => `Recordatorio de tu servicio con ${business}`,
+      tomorrowPreview: "Recordatorio automatico de servicio",
+      tomorrowTitle: "Tu servicio esta confirmado",
+      tomorrowBody: (name, business) => `Hola ${name}, manana tienes un servicio con <strong>${business}</strong>.`,
+      schedule: "Horario",
+      portalHint: "Desde el portal puedes revisar el estado del trabajo y dejar comentarios cuando termine.",
+      arrivedSubject: (cleaner) => `${cleaner} ya llego`,
+      arrivedPreview: "El cleaner marco llegada",
+      arrivedTitle: (cleaner) => `${cleaner} ya llego`,
+      arrivedBody: (name) => `Hola ${name}, el trabajo ya esta iniciando.`,
+      finishedSubject: "Tu servicio fue marcado como terminado",
+      finishedPreview: "Trabajo terminado",
+      finishedTitle: "Servicio terminado",
+      finishedBody: (name) => `Hola ${name}, tu servicio fue marcado como terminado.`,
+      reviewHint: "Ahora puedes revisar la informacion del trabajo y dejar tu comentario sobre el servicio y el cleaner.",
+      reviewAction: "Revisar servicio",
+      estimated: "segun agenda"
+    },
+    en: {
+      openPortal: "Open portal",
+      automatic: "Automatic message sent by JobVisto.",
+      tomorrowSubject: (business) => `Reminder for your service with ${business}`,
+      tomorrowPreview: "Automatic service reminder",
+      tomorrowTitle: "Your service is confirmed",
+      tomorrowBody: (name, business) => `Hi ${name}, you have a service tomorrow with <strong>${business}</strong>.`,
+      schedule: "Schedule",
+      portalHint: "From the portal you can check the job status and leave feedback when it is finished.",
+      arrivedSubject: (cleaner) => `${cleaner} has arrived`,
+      arrivedPreview: "The cleaner marked arrival",
+      arrivedTitle: (cleaner) => `${cleaner} has arrived`,
+      arrivedBody: (name) => `Hi ${name}, the job is starting now.`,
+      finishedSubject: "Your service was marked as finished",
+      finishedPreview: "Job finished",
+      finishedTitle: "Service finished",
+      finishedBody: (name) => `Hi ${name}, your service was marked as finished.`,
+      reviewHint: "You can now review the job information and leave feedback about the service and cleaner.",
+      reviewAction: "Review service",
+      estimated: "as scheduled"
+    },
+    ru: {
+      openPortal: "Открыть портал",
+      automatic: "Автоматическое сообщение от JobVisto.",
+      tomorrowSubject: (business) => `Напоминание об услуге от ${business}`,
+      tomorrowPreview: "Автоматическое напоминание",
+      tomorrowTitle: "Ваша услуга подтверждена",
+      tomorrowBody: (name, business) => `Здравствуйте, ${name}. Завтра у вас запланирована услуга от <strong>${business}</strong>.`,
+      schedule: "Время",
+      portalHint: "В портале можно проверить статус работы и оставить отзыв после завершения.",
+      arrivedSubject: (cleaner) => `${cleaner} прибыл`,
+      arrivedPreview: "Клинер отметил прибытие",
+      arrivedTitle: (cleaner) => `${cleaner} прибыл`,
+      arrivedBody: (name) => `Здравствуйте, ${name}. Работа начинается.`,
+      finishedSubject: "Ваша услуга отмечена как завершенная",
+      finishedPreview: "Работа завершена",
+      finishedTitle: "Услуга завершена",
+      finishedBody: (name) => `Здравствуйте, ${name}. Ваша услуга отмечена как завершенная.`,
+      reviewHint: "Теперь вы можете проверить информацию о работе и оставить отзыв о сервисе и клинере.",
+      reviewAction: "Проверить услугу",
+      estimated: "по расписанию"
+    },
+    he: {
+      openPortal: "פתח פורטל",
+      automatic: "הודעה אוטומטית נשלחה על ידי JobVisto.",
+      tomorrowSubject: (business) => `תזכורת לשירות עם ${business}`,
+      tomorrowPreview: "תזכורת שירות אוטומטית",
+      tomorrowTitle: "השירות שלך אושר",
+      tomorrowBody: (name, business) => `שלום ${name}, מחר יש לך שירות עם <strong>${business}</strong>.`,
+      schedule: "שעה",
+      portalHint: "בפורטל אפשר לראות את מצב העבודה ולהשאיר משוב בסיום.",
+      arrivedSubject: (cleaner) => `${cleaner} הגיע`,
+      arrivedPreview: "הקלינר סימן הגעה",
+      arrivedTitle: (cleaner) => `${cleaner} הגיע`,
+      arrivedBody: (name) => `שלום ${name}, העבודה מתחילה עכשיו.`,
+      finishedSubject: "השירות שלך סומן כהסתיים",
+      finishedPreview: "העבודה הסתיימה",
+      finishedTitle: "השירות הסתיים",
+      finishedBody: (name) => `שלום ${name}, השירות שלך סומן כהסתיים.`,
+      reviewHint: "עכשיו אפשר לבדוק את פרטי העבודה ולהשאיר משוב על השירות והקלינר.",
+      reviewAction: "בדוק שירות",
+      estimated: "לפי התכנון"
+    }
+  }[language] || emailCopy("es");
+}
+
+function emailShell({ preview, body, actionUrl, actionLabel = "Abrir portal", footer = "Mensaje automatico enviado por JobVisto.", direction = "ltr" }) {
   return `
-    <div style="font-family:Arial,sans-serif;background:#f7faf9;padding:24px;color:#113235;">
+    <div dir="${direction}" style="font-family:Arial,sans-serif;background:#f7faf9;padding:24px;color:#113235;">
       <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #dbe7e4;border-radius:14px;padding:24px;">
         <p style="margin:0 0 12px;color:#6b7a7a;font-size:13px;">${preview}</p>
         ${body}
         ${actionUrl ? `<p style="margin:24px 0 0;"><a href="${actionUrl}" style="display:inline-block;background:#007b7b;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700;">${actionLabel}</a></p>` : ""}
-        <p style="margin:24px 0 0;color:#84908f;font-size:12px;">Mensaje automatico enviado por JobVisto.</p>
+        <p style="margin:24px 0 0;color:#84908f;font-size:12px;">${footer}</p>
       </div>
     </div>
   `;
@@ -101,20 +195,26 @@ function templateFor(event, context) {
   const business = companyName(org);
   const cleanerName = cleaner?.name || "tu cleaner";
   const { date, time } = formatDateTime(job.scheduled_start, org?.timezone || "UTC");
+  const language = clientLanguage(client);
+  const copy = emailCopy(language);
+  const direction = language === "he" ? "rtl" : "ltr";
 
   if (event === "tomorrow") {
     return {
-      subject: `Recordatorio de tu servicio con ${business}`,
-      preview: "Recordatorio automatico de servicio",
-      text: `Hola ${client.name}, manana tienes un servicio con ${business}. Hora estimada: ${time || "segun agenda"}. Puedes ver el estado desde tu portal: ${portalUrl}`,
+      subject: copy.tomorrowSubject(business),
+      preview: copy.tomorrowPreview,
+      text: `${copy.tomorrowTitle}. ${copy.schedule}: ${time || copy.estimated}. ${portalUrl}`,
       html: emailShell({
-        preview: "Recordatorio automatico de servicio",
+        preview: copy.tomorrowPreview,
         actionUrl: portalUrl,
+        actionLabel: copy.openPortal,
+        footer: copy.automatic,
+        direction,
         body: `
-          <h2 style="margin:0 0 12px;color:#103235;">Tu servicio esta confirmado</h2>
-          <p>Hola ${client.name}, manana tienes un servicio con <strong>${business}</strong>.</p>
-          <p><strong>Horario:</strong> ${date || time || "segun agenda"}</p>
-          <p>Desde el portal puedes revisar el estado del trabajo y dejar comentarios cuando termine.</p>
+          <h2 style="margin:0 0 12px;color:#103235;">${copy.tomorrowTitle}</h2>
+          <p>${copy.tomorrowBody(client.name, business)}</p>
+          <p><strong>${copy.schedule}:</strong> ${date || time || copy.estimated}</p>
+          <p>${copy.portalHint}</p>
         `
       })
     };
@@ -122,33 +222,38 @@ function templateFor(event, context) {
 
   if (event === "arrived") {
     return {
-      subject: `${cleanerName} ya llego`,
-      preview: "El cleaner marco llegada",
-      text: `Hola ${client.name}, ${cleanerName} ya llego y el trabajo esta iniciando. Puedes seguir el servicio aqui: ${portalUrl}`,
+      subject: copy.arrivedSubject(cleanerName),
+      preview: copy.arrivedPreview,
+      text: `${copy.arrivedTitle(cleanerName)}. ${portalUrl}`,
       html: emailShell({
-        preview: "El cleaner marco llegada",
+        preview: copy.arrivedPreview,
         actionUrl: portalUrl,
+        actionLabel: copy.openPortal,
+        footer: copy.automatic,
+        direction,
         body: `
-          <h2 style="margin:0 0 12px;color:#103235;">${cleanerName} ya llego</h2>
-          <p>Hola ${client.name}, el trabajo ya esta iniciando.</p>
-          <p>Puedes abrir tu portal para ver el estado del servicio.</p>
+          <h2 style="margin:0 0 12px;color:#103235;">${copy.arrivedTitle(cleanerName)}</h2>
+          <p>${copy.arrivedBody(client.name)}</p>
+          <p>${copy.portalHint}</p>
         `
       })
     };
   }
 
   return {
-    subject: `Tu servicio fue marcado como terminado`,
-    preview: "Trabajo terminado",
-    text: `Hola ${client.name}, tu servicio fue marcado como terminado. Puedes revisar el portal y dejar tu comentario: ${portalUrl}`,
+    subject: copy.finishedSubject,
+    preview: copy.finishedPreview,
+    text: `${copy.finishedTitle}. ${portalUrl}`,
     html: emailShell({
-      preview: "Trabajo terminado",
+      preview: copy.finishedPreview,
       actionUrl: portalUrl,
-      actionLabel: "Revisar servicio",
+      actionLabel: copy.reviewAction,
+      footer: copy.automatic,
+      direction,
       body: `
-        <h2 style="margin:0 0 12px;color:#103235;">Servicio terminado</h2>
-        <p>Hola ${client.name}, tu servicio fue marcado como terminado.</p>
-        <p>Ahora puedes revisar la informacion del trabajo y dejar tu comentario sobre el servicio y el cleaner.</p>
+        <h2 style="margin:0 0 12px;color:#103235;">${copy.finishedTitle}</h2>
+        <p>${copy.finishedBody(client.name)}</p>
+        <p>${copy.reviewHint}</p>
       `
     })
   };
