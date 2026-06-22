@@ -2784,21 +2784,60 @@ function addDays(days) {
   return localDateKey(date);
 }
 
+function compactLocalEvidence(evidence = []) {
+  return (Array.isArray(evidence) ? evidence : []).map((item) => ({
+    ...item,
+    url: typeof item.url === "string" && item.url.startsWith("data:") ? "" : item.url
+  }));
+}
+
+function compactJobForLocalStorage(job = {}) {
+  return {
+    ...job,
+    evidence: compactLocalEvidence(job.evidence),
+    clientSignature: typeof job.clientSignature === "string" && job.clientSignature.length > 5000 ? "" : job.clientSignature,
+    siteSignature: typeof job.siteSignature === "string" && job.siteSignature.length > 5000 ? "" : job.siteSignature
+  };
+}
+
+function compactReceiptForLocalStorage(receipt = {}) {
+  return {
+    ...receipt,
+    signature: typeof receipt.signature === "string" && receipt.signature.length > 5000 ? "" : receipt.signature
+  };
+}
+
+function setLocalStorageValue(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (error) {
+    console.warn(`Local cache skipped for ${key}:`, error);
+    return false;
+  }
+}
+
+function setLocalStorageJson(key, value, fallbackValue = null) {
+  const saved = setLocalStorageValue(key, JSON.stringify(value));
+  if (saved || fallbackValue === null) return saved;
+  return setLocalStorageValue(key, JSON.stringify(fallbackValue));
+}
+
 function saveLocalState() {
-  localStorage.setItem("jobvisto-mode", state.mode);
-  localStorage.setItem("jobvisto-country", state.country);
-  localStorage.setItem("jobvisto-language", state.language);
-  localStorage.setItem("jobvisto-clients", JSON.stringify(state.clients));
-  localStorage.setItem("jobvisto-cleaners", JSON.stringify(state.cleaners));
-  localStorage.setItem("jobvisto-jobs", JSON.stringify(state.jobs));
-  localStorage.setItem("jobvisto-receipts", JSON.stringify(state.receipts));
-  localStorage.setItem("jobvisto-client-payments", JSON.stringify(state.clientPayments || []));
-  localStorage.setItem("jobvisto-service-rules", JSON.stringify(state.serviceRules));
-  localStorage.setItem("jobvisto-client-price-rules", JSON.stringify(state.clientPriceRules));
-  localStorage.setItem("jobvisto-cost-rules", JSON.stringify(state.costRules));
-  localStorage.setItem("jobvisto-company-profile", JSON.stringify(state.companyProfile));
-  localStorage.setItem("jobvisto-vat-rate", String(state.vatRate));
-  localStorage.setItem("jobvisto-currency-symbol", state.currencySymbol);
+  setLocalStorageValue("jobvisto-mode", state.mode);
+  setLocalStorageValue("jobvisto-country", state.country);
+  setLocalStorageValue("jobvisto-language", state.language);
+  setLocalStorageJson("jobvisto-clients", state.clients, []);
+  setLocalStorageJson("jobvisto-cleaners", state.cleaners, []);
+  setLocalStorageJson("jobvisto-jobs", (state.jobs || []).map(compactJobForLocalStorage), []);
+  setLocalStorageJson("jobvisto-receipts", (state.receipts || []).map(compactReceiptForLocalStorage), []);
+  setLocalStorageJson("jobvisto-client-payments", state.clientPayments || [], []);
+  setLocalStorageJson("jobvisto-service-rules", state.serviceRules, {});
+  setLocalStorageJson("jobvisto-client-price-rules", state.clientPriceRules, []);
+  setLocalStorageJson("jobvisto-cost-rules", state.costRules, {});
+  setLocalStorageJson("jobvisto-company-profile", state.companyProfile, {});
+  setLocalStorageValue("jobvisto-vat-rate", String(state.vatRate));
+  setLocalStorageValue("jobvisto-currency-symbol", state.currencySymbol);
 }
 
 function save() {
