@@ -4221,6 +4221,25 @@ function clientPortalCredentials() {
 async function persistPortalEvidence(job, evidence) {
   if (!supabaseClient) return;
   const dbPhase = evidence.phase === "Antes" ? "before" : "after";
+  let filePath = evidence.url;
+  if (String(evidence.url || "").startsWith("data:")) {
+    const extension = String(evidence.fileName || "photo.jpg").split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+    const storagePath = `${job.organizationId || state.orgId}/${job.id}/${evidence.id}.${extension === "jpeg" ? "jpg" : extension}`;
+    const blob = await fetch(evidence.url).then((response) => response.blob());
+    const { error: uploadError } = await supabaseClient.storage
+      .from("job-evidence")
+      .upload(storagePath, blob, {
+        contentType: blob.type || "image/jpeg",
+        upsert: true
+      });
+    if (uploadError) throw uploadError;
+    const { data: signedData, error: signedError } = await supabaseClient.storage
+      .from("job-evidence")
+      .createSignedUrl(storagePath, 60 * 60 * 24 * 30);
+    if (signedError) throw signedError;
+    filePath = signedData?.signedUrl || storagePath;
+    evidence.url = filePath;
+  }
   if (portalPageVisible("#cleanerPortalPage") && !portalCleanerAdmin) {
     const { cleanerId, cleanerKey } = cleanerPortalCredentials();
     const { error } = await supabaseClient.rpc("portal_cleaner_save_evidence", {
@@ -4230,7 +4249,7 @@ async function persistPortalEvidence(job, evidence) {
       job_id: job.id,
       p_area: evidence.section || "General",
       p_phase: dbPhase,
-      p_file_path: evidence.url,
+      p_file_path: filePath,
       p_caption: evidence.comment || ""
     });
     if (error) throw error;
@@ -4243,7 +4262,7 @@ async function persistPortalEvidence(job, evidence) {
     job_id: job.id,
     area: evidence.section || "General",
     phase: dbPhase,
-    file_path: evidence.url,
+    file_path: filePath,
     caption: evidence.comment || ""
   });
   if (error) throw error;
@@ -6612,8 +6631,9 @@ async function handleAdminEvidenceSubmit(event) {
   const phase = data.get("phase") || "Antes";
   const comment = data.get("comment") || "Evidencia agregada por administracion.";
   const createdAt = new Date().toISOString();
+  const createdEvidence = [];
   for (const file of files) {
-    evidenceFor(job).push({
+    createdEvidence.push({
       id: safeId(),
       section,
       phase,
@@ -6624,11 +6644,15 @@ async function handleAdminEvidenceSubmit(event) {
       source: "admin"
     });
   }
-  job.photos = evidenceCount(job);
   try {
-    await saveAndSyncCritical();
+    for (const evidence of createdEvidence) {
+      await persistPortalEvidence(job, evidence);
+      evidenceFor(job).push(evidence);
+    }
+    job.photos = evidenceCount(job);
+    saveLocalState();
     renderAll();
-    toast(`${files.length} foto${files.length === 1 ? "" : "s"} agregada${files.length === 1 ? "" : "s"} por administracion.`);
+    toast(`Evidencia guardada correctamente: ${files.length} foto${files.length === 1 ? "" : "s"}.`);
   } catch (error) {
     console.error("Error saving admin evidence:", error);
     toast(t("adminEvidenceSaveError"));
@@ -9040,14 +9064,22 @@ function setupEvents() {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
     if (selectedAuthAction === "login") {
+      const email = String(data.email || "").trim();
+      const password = String(data.password || "").trim();
+      if (!email || !password) {
+        resetAuthSubmitButton();
+        toast(!email ? "Ingresa tu correo para continuar." : "Ingresa tu contrasena para continuar.");
+        return;
+      }
       toast("Iniciando sesion...");
       try {
         const { data: authData, error } = await supabaseClient.auth.signInWithPassword({
-          email: data.email,
-          password: data.password
+          email,
+          password
         });
         if (error) {
           toast("Error: " + error.message);
+          resetAuthSubmitButton();
           return;
         }
         state.user = authData.user;
@@ -9971,7 +10003,13 @@ if (supabaseClient) {
     if (session) {
       // Disable login button to prevent overlapping submissions
       const loginBtn = $("#authForm button[type='submit']");
-      if (loginBtn) {
+      const authForm = $("#authForm");
+      const authScreenVisible = !$("#authScreen")?.classList.contains("hidden");
+      const hasTypedCredentials = Boolean(
+        authForm?.elements.email?.value?.trim() &&
+        authForm?.elements.password?.value?.trim()
+      );
+      if (loginBtn && (!authScreenVisible || hasTypedCredentials || event === "INITIAL_SESSION")) {
         loginBtn.disabled = true;
         loginBtn.textContent = event === "INITIAL_SESSION" ? "Cargando sesión..." : "Iniciando...";
       }
