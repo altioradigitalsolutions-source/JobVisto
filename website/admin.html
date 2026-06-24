@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>JobVisto | Admin privado</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#063f34">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./admin.css">
+  </head>
+  <body>
+    <main class="admin-page">
+      <section class="admin-auth" id="adminAuth">
+        <div class="auth-card">
+          <a class="brand" href="./index.html" aria-label="JobVisto inicio">
+            <img src="./assets/Logo Jobvisto.png" alt="JobVisto">
+          </a>
+          <div>
+            <p class="eyebrow">Admin privado</p>
+            <h1>Dashboard del dueno de JobVisto</h1>
+            <p class="muted">Acceso protegido. Solo el email admin autorizado puede ver y gestionar cuentas.</p>
+          </div>
+          <form class="admin-login-form" id="adminLoginForm">
+            <label>
+              Email admin
+              <input type="email" name="email" autocomplete="email" required>
+            </label>
+            <label>
+              Password
+              <input type="password" name="password" autocomplete="current-password" required>
+            </label>
+            <button class="primary" type="submit">Entrar</button>
+          </form>
+          <p class="auth-message" id="authMessage" role="alert"></p>
+        </div>
+      </section>
+
+      <section class="admin-shell hidden" id="adminShell">
+        <header class="admin-header">
+          <div>
+            <p class="eyebrow">JobVisto Admin</p>
+            <h1>Clientes registrados</h1>
+            <p class="muted">Lectura y gestion manual de cuentas. No modifica flujos automaticos.</p>
+          </div>
+          <div class="admin-actions">
+            <button class="secondary" type="button" id="refreshButton">Actualizar</button>
+            <button class="ghost" type="button" id="signOutButton">Salir</button>
+          </div>
+        </header>
+
+        <section class="kpi-grid" aria-label="Resumen de clientes registrados">
+          <article>
+            <span>Total clientes</span>
+            <strong id="totalClients">0</strong>
+          </article>
+          <article>
+            <span>Activos</span>
+            <strong id="activeClients">0</strong>
+          </article>
+          <article>
+            <span>Inactivos</span>
+            <strong id="inactiveClients">0</strong>
+          </article>
+          <article>
+            <span>Pagos al dia</span>
+            <strong id="paidClients">0</strong>
+          </article>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Cuentas</h2>
+              <p class="muted">Nombre, email, plan, fecha de registro y estado de pago.</p>
+            </div>
+            <p class="status-line" id="statusLine" aria-live="polite"></p>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Email</th>
+                  <th>Plan</th>
+                  <th>Registro</th>
+                  <th>Estado</th>
+                  <th>Pago</th>
+                  <th>Gestion manual</th>
+                </tr>
+              </thead>
+              <tbody id="clientsTableBody">
+                <tr>
+                  <td colspan="7" class="empty-cell">Cargando clientes...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./supabase-config.js"></script>
+    <script src="./admin.js"></script>
+  </body>
+</html>
