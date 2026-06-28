@@ -2191,6 +2191,40 @@ body.social-login-disabled .social-row {
 .confirm-modal-card {
   width: min(560px, 100%);
 }
+.void-client-payment-card {
+  border: 1px solid rgba(53, 209, 127, .28);
+  background:
+    linear-gradient(145deg, rgba(4, 34, 29, .98), rgba(9, 87, 66, .96) 52%, rgba(15, 139, 99, .94)),
+    var(--green-dark);
+  color: #ffffff;
+  box-shadow: 0 28px 80px rgba(2, 28, 22, .32);
+}
+.void-client-payment-card .muted,
+.void-client-payment-card .delete-job-summary span {
+  color: rgba(255, 255, 255, .76);
+}
+.void-client-payment-card .ghost {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, .24);
+  background: rgba(255, 255, 255, .08);
+}
+.void-client-payment-card .status-chip {
+  display: inline-flex;
+  margin-bottom: 8px;
+  color: var(--green-dark);
+  background: #dff8eb;
+}
+.void-client-payment-summary {
+  border-color: rgba(255, 255, 255, .18);
+  background: rgba(2, 28, 22, .34);
+}
+.void-client-payment-card .confirm-danger {
+  color: #06231d;
+  background: #f1b7dd;
+}
+.void-client-payment-card .confirm-danger:hover {
+  background: #f6c7e6;
+}
 .idle-brand-card {
   width: 100%;
   max-width: 350px;

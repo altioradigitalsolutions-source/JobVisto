@@ -1642,6 +1642,24 @@
       </div>
     </div>
 
+    <div class="modal hidden" id="voidClientPaymentModal" role="dialog" aria-modal="true" aria-labelledby="voidClientPaymentTitle">
+      <div class="modal-card confirm-modal-card void-client-payment-card">
+        <div class="panel-head">
+          <div>
+            <span class="status-chip">JV</span>
+            <h3 id="voidClientPaymentTitle">Anular cobro</h3>
+            <p class="muted">Este cobro se quitara del historial y el balance del cliente se recalculara.</p>
+          </div>
+          <button class="ghost" type="button" id="closeVoidClientPaymentModal">Cerrar</button>
+        </div>
+        <div class="delete-job-summary void-client-payment-summary" id="voidClientPaymentSummary"></div>
+        <div class="form-actions">
+          <button class="ghost" type="button" id="cancelVoidClientPayment">Cancelar</button>
+          <button class="mini-action danger confirm-danger" type="button" id="confirmVoidClientPaymentButton">Anular cobro</button>
+        </div>
+      </div>
+    </div>
+
     <div class="toast" id="toast"></div>
 
     <div class="modal hidden" id="clientPortalSettingsModal" role="dialog" aria-modal="true" aria-labelledby="clientPortalSettingsTitle" style="z-index: 1000;">

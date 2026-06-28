@@ -933,6 +933,7 @@ let pendingDeleteJobId = null;
 let pendingArchiveCleanerId = null;
 let pendingArchiveClientId = null;
 let pendingDeleteReceiptId = null;
+let pendingVoidClientPaymentId = null;
 let signaturePad = null;
 let portalClientId = null;
 let portalCleanerId = null;
@@ -3226,14 +3227,12 @@ async function persistClientPaymentVoidCritical(paymentId, affectedJobIds = []) 
   }
 }
 
-async function voidClientPayment(paymentId) {
+async function executeVoidClientPayment(paymentId) {
   const payment = (state.clientPayments || []).find(item => item.id === paymentId);
   if (!payment) {
     toast("No se encontro el cobro.");
     return;
   }
-  const clientName = payment.clientName || state.clients.find(client => client.id === payment.clientId)?.name || "cliente";
-  if (!window.confirm(`Anular este cobro de ${clientName}? El balance del cliente se recalculara.`)) return;
 
   const previousJobs = structuredClone(state.jobs || []);
   const previousClientPayments = structuredClone(state.clientPayments || []);
@@ -3254,6 +3253,38 @@ async function voidClientPayment(paymentId) {
     renderAll();
     toast("No se pudo anular el cobro. Intentalo nuevamente.");
   }
+}
+
+function openVoidClientPaymentModal(paymentId) {
+  const payment = (state.clientPayments || []).find(item => item.id === paymentId);
+  if (!payment) {
+    toast("No se encontro el cobro.");
+    return;
+  }
+  const client = state.clients.find(item => item.id === payment.clientId);
+  pendingVoidClientPaymentId = paymentId;
+  $("#voidClientPaymentSummary").innerHTML = `
+    <strong>${escapeHtml(payment.clientName || client?.name || "Cliente")} - ${money(payment.amountReceived || 0)}</strong>
+    <span>${escapeHtml(payment.method || "Efectivo")} - ${escapeHtml(payment.date || "")}</span>
+    <span>${payment.jobIds?.length || 0} trabajo${payment.jobIds?.length === 1 ? "" : "s"} incluido${payment.jobIds?.length === 1 ? "" : "s"}</span>
+  `;
+  $("#voidClientPaymentModal").classList.remove("hidden");
+}
+
+function closeVoidClientPaymentModal() {
+  pendingVoidClientPaymentId = null;
+  $("#voidClientPaymentModal").classList.add("hidden");
+}
+
+async function confirmVoidClientPayment() {
+  const paymentId = pendingVoidClientPaymentId;
+  closeVoidClientPaymentModal();
+  if (!paymentId) return;
+  await executeVoidClientPayment(paymentId);
+}
+
+function voidClientPayment(paymentId) {
+  openVoidClientPaymentModal(paymentId);
 }
 window.voidClientPayment = voidClientPayment;
 
@@ -9629,6 +9660,12 @@ function setupEvents() {
   $("#confirmDeleteReceiptButton").addEventListener("click", deletePendingReceipt);
   $("#deleteReceiptModal").addEventListener("click", (event) => {
     if (event.target.id === "deleteReceiptModal") closeDeleteReceiptModal();
+  });
+  $("#closeVoidClientPaymentModal").addEventListener("click", closeVoidClientPaymentModal);
+  $("#cancelVoidClientPayment").addEventListener("click", closeVoidClientPaymentModal);
+  $("#confirmVoidClientPaymentButton").addEventListener("click", confirmVoidClientPayment);
+  $("#voidClientPaymentModal").addEventListener("click", (event) => {
+    if (event.target.id === "voidClientPaymentModal") closeVoidClientPaymentModal();
   });
   
   document.addEventListener("click", async (event) => {
