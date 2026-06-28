@@ -328,6 +328,41 @@ async function persistClientPayment(organizationId, payment = {}, backups = {}) 
   return warnings;
 }
 
+async function voidClientPayment(organizationId, paymentId, affectedJobIds = [], backups = {}) {
+  const jobIds = cleanUuidArray(affectedJobIds);
+  const jobs = Array.isArray(backups.jobs) ? backups.jobs.filter((job) => jobIds.includes(job.id)) : [];
+  const warnings = [];
+  let historySaved = false;
+
+  if (!paymentId) {
+    throw new Error("Missing client payment id");
+  }
+
+  historySaved = await safeBackupSetting(warnings, organizationId, "client_payment_receipts_backup", { payments: backups.clientPayments || [] }) || historySaved;
+  await safeBackupSetting(warnings, organizationId, "jobs_payment_state_backup", { jobs: backups.jobs || [] });
+
+  for (const job of jobs) {
+    const warning = await safeWrite(`job payment state ${job.id}`, () => supabaseFetch(`/rest/v1/jobs?id=eq.${encodeURIComponent(job.id)}&organization_id=eq.${encodeURIComponent(organizationId)}`, {
+      method: "PATCH",
+      body: {
+        client_paid_amount: money(job.clientPaidAmount),
+        client_payment_status: job.clientPaymentStatus || "unpaid",
+        client_paid_date: job.clientPaidDate || null,
+        client_payment_method: job.clientPaymentMethod || null
+      }
+    }));
+    if (warning) warnings.push(warning);
+  }
+
+  const receiptWarning = await safeWrite("client payment receipt void", () => supabaseFetch(`/rest/v1/client_payment_receipts?id=eq.${encodeURIComponent(paymentId)}&organization_id=eq.${encodeURIComponent(organizationId)}`, {
+    method: "DELETE"
+  }));
+  historySaved = pushWarning(warnings, receiptWarning) || historySaved;
+  requireHistorySaved(historySaved, warnings, "La anulacion del cobro del cliente");
+
+  return warnings;
+}
+
 export default async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
@@ -348,6 +383,10 @@ export default async (req) => {
 
     if (body.type === "client_payment") {
       const warnings = addAuthWarning(await persistClientPayment(organizationId, body.payment, body.backups));
+      return json({ ok: true, warnings });
+    }
+    if (body.type === "client_payment_void") {
+      const warnings = addAuthWarning(await voidClientPayment(organizationId, body.paymentId, body.affectedJobIds, body.backups));
       return json({ ok: true, warnings });
     }
 

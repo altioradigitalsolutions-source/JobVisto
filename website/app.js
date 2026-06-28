@@ -3106,6 +3106,157 @@ async function persistClientPaymentCritical(payment, jobIds = []) {
   }
 }
 
+function recalculateClientPaymentJobs(extraJobIds = []) {
+  const paidJobIds = new Set(extraJobIds);
+  (state.clientPayments || []).forEach(payment => {
+    (payment.jobIds || []).forEach(jobId => paidJobIds.add(jobId));
+  });
+  (state.jobs || []).forEach(job => {
+    if (!paidJobIds.has(job.id)) return;
+    job.clientPaidAmount = 0;
+    job.clientPaymentStatus = "unpaid";
+    job.clientPaidDate = "";
+    job.clientPaymentMethod = "";
+  });
+
+  const payments = [...(state.clientPayments || [])].sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
+  payments.forEach(payment => {
+    let remainingToCover = roundMoney(Number(payment.amountReceived || 0) + Number(payment.discount || 0));
+    (payment.jobIds || []).forEach(jobId => {
+      if (remainingToCover <= 0) return;
+      const job = (state.jobs || []).find(item => item.id === jobId);
+      if (!job) return;
+      const jobCost = roundMoney(estimateJob(job));
+      const alreadyPaid = roundMoney(parseMoneyInput(job.clientPaidAmount));
+      const owe = Math.max(0, roundMoney(jobCost - alreadyPaid));
+      if (owe <= 0) return;
+
+      const applied = Math.min(remainingToCover, owe);
+      job.clientPaidAmount = roundMoney(alreadyPaid + applied);
+      job.clientPaymentStatus = job.clientPaidAmount >= jobCost ? "paid" : "partial";
+      job.clientPaidDate = payment.createdAt ? String(payment.createdAt).slice(0, 10) : today();
+      job.clientPaymentMethod = payment.method || "";
+      remainingToCover = roundMoney(remainingToCover - applied);
+    });
+  });
+}
+
+async function persistClientPaymentVoidCritical(paymentId, affectedJobIds = []) {
+  saveLocalState();
+  if (!supabaseClient || !state.orgId || !state.user) return;
+  ensureValidUuids();
+  saveLocalState();
+
+  const jobsBackup = jobPaymentBackupRows();
+
+  if (shouldUseServerPaymentPersistence()) {
+    try {
+      await persistPaymentThroughServer({
+        type: "client_payment_void",
+        paymentId,
+        affectedJobIds,
+        backups: {
+          clientPayments: state.clientPayments || [],
+          jobs: jobsBackup
+        }
+      });
+      return;
+    } catch (error) {
+      console.warn("Server client payment void failed; falling back to browser persistence:", error);
+    }
+  }
+
+  const jobIds = new Set(affectedJobIds);
+  const jobsToPersist = (state.jobs || []).filter(job => jobIds.has(job.id));
+  let clientBackupSaved = false;
+  let jobBackupSaved = false;
+  let receiptDeleted = false;
+  let anyJobStatusSaved = false;
+  let lastError = null;
+
+  try {
+    clientBackupSaved = await upsertOrganizationSetting("client_payment_receipts_backup", { payments: state.clientPayments || [] });
+  } catch (error) {
+    lastError = error;
+    console.warn("Client payment backup setting failed after void:", error);
+  }
+
+  try {
+    jobBackupSaved = await upsertOrganizationSetting("jobs_payment_state_backup", { jobs: jobsBackup });
+  } catch (error) {
+    lastError = error;
+    console.warn("Job payment backup setting failed after void:", error);
+  }
+
+  for (const job of jobsToPersist) {
+    try {
+      const { error: jobPaymentError } = await supabaseClient
+        .from("jobs")
+        .update({
+          client_paid_amount: Number(job.clientPaidAmount || 0),
+          client_payment_status: job.clientPaymentStatus || "unpaid",
+          client_paid_date: job.clientPaidDate || null,
+          client_payment_method: job.clientPaymentMethod || null
+        })
+        .eq("id", job.id)
+        .eq("organization_id", state.orgId);
+      if (jobPaymentError) throw jobPaymentError;
+      anyJobStatusSaved = true;
+    } catch (error) {
+      lastError = error;
+      console.warn("Client payment job status void failed; keeping backup setting:", error);
+    }
+  }
+
+  try {
+    const { error: receiptError } = await supabaseClient
+      .from("client_payment_receipts")
+      .delete()
+      .eq("id", paymentId)
+      .eq("organization_id", state.orgId);
+    if (receiptError) throw receiptError;
+    receiptDeleted = true;
+  } catch (error) {
+    lastError = error;
+    console.warn("Client payment receipt delete failed; keeping backup setting:", error);
+  }
+
+  if (!clientBackupSaved && !jobBackupSaved && !receiptDeleted && !anyJobStatusSaved) {
+    throw lastError || new Error("No se pudo anular el cobro del cliente.");
+  }
+}
+
+async function voidClientPayment(paymentId) {
+  const payment = (state.clientPayments || []).find(item => item.id === paymentId);
+  if (!payment) {
+    toast("No se encontro el cobro.");
+    return;
+  }
+  const clientName = payment.clientName || state.clients.find(client => client.id === payment.clientId)?.name || "cliente";
+  if (!window.confirm(`Anular este cobro de ${clientName}? El balance del cliente se recalculara.`)) return;
+
+  const previousJobs = structuredClone(state.jobs || []);
+  const previousClientPayments = structuredClone(state.clientPayments || []);
+  const affectedJobIds = [...new Set(payment.jobIds || [])];
+
+  state.clientPayments = (state.clientPayments || []).filter(item => item.id !== paymentId);
+  recalculateClientPaymentJobs(affectedJobIds);
+
+  try {
+    await persistClientPaymentVoidCritical(paymentId, affectedJobIds);
+    renderAll();
+    toast("Cobro anulado. Balance del cliente actualizado.");
+  } catch (error) {
+    console.error("Error voiding client payment:", error);
+    state.jobs = previousJobs;
+    state.clientPayments = previousClientPayments;
+    saveLocalState();
+    renderAll();
+    toast("No se pudo anular el cobro. Intentalo nuevamente.");
+  }
+}
+window.voidClientPayment = voidClientPayment;
+
 function clientFor(job) {
   return state.clients.find((client) => client.id === job.clientId) || state.clients[0];
 }
@@ -8777,6 +8928,9 @@ function renderClientPaymentReceipts() {
             <span class="receipt-amount">${balance > 0 ? money(balance) : money(0)}</span>
             <span class="${balance > 0 ? "receipt-status-pending" : "receipt-status-done"}">${balance > 0 ? "Saldo" : "Pagado"}</span>
           </div>
+        </div>
+        <div class="receipt-actions" style="margin-top: 8px;">
+          <button class="mini-action" type="button" onclick="voidClientPayment('${payment.id}')">Anular cobro</button>
         </div>
       </article>
     `;
