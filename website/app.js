@@ -28,13 +28,39 @@ function mergeById(primary = [], backup = []) {
   );
 }
 
-const JOBVISTO_SUPABASE_URL = window.JOBVISTO_CONFIG?.supabaseUrl || "https://fmpzdmmmqwqxxgeytmkr.supabase.co";
-const JOBVISTO_SUPABASE_ANON_KEY = window.JOBVISTO_CONFIG?.supabaseAnonKey || "sb_publishable_YWE8eNstQh3KkkAWc6cXyA_Crhbvord";
+const JOBVISTO_SUPABASE_URL = window.JOBVISTO_CONFIG?.supabaseUrl || "https://aofsfxwfvagzgnhiyntb.supabase.co";
+const JOBVISTO_SUPABASE_ANON_KEY = window.JOBVISTO_CONFIG?.supabaseAnonKey || "sb_publishable_5eepp5D9Z1NZ88GbOCkHAA_FR1b6dyZ";
 
 const supabaseClient = window.supabase ? window.supabase.createClient(
   JOBVISTO_SUPABASE_URL,
   JOBVISTO_SUPABASE_ANON_KEY
-) : null;
+) : {
+  auth: {
+    getUser: async () => ({ data: { user: null }, error: null }),
+    getSession: async () => ({ data: { session: null }, error: null }),
+    onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } })
+  },
+  rpc: async (name, body) => {
+    const response = await fetch(`${JOBVISTO_SUPABASE_URL}/rest/v1/rpc/${name}`, {
+      method: "POST",
+      headers: { apikey: JOBVISTO_SUPABASE_ANON_KEY, authorization: `Bearer ${JOBVISTO_SUPABASE_ANON_KEY}`, "content-type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    return { data: response.ok ? await response.json() : null, error: response.ok ? null : await response.json().catch(() => ({ message: response.statusText })) };
+  },
+  from: (table) => ({
+    update: (body) => ({
+      eq: async (column, value) => {
+        const response = await fetch(`${JOBVISTO_SUPABASE_URL}/rest/v1/${table}?${encodeURIComponent(column)}=eq.${encodeURIComponent(value)}`, {
+          method: "PATCH",
+          headers: { apikey: JOBVISTO_SUPABASE_ANON_KEY, authorization: `Bearer ${JOBVISTO_SUPABASE_ANON_KEY}`, "content-type": "application/json", prefer: "return=minimal" },
+          body: JSON.stringify(body)
+        });
+        return { error: response.ok ? null : await response.json().catch(() => ({ message: response.statusText })) };
+      }
+    })
+  })
+};
 
 async function supabaseData(query, label = "Supabase") {
   const { data, error } = await query;
@@ -7679,13 +7705,19 @@ async function generateClientPortalKey(clientId) {
   client.portalPasscode = generateBrandPasscode(client.name);
   if (supabaseClient && state.user) {
     toast("Guardando clave nueva...");
-    const { error } = await supabaseClient
-      .from("clients")
-      .update({
-        portal_active: true,
-        portal_passcode: client.portalPasscode
-      })
-      .eq("id", client.id);
+    const { error } = await (async () => {
+      const session = await supabaseClient.auth?.getSession?.();
+      const token = session?.data?.session?.access_token;
+      if (token && state.orgId) {
+        const response = await fetch("/.netlify/functions/app-job", {
+          method: "POST",
+          headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+          body: JSON.stringify({ organizationId: state.orgId, client: clientSupabasePayload(client) })
+        });
+        if (response.ok) return { error: null };
+      }
+      return supabaseClient.from("clients").update({ portal_active: true, portal_passcode: client.portalPasscode }).eq("id", client.id);
+    })();
     if (error) {
       toast("No se pudo guardar la clave nueva. Intenta otra vez.");
       return;
