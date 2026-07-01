@@ -1,7 +1,7 @@
 function env(name) {
   const netlifyValue = globalThis.Netlify?.env?.get?.(name);
   const value = netlifyValue || process.env[name];
-  if (name === "SUPABASE_URL" && !String(value || "").startsWith("http")) return "https://fmpzdmmmqwqxxgeytmkr.supabase.co";
+  if (name === "SUPABASE_URL" && !String(value || "").startsWith("http")) return "https://aofsfxwfvagzgnhiyntb.supabase.co";
   return value;
 }
 

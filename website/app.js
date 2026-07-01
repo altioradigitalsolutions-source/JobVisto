@@ -7100,11 +7100,16 @@ function renderCleaners() {
     button.addEventListener("click", () => restoreCleaner(button.dataset.restoreCleaner));
   });
   $$("[data-open-cleaner-portal]").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       const cleaner = state.cleaners.find((item) => item.id === button.dataset.openCleanerPortal);
-      ensureCleanerPortalKey(cleaner);
-      save();
-      window.open(localCleanerPortalUrl(cleaner), "_blank");
+      if (!cleaner) return;
+      try {
+        await ensureCleanerPortalAccessSynced(cleaner);
+        window.open(localCleanerPortalUrl(cleaner), "_blank");
+      } catch (error) {
+        console.error("Cleaner portal key sync failed:", error);
+        toast("No se pudo guardar la clave del limpiador. Intenta de nuevo.");
+      }
     });
   });
 }
@@ -7158,8 +7163,13 @@ function territoryHtml(records, label) {
 async function copyCleanerLink(cleanerId) {
   const cleaner = state.cleaners.find((item) => item.id === cleanerId);
   if (!cleaner) return;
-  ensureCleanerPortalKey(cleaner);
-  save();
+  try {
+    await ensureCleanerPortalAccessSynced(cleaner);
+  } catch (error) {
+    console.error("Cleaner portal key sync failed:", error);
+    toast("No se pudo guardar la clave del limpiador. Intenta de nuevo.");
+    return;
+  }
   const text = `${localCleanerPortalUrl(cleaner)}\nClave: ${cleanerPortalDisplayKey(cleaner)}`;
   try {
     await navigator.clipboard.writeText(text);
@@ -7172,8 +7182,13 @@ async function copyCleanerLink(cleanerId) {
 async function copyCleanerKey(cleanerId) {
   const cleaner = state.cleaners.find((item) => item.id === cleanerId);
   if (!cleaner) return;
-  ensureCleanerPortalKey(cleaner);
-  save();
+  try {
+    await ensureCleanerPortalAccessSynced(cleaner);
+  } catch (error) {
+    console.error("Cleaner portal key sync failed:", error);
+    toast("No se pudo guardar la clave del limpiador. Intenta de nuevo.");
+    return;
+  }
   const text = cleanerPortalDisplayKey(cleaner);
   try {
     await navigator.clipboard.writeText(text);
@@ -7181,6 +7196,19 @@ async function copyCleanerKey(cleanerId) {
   } catch {
     window.prompt("Copia esta clave del limpiador:", text);
   }
+}
+
+async function ensureCleanerPortalAccessSynced(cleaner) {
+  if (!cleaner) return null;
+  ensureCleanerPortalKey(cleaner);
+  saveLocalState();
+  if (supabaseClient && state.orgId && state.user) {
+    const { error } = await supabaseClient
+      .from("cleaners")
+      .upsert(cleanerSupabasePayload(cleaner));
+    if (error) throw error;
+  }
+  return cleaner;
 }
 
 function startCleanerEdit(cleanerId) {
