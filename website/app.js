@@ -951,6 +951,7 @@ const stripePaymentReturn = ["success", "paid"].includes(String(pageParams.get("
 let selectedAuthAction = pageParams.get("intent") === "signup" || pageParams.get("plan") || stripePaymentReturn ? "signup" : "login";
 let selectedPlan = normalizePlanKey(pageParams.get("plan")) || (state.mode === "company" ? "company" : "free");
 let verificationSent = false;
+let signupVerification = JSON.parse(sessionStorage.getItem("jobvisto-signup-verification") || "null");
 let calendarCursor = new Date();
 let expandedJobId = null;
 let signingReceiptId = null;
@@ -1139,7 +1140,7 @@ const i18n = {
     phonePlaceholder: "Contact number",
     plan: "Plan",
     emailVerification: "Email verification",
-    emailVerificationCopy: "First we confirm that the email belongs to the client. In production, a real email will be sent.",
+    emailVerificationCopy: "We will send a code to your email to confirm your account.",
     sendCode: "Send code",
     receivedCode: "Received code",
     securePayment: "Secure payment",
@@ -1148,7 +1149,7 @@ const i18n = {
     paymentReturnTitle: "Payment received",
     paymentReturnCopy: "Complete your account details to activate JobVisto with the plan you just paid for.",
     createAccount: "Create account and activate",
-    fineprint: "Real payment will connect with Stripe. This screen prepares the registration, verification and activation flow.",
+    fineprint: "",
     cleanerArrived: "Cleaner arrived",
     cleanerArrivedCopy: "Client notified, GPS saved and job in progress.",
     cleanerPrivatePortal: "Cleaner private portal",
@@ -1560,7 +1561,7 @@ const i18n = {
     phonePlaceholder: "Numero de contacto",
     plan: "Plan",
     emailVerification: "Verificacion de email",
-    emailVerificationCopy: "Primero confirmamos que el correo pertenece al cliente. En produccion se enviara un email real.",
+    emailVerificationCopy: "Te enviaremos un codigo a tu correo para confirmar tu cuenta.",
     sendCode: "Enviar codigo",
     receivedCode: "Codigo recibido",
     securePayment: "Pago seguro",
@@ -1569,7 +1570,7 @@ const i18n = {
     paymentReturnTitle: "Pago recibido",
     paymentReturnCopy: "Completa los datos de tu cuenta para activar JobVisto con el plan que acabas de pagar.",
     createAccount: "Crear cuenta y activar",
-    fineprint: "El pago real se conectara con Stripe. Esta pantalla deja armado el flujo de registro, verificacion y activacion.",
+    fineprint: "",
     cleanerArrived: "El limpiador llego",
     cleanerArrivedCopy: "Cliente notificado, GPS guardado y trabajo en progreso.",
     cleanerPrivatePortal: "Portal privado del limpiador",
@@ -1981,7 +1982,7 @@ const i18n = {
     phonePlaceholder: "Контактный номер",
     plan: "Тариф",
     emailVerification: "Проверка email",
-    emailVerificationCopy: "Сначала мы подтверждаем, что email принадлежит клиенту. В продакшене будет отправлено настоящее письмо.",
+    emailVerificationCopy: "Мы отправим код на ваш email, чтобы подтвердить учетную запись.",
     sendCode: "Отправить код",
     receivedCode: "Полученный код",
     securePayment: "Безопасная оплата",
@@ -1990,7 +1991,7 @@ const i18n = {
     paymentReturnTitle: "Платеж получен",
     paymentReturnCopy: "Заполните данные аккаунта, чтобы активировать JobVisto с оплаченным тарифом.",
     createAccount: "Создать аккаунт и активировать",
-    fineprint: "Реальная оплата будет подключена к Stripe. Этот экран готовит регистрацию, проверку и активацию.",
+    fineprint: "",
     cleanerArrived: "Клинер прибыл",
     cleanerArrivedCopy: "Клиент уведомлен, GPS сохранен, работа в процессе.",
     cleanerPrivatePortal: "Личный портал клинера",
@@ -2554,6 +2555,42 @@ function goToStripeForPlan(planKey, email = "") {
   const link = stripePaymentLinks[planKey] || stripePaymentLinks.independent;
   const suffix = email ? `?prefilled_email=${encodeURIComponent(email)}` : "";
   location.href = `${link}${suffix}`;
+}
+
+function storeSignupVerification(value) {
+  signupVerification = value;
+  if (value) {
+    sessionStorage.setItem("jobvisto-signup-verification", JSON.stringify(value));
+  } else {
+    sessionStorage.removeItem("jobvisto-signup-verification");
+  }
+}
+
+async function sendSignupVerificationCode(email) {
+  const response = await fetch("/.netlify/functions/app-verification-code", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action: "send", email })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data?.error || "No se pudo enviar el codigo.");
+  storeSignupVerification({ email: String(email || "").trim().toLowerCase(), token: data.verificationToken, verified: false });
+  verificationSent = true;
+}
+
+async function verifySignupCode(email, code) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!signupVerification?.token || signupVerification.email !== normalizedEmail) {
+    throw new Error("Primero envia el codigo a tu correo.");
+  }
+  const response = await fetch("/.netlify/functions/app-verification-code", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action: "verify", email: normalizedEmail, code, verificationToken: signupVerification.token })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.verified) throw new Error(data?.error || "Codigo incorrecto.");
+  storeSignupVerification({ ...signupVerification, verified: true });
 }
 
 async function choosePlan(planKey) {
@@ -9292,9 +9329,19 @@ function setupEvents() {
     if (!button) return;
     await choosePlan(button.dataset.choosePlan);
   });
-  $("#sendVerification").addEventListener("click", () => {
-    verificationSent = true;
-    toast("Codigo enviado al correo. En esta version usa 123456 para continuar.");
+  $("#sendVerification").addEventListener("click", async () => {
+    const email = String($("#authForm")?.elements.email.value || "").trim();
+    if (!email) {
+      toast("Ingresa tu correo para enviar el codigo.");
+      return;
+    }
+    try {
+      toast("Enviando codigo...");
+      await sendSignupVerificationCode(email);
+      toast("Codigo enviado al correo.");
+    } catch (err) {
+      toast(err.message || "No se pudo enviar el codigo.");
+    }
   });
   $("#stripePayButton").addEventListener("click", () => {
     if (selectedPlan === "free") {
@@ -9340,6 +9387,14 @@ function setupEvents() {
     }
     
     if (!stripePaymentReturn) {
+      const email = String(data.email || "").trim();
+      const code = String(data.verifyCode || "").trim();
+      try {
+        await verifySignupCode(email, code);
+      } catch (err) {
+        toast(err.message || "Codigo incorrecto.");
+        return;
+      }
       pendingSignupData = data;
       openPlanChoiceModal("signup");
       return;
