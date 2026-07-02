@@ -4563,6 +4563,25 @@ async function persistCleanerJobAction(action, job, extra = {}) {
   }
 }
 
+async function sendCleanerJobNotification(event, job) {
+  const { cleanerId, cleanerKey } = cleanerPortalCredentials();
+  if (!cleanerId || !cleanerKey) throw new Error("No se pudo validar el acceso del limpiador.");
+  const response = await fetch("/api/app-notifications", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "job-event",
+      event,
+      jobId: job.id,
+      cleanerId,
+      cleanerKey
+    })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data?.error || "No se pudo enviar el email al cliente.");
+  return data;
+}
+
 async function persistPortalClientConfirmation(job) {
   if (!supabaseClient) return;
   if (portalPageVisible("#clientPortalPage")) {
@@ -5538,6 +5557,27 @@ function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
   $$("[data-cleaner-sign-payment]").forEach((button) => {
     button.addEventListener("click", () => openSignatureModal(button.dataset.cleanerSignPayment));
   });
+  $$("[data-cleaner-on-way]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const job = state.jobs.find((item) => item.id === button.dataset.cleanerOnWay);
+      if (!job) return;
+      if (cleanerActionsLocked(job)) {
+        toast(t("futureJobToast"));
+        return;
+      }
+      button.disabled = true;
+      toast("Enviando aviso al cliente...");
+      try {
+        await sendCleanerJobNotification("on_way", job);
+        toast("Aviso enviado al cliente por email.");
+      } catch (err) {
+        console.error("Error sending on-way notification:", err);
+        toast(err.message || "No se pudo enviar el email al cliente.");
+      } finally {
+        button.disabled = false;
+      }
+    });
+  });
   $$("[data-cleaner-arrived]").forEach((button) => {
     button.addEventListener("click", async () => {
       const job = state.jobs.find((item) => item.id === button.dataset.cleanerArrived);
@@ -5734,10 +5774,20 @@ function renderStandaloneCleanerPortal(unlocked = true, options = {}) {
         }
       }
 
+      let finishNotificationError = null;
+      if (!portalCleanerAdmin) {
+        try {
+          await sendCleanerJobNotification("finished", job);
+        } catch (err) {
+          console.error("Error sending finished notification:", err);
+          finishNotificationError = err;
+        }
+      }
+
       save();
       renderStandaloneCleanerPortal(true);
       openJobSignatureModal(job.id);
-      toast(portalCleanerAdmin ? t("adminFinishNeedsSignature") : t("finishNeedsSignature"));
+      toast(finishNotificationError ? "Trabajo terminado, pero no se pudo enviar el email al cliente." : (portalCleanerAdmin ? t("adminFinishNeedsSignature") : t("finishNeedsSignature")));
     });
   });
   bindCleanerAdminCorrections();
@@ -5918,7 +5968,6 @@ function cleanerJobHtml(job) {
   const finishedText = job.checkedOut || job.cleanerFinished ? t("finishedAt").replace("{time}", job.actualEnd || "") : t("finishJob");
   const areaOptions = [...new Set([...(job.tasks || []), ...evidenceFor(job).map((item) => item.section).filter(Boolean)])];
   const areaListId = `areas-${job.id}`;
-  const onWayUrl = whatsAppUrl(client.phone, `Hola ${client.name}, ${cleanerName} va en camino para el servicio de JobVisto (${job.date}, ${job.start}).`);
   return `
     <article class="client-item">
       <strong>${client.name}</strong>
@@ -5949,7 +5998,7 @@ function cleanerJobHtml(job) {
         <p>${t("workBriefInstruction")}</p>
       </div>
       <div class="receipt-actions">
-        ${onWayUrl ? `<a class="mini-action" href="${onWayUrl}" target="_blank" rel="noopener">Voy en camino</a>` : ""}
+        <button class="mini-action" type="button" data-cleaner-on-way="${job.id}" ${actionDisabled}>Voy en camino</button>
         <button class="mini-action" type="button" data-cleaner-arrived="${job.id}" ${arrivedDisabled}>${arrivedText}</button>
         <button class="mini-action" type="button" data-cleaner-photo="${job.id}" ${actionDisabled}>${t("addPhoto")}</button>
         <button class="mini-action" type="button" data-cleaner-finish="${job.id}" ${finishedDisabled}>${finishedText}</button>

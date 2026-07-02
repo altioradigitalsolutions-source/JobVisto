@@ -90,6 +90,15 @@ function clientLanguage(client = {}) {
   return ["es", "en", "ru", "he"].includes(language) ? language : "es";
 }
 
+function cleanerFallbackName(language) {
+  return {
+    es: "tu cleaner",
+    en: "your cleaner",
+    ru: "ваш клинер",
+    he: "הקלינר שלך"
+  }[language] || "tu cleaner";
+}
+
 function emailCopy(language) {
   return {
     es: {
@@ -105,6 +114,10 @@ function emailCopy(language) {
       arrivedPreview: "El cleaner marco llegada",
       arrivedTitle: (cleaner) => `${cleaner} ya llego`,
       arrivedBody: (name) => `Hola ${name}, el trabajo ya esta iniciando.`,
+      onWaySubject: (cleaner) => `${cleaner} va en camino`,
+      onWayPreview: "El cleaner va en camino",
+      onWayTitle: (cleaner) => `${cleaner} va en camino`,
+      onWayBody: (name) => `Hola ${name}, el cleaner ya va en camino para iniciar el servicio.`,
       finishedSubject: "Tu servicio fue marcado como terminado",
       finishedPreview: "Trabajo terminado",
       finishedTitle: "Servicio terminado",
@@ -126,6 +139,10 @@ function emailCopy(language) {
       arrivedPreview: "The cleaner marked arrival",
       arrivedTitle: (cleaner) => `${cleaner} has arrived`,
       arrivedBody: (name) => `Hi ${name}, the job is starting now.`,
+      onWaySubject: (cleaner) => `${cleaner} is on the way`,
+      onWayPreview: "The cleaner is on the way",
+      onWayTitle: (cleaner) => `${cleaner} is on the way`,
+      onWayBody: (name) => `Hi ${name}, the cleaner is on the way to start the service.`,
       finishedSubject: "Your service was marked as finished",
       finishedPreview: "Job finished",
       finishedTitle: "Service finished",
@@ -137,8 +154,8 @@ function emailCopy(language) {
     ru: {
       openPortal: "Открыть портал",
       automatic: "Автоматическое сообщение от JobVisto.",
-      tomorrowSubject: (business) => `Напоминание об услуге от ${business}`,
-      tomorrowPreview: "Автоматическое напоминание",
+      tomorrowSubject: (business) => `Напоминание о вашей услуге от ${business}`,
+      tomorrowPreview: "Автоматическое напоминание об услуге",
       tomorrowTitle: "Ваша услуга подтверждена",
       tomorrowBody: (name, business) => `Здравствуйте, ${name}. Завтра у вас запланирована услуга от <strong>${business}</strong>.`,
       schedule: "Время",
@@ -147,18 +164,22 @@ function emailCopy(language) {
       arrivedPreview: "Клинер отметил прибытие",
       arrivedTitle: (cleaner) => `${cleaner} прибыл`,
       arrivedBody: (name) => `Здравствуйте, ${name}. Работа начинается.`,
+      onWaySubject: (cleaner) => `${cleaner} уже в пути`,
+      onWayPreview: "Клинер уже в пути",
+      onWayTitle: (cleaner) => `${cleaner} уже в пути`,
+      onWayBody: (name) => `Здравствуйте, ${name}. Клинер уже едет, чтобы начать услугу.`,
       finishedSubject: "Ваша услуга отмечена как завершенная",
       finishedPreview: "Работа завершена",
       finishedTitle: "Услуга завершена",
       finishedBody: (name) => `Здравствуйте, ${name}. Ваша услуга отмечена как завершенная.`,
-      reviewHint: "Теперь вы можете проверить информацию о работе и оставить отзыв о сервисе и клинере.",
+      reviewHint: "Теперь вы можете проверить информацию о работе и оставить отзыв об услуге и клинере.",
       reviewAction: "Проверить услугу",
       estimated: "по расписанию"
     },
     he: {
       openPortal: "פתח פורטל",
       automatic: "הודעה אוטומטית נשלחה על ידי JobVisto.",
-      tomorrowSubject: (business) => `תזכורת לשירות עם ${business}`,
+      tomorrowSubject: (business) => `תזכורת לשירות שלך עם ${business}`,
       tomorrowPreview: "תזכורת שירות אוטומטית",
       tomorrowTitle: "השירות שלך אושר",
       tomorrowBody: (name, business) => `שלום ${name}, מחר יש לך שירות עם <strong>${business}</strong>.`,
@@ -168,6 +189,10 @@ function emailCopy(language) {
       arrivedPreview: "הקלינר סימן הגעה",
       arrivedTitle: (cleaner) => `${cleaner} הגיע`,
       arrivedBody: (name) => `שלום ${name}, העבודה מתחילה עכשיו.`,
+      onWaySubject: (cleaner) => `${cleaner} בדרך`,
+      onWayPreview: "הקלינר בדרך",
+      onWayTitle: (cleaner) => `${cleaner} בדרך`,
+      onWayBody: (name) => `שלום ${name}, הקלינר בדרך כדי להתחיל את השירות.`,
       finishedSubject: "השירות שלך סומן כהסתיים",
       finishedPreview: "העבודה הסתיימה",
       finishedTitle: "השירות הסתיים",
@@ -178,11 +203,11 @@ function emailCopy(language) {
     }
   }[language] || emailCopy("es");
 }
-
 function emailShell({ preview, body, actionUrl, actionLabel = "Abrir portal", footer = "Mensaje automatico enviado por JobVisto.", direction = "ltr" }) {
   return `
     <div dir="${direction}" style="font-family:Arial,sans-serif;background:#f7faf9;padding:24px;color:#113235;">
       <div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #dbe7e4;border-radius:14px;padding:24px;">
+        <img src="https://jobvisto.netlify.app/assets/Logo%20Jobvisto.png" alt="JobVisto" width="150" style="display:block;max-width:150px;height:auto;margin:0 0 18px;">
         <p style="margin:0 0 12px;color:#6b7a7a;font-size:13px;">${preview}</p>
         ${body}
         ${actionUrl ? `<p style="margin:24px 0 0;"><a href="${actionUrl}" style="display:inline-block;background:#007b7b;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700;">${actionLabel}</a></p>` : ""}
@@ -195,11 +220,11 @@ function emailShell({ preview, body, actionUrl, actionLabel = "Abrir portal", fo
 function templateFor(event, context) {
   const { client, cleaner, job, org, portalUrl } = context;
   const business = companyName(org);
-  const cleanerName = cleaner?.name || "tu cleaner";
   const { date, time } = formatDateTime(job.scheduled_start, org?.timezone || "UTC");
   const language = clientLanguage(client);
   const copy = emailCopy(language);
   const direction = language === "he" ? "rtl" : "ltr";
+  const cleanerName = cleaner?.name || cleanerFallbackName(language);
 
   if (event === "tomorrow") {
     return {
@@ -236,6 +261,26 @@ function templateFor(event, context) {
         body: `
           <h2 style="margin:0 0 12px;color:#103235;">${copy.arrivedTitle(cleanerName)}</h2>
           <p>${copy.arrivedBody(client.name)}</p>
+          <p>${copy.portalHint}</p>
+        `
+      })
+    };
+  }
+
+  if (event === "on_way") {
+    return {
+      subject: copy.onWaySubject(cleanerName),
+      preview: copy.onWayPreview,
+      text: `${copy.onWayTitle(cleanerName)}. ${portalUrl}`,
+      html: emailShell({
+        preview: copy.onWayPreview,
+        actionUrl: portalUrl,
+        actionLabel: copy.openPortal,
+        footer: copy.automatic,
+        direction,
+        body: `
+          <h2 style="margin:0 0 12px;color:#103235;">${copy.onWayTitle(cleanerName)}</h2>
+          <p>${copy.onWayBody(client.name)}</p>
           <p>${copy.portalHint}</p>
         `
       })
@@ -333,6 +378,81 @@ function eligibleEvents(job, now = new Date()) {
   return events;
 }
 
+async function buildJobNotificationContext(jobId, siteUrl) {
+  const jobs = await supabaseFetch("/rest/v1/jobs", {
+    query: `?id=eq.${restValue(jobId)}&select=id,organization_id,client_id,assigned_cleaner_id,service_type,scheduled_start,actual_start,actual_end,status,updated_at,notify_client&limit=1`
+  });
+  const job = Array.isArray(jobs) ? jobs[0] : null;
+  if (!job) throw new Error("Job not found.");
+  if (job.notify_client === false) throw new Error("Client notifications are disabled for this job.");
+
+  const [clientRows, cleanerRows, orgRows] = await Promise.all([
+    supabaseFetch("/rest/v1/clients", {
+      query: `?id=eq.${restValue(job.client_id)}&select=id,organization_id,name,email,portal_passcode,portal_active,notification_channel,preferred_language&limit=1`
+    }),
+    job.assigned_cleaner_id ? supabaseFetch("/rest/v1/cleaners", {
+      query: `?id=eq.${restValue(job.assigned_cleaner_id)}&select=id,name,email,phone,access_key,portal_passcode,archived&limit=1`
+    }) : [],
+    supabaseFetch("/rest/v1/organizations", {
+      query: `?id=eq.${restValue(job.organization_id)}&select=id,name,timezone,default_language&limit=1`
+    })
+  ]);
+
+  const client = Array.isArray(clientRows) ? clientRows[0] : null;
+  if (!client?.email || client.portal_active === false) throw new Error("Client cannot receive this notification.");
+
+  return {
+    job,
+    client,
+    cleaner: Array.isArray(cleanerRows) ? cleanerRows[0] : null,
+    org: Array.isArray(orgRows) ? orgRows[0] : null,
+    portalUrl: portalUrlForClient(client, siteUrl)
+  };
+}
+
+export async function sendJobNotification({ event, jobId, siteUrl, dedupe = true } = {}) {
+  const allowedEvents = new Set(["on_way", "arrived", "finished"]);
+  if (!allowedEvents.has(event)) throw new Error("Unsupported notification event.");
+
+  const context = await buildJobNotificationContext(jobId, siteUrl);
+  const dedupeKey = `${context.job.id}:${event}:email`;
+  if (dedupe && await notificationExists(dedupeKey)) {
+    return { ok: true, skipped: true, reason: "already_sent", event, to: context.client.email };
+  }
+
+  const message = templateFor(event, context);
+  const baseRow = {
+    organization_id: context.job.organization_id,
+    job_id: context.job.id,
+    recipient_type: "client",
+    recipient_id: context.client.id,
+    recipient_email: context.client.email,
+    channel: "email",
+    template_key: event,
+    dedupe_key: dedupeKey,
+    subject: message.subject,
+    payload: { service_type: context.job.service_type, scheduled_start: context.job.scheduled_start },
+    status: "pending"
+  };
+
+  try {
+    const provider = await sendEmail({ to: context.client.email, ...message });
+    await saveNotification({
+      ...baseRow,
+      status: "sent",
+      sent_at: new Date().toISOString(),
+      provider_message_id: provider?.id || null
+    });
+    return { ok: true, event, to: context.client.email, providerMessageId: provider?.id || null };
+  } catch (error) {
+    await saveNotification({
+      ...baseRow,
+      status: "failed",
+      error_message: error.message || String(error)
+    });
+    throw error;
+  }
+}
 export async function processAutomaticNotifications({ siteUrl } = {}) {
   const now = new Date();
   const lower = new Date(now.getTime() - 48 * 36e5).toISOString();
@@ -425,3 +545,4 @@ export async function sendTestNotification(to) {
   });
   return { ok: true, providerMessageId: sent?.id || null, to: target };
 }
+
